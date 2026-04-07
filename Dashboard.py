@@ -7,6 +7,31 @@ import plotly.express as px
 # ==========================================
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
+# CSS para aumentar o tamanho dos números e títulos das métricas
+# CSS para ajustar os tamanhos e puxar o layout para cima
+st.markdown(
+    """
+    <style>
+    /* 1. PUXA TUDO PARA CIMA (Reduz a margem do topo da página) */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 0rem !important;
+    }
+    
+    /* 2. Aumenta o tamanho do número gigante */
+    [data-testid="stMetricValue"] {
+        font-size: 50px !important;
+    }
+    
+    /* 3. Aumenta o título (ex: Total de Itens Separados) */
+    [data-testid="stMetricLabel"] > div {
+        font-size: 20px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("📊 Monitor de Produtividade - Expedição")
 st.markdown("Acompanhamento de desempenho da equipe.")
 
@@ -56,7 +81,7 @@ try:
     df = carregar_dados()
 
     # --- CARTÕES DE RESUMO (KPIs) ---
-    st.markdown("### 🎯 Visão Geral")
+    st.markdown("# 🎯 Visão Geral")
     col1, col2, col3 = st.columns(3)
 
     total_itens = df['Itens Sep'].sum()
@@ -72,23 +97,26 @@ try:
     # --- DIVISÃO DA TELA: GRÁFICO E TABELA ---
     col_graf, col_tab = st.columns([1.2, 1]) 
 
-    # LADO ESQUERDO: GRÁFICO DE ITENS SEPARADOS
+    # LADO ESQUERDO: GRÁFICO DE ITENS SEPARADOS (TOP 10)
     with col_graf:
-        st.markdown("### 🏆 Quantidade de Itens Separados")
+        st.markdown("### 🏆 Top 10 - Quantidade de Itens Separados")
         
-        # Filtra quem teve pelomenos 1 item separado para não mostrar zeros no gráfico
+        # Filtra quem teve produtividade
         df_grafico = df[df['Itens Sep'] > 0]
         
+        # O TRUQUE DO TOP 10: Pega os 10 maiores e ordena do menor pro maior 
+        # (O Plotly desenha de baixo para cima, então o maior de todos vai ficar no topo)
+        df_top10 = df_grafico.nlargest(10, 'Itens Sep').sort_values(by="Itens Sep", ascending=True)
+        
         fig = px.bar(
-            df_grafico.sort_values(by="Itens Sep", ascending=True), # Agora ordena pelos Itens Totais
-            x="Itens Sep", # O tamanho da barra agora é o total de itens
+            df_top10, # Usando a nossa nova tabela filtrada com os 10 melhores
+            x="Itens Sep", 
             y="NOME", 
             color="TURNO", 
             orientation='h',
             text_auto=True
         )
         
-        # Deixa o gráfico mais limpo e tira os nomes dos eixos laterais que já são óbvios
         fig.update_layout(
             plot_bgcolor="rgba(0,0,0,0)", 
             paper_bgcolor="rgba(0,0,0,0)",
