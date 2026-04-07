@@ -81,7 +81,7 @@ try:
     df = carregar_dados()
 
     # --- CARTÕES DE RESUMO (KPIs) ---
-    st.markdown("# 🎯 Visão Geral")
+    st.markdown("## 🎯 Visão Geral")
     col1, col2, col3 = st.columns(3)
 
     total_itens = df['Itens Sep'].sum()
