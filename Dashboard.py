@@ -31,48 +31,50 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS DA NUVEM E DATAS
+# 2. CARREGAMENTO DOS DADOS DA NUVEM
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
-    # --- NOVIDADE: Buscando as datas nas células C1 e D1 ---
-    # O Pandas lê a linha 0 (header=None), colunas 2 e 3 (C e D)
-    try:
-        df_topo = pd.read_csv(link_csv, header=None, nrows=1)
-        data_inicio = str(df_topo.iloc[0, 2]).strip()
-        data_fim = str(df_topo.iloc[0, 3]).strip()
-    except:
-        data_inicio, data_fim = "--/--/----", "--/--/----"
+    # 1. Lê a planilha direto (já que o cabeçalho agora está certinho na Linha 1)
+    df = pd.read_csv(link_csv)
     
-    # Carrega a tabela pulando as 2 primeiras linhas para pegar o cabeçalho certo
-    try:
-        df = pd.read_csv(link_csv, skiprows=2)
-    except:
-        df = pd.read_csv(link_csv) 
-        
-    df = df.dropna(subset=['NOME'])
+    # Limpa espaços invisíveis nos nomes das colunas
+    df.columns = df.columns.astype(str).str.strip()
     
+    # 2. Remove quem não tem nome
+    if 'NOME' in df.columns:
+        df = df.dropna(subset=['NOME'])
+    
+    # 3. Puxa só as colunas que importam
     colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
     try:
         df = df[colunas_desejadas]
     except KeyError:
-        pass 
+        pass # Evita que o site quebre se uma coluna sumir
     
-    # Tratamento da vírgula brasileira e do %
+    # 4. Tratamento da vírgula brasileira para o Python conseguir calcular
     colunas_numericas = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
     for col in colunas_numericas:
-        df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    if df['Jornada Líq.'].mean() < 2: 
+    # 5. Ajuste da Jornada (Decimal para Porcentagem)
+    if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
         
-    # Filtros
-    df = df[(df['Itens Sep'] > 0) | (df['Horas'] > 0)]
-    df = df[df['TURNO'] == 'T3']
-    df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
+    # 6. Filtros Mágicos
+    if all(col in df.columns for col in ['Itens Sep', 'Horas', 'TURNO', 'FUNÇÃO']):
+        df = df[(df['Itens Sep'] > 0) | (df['Horas'] > 0)]
+        df = df[df['TURNO'] == 'T3']
+        df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
+            
+    # Como as datas sumiram da planilha, vamos deixar um texto fixo.
+    # Você pode alterar esses textos abaixo sempre que quiser!
+    data_inicio = "01/04"
+    data_fim = "Hoje"
             
     return df, data_inicio, data_fim
 
