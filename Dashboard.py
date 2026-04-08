@@ -3,16 +3,14 @@ import pandas as pd
 import plotly.express as px
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA E CSS
 # ==========================================
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
-# CSS para aumentar o tamanho dos números e títulos das métricas
-# CSS para ajustar os tamanhos e puxar o layout para cima
 st.markdown(
     """
     <style>
-    /* 1. PUXA TUDO PARA CIMA (Reduz a margem do topo da página) */
+    /* 1. PUXA TUDO PARA CIMA */
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 0rem !important;
@@ -32,18 +30,28 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("📊 Monitor de Produtividade - Expedição")
-st.markdown("Acompanhamento de desempenho da equipe.")
-
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS DA NUVEM
+# 2. CARREGAMENTO DOS DADOS DA NUVEM E DATAS
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
-    # COLE AQUI O SEU LINK DO CSV DO GOOGLE SHEETS
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
-    df = pd.read_csv(link_csv)
+    # --- NOVIDADE: Buscando as datas nas células C1 e D1 ---
+    # O Pandas lê a linha 0 (header=None), colunas 2 e 3 (C e D)
+    try:
+        df_topo = pd.read_csv(link_csv, header=None, nrows=1)
+        data_inicio = str(df_topo.iloc[0, 2]).strip()
+        data_fim = str(df_topo.iloc[0, 3]).strip()
+    except:
+        data_inicio, data_fim = "--/--/----", "--/--/----"
+    
+    # Carrega a tabela pulando as 2 primeiras linhas para pegar o cabeçalho certo
+    try:
+        df = pd.read_csv(link_csv, skiprows=2)
+    except:
+        df = pd.read_csv(link_csv) 
+        
     df = df.dropna(subset=['NOME'])
     
     colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
@@ -52,18 +60,12 @@ def carregar_dados():
     except KeyError:
         pass 
     
-    # ---------------------------------------------------------
-    # A SOLUÇÃO: O TRATAMENTO DA VÍRGULA BRASILEIRA E DO %
-    # ---------------------------------------------------------
+    # Tratamento da vírgula brasileira e do %
     colunas_numericas = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
     for col in colunas_numericas:
-        # Transforma em texto, tira o símbolo de % (se vier) e troca a vírgula pelo ponto
         df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
-        # Agora sim, converte para número em segurança
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    # Se o Google mandou a Jornada Líquida como decimal (ex: 0.39), multiplicamos por 100.
-    # Mas se já veio como 39, não fazemos nada.
     if df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
         
@@ -72,45 +74,53 @@ def carregar_dados():
     df = df[df['TURNO'] == 'T3']
     df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
-    return df
+    return df, data_inicio, data_fim
 
 # ==========================================
-# 3. CONSTRUÇÃO DA TELA
+# 3. CONSTRUÇÃO DA TELA (NOVO LAYOUT)
 # ==========================================
 try:
-    df = carregar_dados()
+    df, dt_inicio, dt_fim = carregar_dados()
 
-    # --- CARTÕES DE RESUMO (KPIs) ---
-    st.markdown("## 🎯 Visão Geral")
-    col1, col2, col3 = st.columns(3)
+    # --- LINHA 1: TÍTULO NA ESQUERDA | KPIS NA DIREITA ---
+    col_titulo, col_kpis = st.columns([1, 1.2])
 
-    total_itens = df['Itens Sep'].sum()
-    media_velocidade = df[df['Itens/Hora'] > 0]['Itens/Hora'].mean() # Média só de quem trabalhou
-    total_horas = df['Horas'].sum()
+    with col_titulo:
+        st.title("📊 Monitor de Produtividade")
+        st.markdown("Acompanhamento de desempenho da equipe.")
 
-    col1.metric("📦 Total de Itens Separados", f"{total_itens:,.0f}".replace(',', '.'))
-    col2.metric("⚡ Média da Equipe (Itens/H)", f"{media_velocidade:.0f}")
-    col3.metric("⏱️ Horas Totais da Operação", f"{total_horas:.1f} h")
+    with col_kpis:
+        # Coloca as Datas alinhadas à direita
+        st.markdown(f"<div style='text-align: right; font-size: 18px; margin-bottom: 10px;'><b>Período Apurado:</b> de {dt_inicio} à {dt_fim}</div>", unsafe_allow_html=True)
+        
+        # Os Cartões de Visão Geral
+        st.markdown("## 🎯 Visão Geral")
+        kpi1, kpi2, kpi3 = st.columns(3)
+
+        total_itens = df['Itens Sep'].sum()
+        media_velocidade = df[df['Itens/Hora'] > 0]['Itens/Hora'].mean()
+        if pd.isna(media_velocidade):
+            media_velocidade = 0
+        total_horas = df['Horas'].sum()
+
+        kpi1.metric("📦 Total de Itens", f"{total_itens:,.0f}".replace(',', '.'))
+        kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
+        kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
     st.divider()
 
-    # --- DIVISÃO DA TELA: GRÁFICO E TABELA ---
+    # --- LINHA 2: GRÁFICO GIGANTE E TABELA ---
     col_graf, col_tab = st.columns([1.2, 1]) 
 
-    # LADO ESQUERDO: GRÁFICO DE ITENS SEPARADOS (TOP 10)
+    # LADO ESQUERDO: GRÁFICO (COM TODOS OS NOMES E JORNADA LÍQUIDA)
     with col_graf:
-        st.markdown("### 🏆 Top 10 - Quantidade de Itens Separados")
+        st.markdown("### 📈 Jornada Líquida por Colaborador")
         
-        # Filtra quem teve produtividade
-        df_grafico = df[df['Itens Sep'] > 0]
-        
-        # O TRUQUE DO TOP 10: Pega os 10 maiores e ordena do menor pro maior 
-        # (O Plotly desenha de baixo para cima, então o maior de todos vai ficar no topo)
-        df_top10 = df_grafico.nlargest(10, 'Itens Sep').sort_values(by="Itens Sep", ascending=True)
+        df_grafico = df[df['Jornada Líq.'] > 0]
         
         fig = px.bar(
-            df_top10, # Usando a nossa nova tabela filtrada com os 10 melhores
-            x="Itens Sep", 
+            df_grafico.sort_values(by="Jornada Líq.", ascending=True), 
+            x="Jornada Líq.", 
             y="NOME", 
             color="TURNO", 
             orientation='h',
@@ -121,24 +131,23 @@ try:
             plot_bgcolor="rgba(0,0,0,0)", 
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None,
-            yaxis_title=None
+            yaxis_title=None,
+            height=650 # Altura fixada para caber todo mundo sem espremer
         )
-        
         st.plotly_chart(fig, use_container_width=True)
 
-    # LADO DIREITO: A TABELA DE DADOS 
+    # LADO DIREITO: TABELA DINÂMICA
     with col_tab:
         st.markdown("### 📋 Tabela Dinâmica")
         
-        # 2. Prepara a Tabela: Seleciona as colunas limpas e ordena por ordem alfabética (A-Z)
         colunas_tabela = ['NOME', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
         df_tabela = df[colunas_tabela].sort_values(by='NOME', ascending=True)
         
-        # Formatação visual da tabela no Streamlit
         st.dataframe(
-            df_tabela, # Usando a nossa tabela limpa e ordenada
+            df_tabela, 
             hide_index=True, 
             use_container_width=True,
+            height=650, # Deixa a tabela na mesma altura exata do gráfico
             column_config={
                 "Itens Sep": st.column_config.NumberColumn("Itens Sep", format="%d"),
                 "Horas": st.column_config.NumberColumn("Horas", format="%.2f"),
@@ -148,5 +157,4 @@ try:
         )
 
 except Exception as e:
-    st.error(f"⚠️ Ocorreu um erro ao ler a planilha: {e}")
-    st.info("Dica: Verifique se o arquivo está salvo e fechado antes de atualizar o dashboard.")
+    st.error(f"⚠️ Ocorreu um erro ao processar os dados: {e}")
