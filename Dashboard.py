@@ -100,23 +100,21 @@ def carregar_dados():
     return df, data_inicio, data_fim
 
 # ==========================================
-# 3. CONSTRUÇÃO DA TELA (NOVO LAYOUT)
+# 3. CONSTRUÇÃO DA TELA (LAYOUT FINAL)
 # ==========================================
 try:
     df, dt_inicio, dt_fim = carregar_dados()
 
-    # --- LINHA 1: TÍTULO NA ESQUERDA | KPIS NA DIREITA ---
+    # --- LINHA 1: TÍTULO E PERÍODO NA ESQUERDA | KPIS NA DIREITA ---
     col_titulo, col_kpis = st.columns([1, 1.2])
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
         st.markdown("Acompanhamento de desempenho da equipe.")
+        # DATA MOVIDA PARA CÁ (Abaixo do título)
+        st.markdown(f"**Período Apurado:** de {dt_inicio} à {dt_fim}")
 
     with col_kpis:
-        # Coloca as Datas alinhadas à direita
-        st.markdown(f"<div style='text-align: right; font-size: 18px; margin-bottom: 10px;'><b>Período Apurado:</b> de {dt_inicio} à {dt_fim}</div>", unsafe_allow_html=True)
-        
-        # Os Cartões de Visão Geral
         st.markdown("## 🎯 Visão Geral")
         kpi1, kpi2, kpi3 = st.columns(3)
 
@@ -132,22 +130,42 @@ try:
 
     st.divider()
 
-    # --- LINHA 2: GRÁFICO GIGANTE E TABELA ---
+    # --- LINHA 2: GRÁFICO INTERATIVO E TABELA ---
     col_graf, col_tab = st.columns([1.2, 1]) 
 
-    # LADO ESQUERDO: GRÁFICO (COM TODOS OS NOMES E JORNADA LÍQUIDA)
+    # LADO ESQUERDO: GRÁFICO COM CAIXA DE SELEÇÃO
     with col_graf:
-        st.markdown("### 📈 Jornada Líquida por Colaborador")
+        st.markdown("### 📈 Análise por Colaborador")
         
-        df_grafico = df[df['Jornada Líq.'] > 0]
+        # 1. A CAIXA DE OPÇÕES (Dropdown)
+        opcao_grafico = st.selectbox(
+            "Selecione a métrica para visualizar no gráfico:",
+            ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"]
+        )
         
+        # 2. Prepara os dados filtrando quem está zerado na opção escolhida
+        df_grafico = df[df[opcao_grafico] > 0].copy()
+        df_grafico = df_grafico.sort_values(by=opcao_grafico, ascending=True)
+        
+        # 3. Formatação Inteligente dos números na barra
+        if opcao_grafico == "Jornada Líq.":
+            # Arredonda e coloca o símbolo de %
+            textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}%")
+        elif opcao_grafico == "Horas":
+            # Coloca um 'h' no final
+            textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.2f}h")
+        else:
+            # Mostra apenas o número inteiro (para Itens Sep e Itens/Hora)
+            textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}")
+        
+        # 4. Desenha o gráfico
         fig = px.bar(
-            df_grafico.sort_values(by="Jornada Líq.", ascending=True), 
-            x="Jornada Líq.", 
+            df_grafico, 
+            x=opcao_grafico, 
             y="NOME", 
             color="TURNO", 
             orientation='h',
-            text_auto=True
+            text=textos_barras # Usa os nossos textos formatados
         )
         
         fig.update_layout(
@@ -155,7 +173,7 @@ try:
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None,
             yaxis_title=None,
-            height=650 # Altura fixada para caber todo mundo sem espremer
+            height=650 
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -170,7 +188,7 @@ try:
             df_tabela, 
             hide_index=True, 
             use_container_width=True,
-            height=650, # Deixa a tabela na mesma altura exata do gráfico
+            height=650, 
             column_config={
                 "Itens Sep": st.column_config.NumberColumn("Itens Sep", format="%d"),
                 "Horas": st.column_config.NumberColumn("Horas", format="%.2f"),
