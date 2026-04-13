@@ -66,65 +66,82 @@ def carregar_dados():
     return df
 
 # ==========================================
-# 3. CONSTRUÇÃO DA TELA E FILTROS
+# 3. CONSTRUÇÃO DA TELA E FILTROS (LAYOUT AVANÇADO)
 # ==========================================
 try:
-    # Carrega a base inteira (todos os turnos)
-    df = carregar_dados()
+    df, dt_inicio, dt_fim = carregar_dados()
 
-    # --- LINHA 1: TÍTULO + FILTRO NA ESQUERDA | KPIS NA DIREITA ---
-    col_titulo, col_kpis = st.columns([1, 1.2])
+    # 1. RESERVANDO OS ESPAÇOS NO TOPO DA TELA
+    col_topo_esq, col_topo_dir = st.columns([1, 1.2])
+    
+    # Criamos caixas "vazias" para preencher depois que o filtro for clicado
+    espaco_titulo = col_topo_esq.empty() 
+    espaco_kpis = col_topo_dir.empty()
 
-    with col_titulo:
-        st.title("📊 Monitor de Produtividade")
-        st.markdown("Acompanhamento de desempenho da equipe.")
+    st.divider()
+
+    # 2. CONSTRUÇÃO DA ÁREA DO GRÁFICO E DO FILTRO LATERAL
+    col_graf, col_tab = st.columns([1.2, 1]) 
+
+    with col_graf:
+        st.markdown("### 📈 Análise por Colaborador")
         
-        # 1. O NOVO FILTRO DE TURNO GLOBAL
-        # Puxa automaticamente os nomes dos turnos que existem na planilha
-        lista_turnos = ["Todos os Turnos"] + sorted(df['TURNO'].dropna().unique().tolist())
-        turno_selecionado = st.selectbox("Filtre por Turno:", lista_turnos)
+        # Filtro de Métrica (Jornada, Itens, etc)
+        opcao_grafico = st.selectbox(
+            "Selecione a métrica para o gráfico:",
+            ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"]
+        )
+        
+        # Dividimos a área esquerda em duas: 85% para o gráfico, 15% para o Filtro de Turno
+        area_grafico, area_filtro_turno = st.columns([4, 1])
 
-    # 2. APLICAÇÃO DO FILTRO (A mágica que atualiza a tela toda)
-    if turno_selecionado != "Todos os Turnos":
+        with area_filtro_turno:
+            # Empurramos o filtro um pouquinho para baixo para alinhar com as barras
+            st.write("") 
+            st.write("")
+            st.markdown("**Turno:**")
+            
+            # O Filtro de Turno no formato de "Legenda" (Botões de Rádio)
+            lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
+            turno_selecionado = st.radio("Filtro de Turnos", lista_turnos, label_visibility="collapsed")
+
+    # ==========================================
+    # 3. APLICAÇÃO DO FILTRO (O Cérebro da Operação)
+    # ==========================================
+    if turno_selecionado != "Todos":
         df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
     else:
         df_filtrado = df.copy()
 
-    with col_kpis:
+    # ==========================================
+    # 4. PREENCHENDO OS ESPAÇOS VAZIOS LÁ DO TOPO
+    # ==========================================
+    with espaco_titulo.container():
+        st.title("📊 Monitor de Produtividade")
+        st.markdown("Acompanhamento de desempenho da equipe.")
+        st.markdown(f"**Período Apurado:** de {dt_inicio} à {dt_fim}")
+
+    with espaco_kpis.container():
         st.markdown("## 🎯 Visão Geral")
         kpi1, kpi2, kpi3 = st.columns(3)
 
-        # Os cálculos agora usam a tabela já filtrada pelo turno selecionado
         total_itens = df_filtrado['Itens Sep'].sum()
         media_velocidade = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean()
-        if pd.isna(media_velocidade):
-            media_velocidade = 0
+        if pd.isna(media_velocidade): media_velocidade = 0
         total_horas = df_filtrado['Horas'].sum()
 
         kpi1.metric("📦 Total de Itens", f"{total_itens:,.0f}".replace(',', '.'))
         kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
         kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
-    st.divider()
-
-    # --- LINHA 2: GRÁFICO INTERATIVO E TABELA ---
-    col_graf, col_tab = st.columns([1.2, 1]) 
-
-    # LADO ESQUERDO: GRÁFICO 
-    with col_graf:
-        st.markdown("### 📈 Análise por Colaborador")
-        
-        # 3. O FILTRO DO GRÁFICO (Métricas)
-        opcao_grafico = st.selectbox(
-            "Selecione a métrica para o gráfico:",
-            ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"]
-        )
-        
-        # Prepara os dados tirando quem está zerado e organizando
+    # ==========================================
+    # 5. DESENHANDO O GRÁFICO E A TABELA
+    # ==========================================
+    with area_grafico:
         df_grafico = df_filtrado[df_filtrado[opcao_grafico] > 0].copy()
         df_grafico = df_grafico.sort_values(by=opcao_grafico, ascending=True)
         
-        # Coloca % na jornada, 'h' nas horas e deixa itens normais
+        # Formatação
         if opcao_grafico == "Jornada Líq.":
             textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}%")
         elif opcao_grafico == "Horas":
@@ -142,6 +159,7 @@ try:
         )
         
         fig.update_layout(
+            showlegend=False, # <-- DESLIGA A LEGENDA PADRÃO PARA NÃO DUPLICAR COM O SEU FILTRO
             plot_bgcolor="rgba(0,0,0,0)", 
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None,
@@ -150,11 +168,9 @@ try:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # LADO DIREITO: TABELA DINÂMICA
     with col_tab:
         st.markdown("### 📋 Tabela Dinâmica")
         
-        # Adicionei a coluna TURNO na tabela para visualização ficar mais clara
         colunas_tabela = ['NOME', 'TURNO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
         df_tabela = df_filtrado[colunas_tabela].sort_values(by='NOME', ascending=True)
         
