@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA E CSS
 # ==========================================
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
@@ -19,7 +19,7 @@ st.markdown(
     [data-testid="stMetricValue"] {
         font-size: 50px !important;
     }
-    /* Aumenta o título (ex: Total de Itens Separados) */
+    /* Aumenta o título */
     [data-testid="stMetricLabel"] > div {
         font-size: 20px !important;
     }
@@ -29,16 +29,37 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS DA NUVEM
+# 2. CARREGAMENTO DOS DADOS (COM AS DATAS)
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
     df = pd.read_csv(link_csv)
-    
-    # Limpa espaços invisíveis
     df.columns = df.columns.astype(str).str.strip()
+    
+    # --- EXTRAÇÃO DAS DATAS ---
+    data_inicio = "--/--/----"
+    data_fim = "--/--/----"
+    try:
+        if 'Data inicio' in df.columns and 'Data Fim' in df.columns:
+            val_ini = str(df['Data inicio'].dropna().iloc[0]).split()[0] 
+            val_fim = str(df['Data Fim'].dropna().iloc[0]).split()[0]
+            
+            if '-' in val_ini:
+                ano, mes, dia = val_ini.split('-')
+                data_inicio = f"{dia}/{mes}/{ano}"
+            else:
+                data_inicio = val_ini
+                
+            if '-' in val_fim:
+                ano, mes, dia = val_fim.split('-')
+                data_fim = f"{dia}/{mes}/{ano}"
+            else:
+                data_fim = val_fim
+    except Exception:
+        pass 
+    # --------------------------
     
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
@@ -58,15 +79,15 @@ def carregar_dados():
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
         
-    # --- O FILTRO DE TURNO "T3" FIXO FOI REMOVIDO DAQUI ---
     if all(col in df.columns for col in ['Itens Sep', 'Horas', 'FUNÇÃO']):
         df = df[(df['Itens Sep'] > 0) | (df['Horas'] > 0)]
         df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
-    return df
+    # AGORA SIM ELE DEVOLVE AS 3 COISAS CORRETAMENTE
+    return df, data_inicio, data_fim
 
 # ==========================================
-# 3. CONSTRUÇÃO DA TELA E FILTROS (LAYOUT AVANÇADO)
+# 3. CONSTRUÇÃO DA TELA (LAYOUT AVANÇADO)
 # ==========================================
 try:
     df, dt_inicio, dt_fim = carregar_dados()
@@ -74,7 +95,6 @@ try:
     # 1. RESERVANDO OS ESPAÇOS NO TOPO DA TELA
     col_topo_esq, col_topo_dir = st.columns([1, 1.2])
     
-    # Criamos caixas "vazias" para preencher depois que o filtro for clicado
     espaco_titulo = col_topo_esq.empty() 
     espaco_kpis = col_topo_dir.empty()
 
@@ -86,36 +106,28 @@ try:
     with col_graf:
         st.markdown("### 📈 Análise por Colaborador")
         
-        # Filtro de Métrica (Jornada, Itens, etc)
         opcao_grafico = st.selectbox(
             "Selecione a métrica para o gráfico:",
             ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"]
         )
         
-        # Dividimos a área esquerda em duas: 85% para o gráfico, 15% para o Filtro de Turno
         area_grafico, area_filtro_turno = st.columns([4, 1])
 
         with area_filtro_turno:
-            # Empurramos o filtro um pouquinho para baixo para alinhar com as barras
             st.write("") 
             st.write("")
             st.markdown("**Turno:**")
             
-            # O Filtro de Turno no formato de "Legenda" (Botões de Rádio)
             lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
             turno_selecionado = st.radio("Filtro de Turnos", lista_turnos, label_visibility="collapsed")
 
-    # ==========================================
-    # 3. APLICAÇÃO DO FILTRO (O Cérebro da Operação)
-    # ==========================================
+    # 3. APLICAÇÃO DO FILTRO DE TURNO
     if turno_selecionado != "Todos":
         df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
     else:
         df_filtrado = df.copy()
 
-    # ==========================================
     # 4. PREENCHENDO OS ESPAÇOS VAZIOS LÁ DO TOPO
-    # ==========================================
     with espaco_titulo.container():
         st.title("📊 Monitor de Produtividade")
         st.markdown("Acompanhamento de desempenho da equipe.")
@@ -134,14 +146,11 @@ try:
         kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
         kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
-    # ==========================================
     # 5. DESENHANDO O GRÁFICO E A TABELA
-    # ==========================================
     with area_grafico:
         df_grafico = df_filtrado[df_filtrado[opcao_grafico] > 0].copy()
         df_grafico = df_grafico.sort_values(by=opcao_grafico, ascending=True)
         
-        # Formatação
         if opcao_grafico == "Jornada Líq.":
             textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}%")
         elif opcao_grafico == "Horas":
@@ -159,7 +168,7 @@ try:
         )
         
         fig.update_layout(
-            showlegend=False, # <-- DESLIGA A LEGENDA PADRÃO PARA NÃO DUPLICAR COM O SEU FILTRO
+            showlegend=False, 
             plot_bgcolor="rgba(0,0,0,0)", 
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None,
