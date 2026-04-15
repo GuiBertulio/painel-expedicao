@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import datetime # <-- Nova biblioteca para lidar com datas
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E CSS
@@ -10,16 +11,13 @@ st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout=
 st.markdown(
     """
     <style>
-    /* PUXA TUDO PARA CIMA */
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 0rem !important;
     }
-    /* Aumenta o tamanho do número gigante */
     [data-testid="stMetricValue"] {
         font-size: 50px !important;
     }
-    /* Aumenta o título */
     [data-testid="stMetricLabel"] > div {
         font-size: 20px !important;
     }
@@ -29,7 +27,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS (COM AS DATAS)
+# 2. CARREGAMENTO DOS DADOS (SEM AS DATAS DO EXCEL)
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
@@ -37,29 +35,6 @@ def carregar_dados():
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
-    
-    # --- EXTRAÇÃO DAS DATAS ---
-    data_inicio = "--/--/----"
-    data_fim = "--/--/----"
-    try:
-        if 'Data inicio' in df.columns and 'Data Fim' in df.columns:
-            val_ini = str(df['Data inicio'].dropna().iloc[0]).split()[0] 
-            val_fim = str(df['Data Fim'].dropna().iloc[0]).split()[0]
-            
-            if '-' in val_ini:
-                ano, mes, dia = val_ini.split('-')
-                data_inicio = f"{dia}/{mes}/{ano}"
-            else:
-                data_inicio = val_ini
-                
-            if '-' in val_fim:
-                ano, mes, dia = val_fim.split('-')
-                data_fim = f"{dia}/{mes}/{ano}"
-            else:
-                data_fim = val_fim
-    except Exception:
-        pass 
-    # --------------------------
     
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
@@ -83,29 +58,37 @@ def carregar_dados():
         df = df[(df['Itens Sep'] > 0) | (df['Horas'] > 0)]
         df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
-    # AGORA SIM ELE DEVOLVE AS 3 COISAS CORRETAMENTE
-    return df, data_inicio, data_fim
+    return df
 
 # ==========================================
-# 3. CONSTRUÇÃO DA TELA (LAYOUT AVANÇADO)
+# CÁLCULO INTELIGENTE DAS DATAS (DIA 26)
+# ==========================================
+hoje = datetime.date.today()
+if hoje.day >= 26:
+    # Se já passou do dia 26, o ciclo atual começou no dia 26 deste mês
+    data_inicio_padrao = datetime.date(hoje.year, hoje.month, 26)
+else:
+    # Se ainda não chegou no dia 26, o ciclo começou no dia 26 do mês passado
+    mes_anterior = hoje.month - 1 if hoje.month > 1 else 12
+    ano_anterior = hoje.year if hoje.month > 1 else hoje.year - 1
+    data_inicio_padrao = datetime.date(ano_anterior, mes_anterior, 26)
+
+# ==========================================
+# 3. CONSTRUÇÃO DA TELA (LAYOUT COM CALENDÁRIO)
 # ==========================================
 try:
-    df, dt_inicio, dt_fim = carregar_dados()
+    df = carregar_dados()
 
-    # 1. RESERVANDO OS ESPAÇOS NO TOPO DA TELA
     col_topo_esq, col_topo_dir = st.columns([1, 1.2])
-    
     espaco_titulo = col_topo_esq.empty() 
     espaco_kpis = col_topo_dir.empty()
 
     st.divider()
 
-    # 2. CONSTRUÇÃO DA ÁREA DO GRÁFICO E DO FILTRO LATERAL
     col_graf, col_tab = st.columns([1.2, 1]) 
 
     with col_graf:
         st.markdown("### 📈 Análise por Colaborador")
-        
         opcao_grafico = st.selectbox(
             "Selecione a métrica para o gráfico:",
             ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"]
@@ -117,21 +100,33 @@ try:
             st.write("") 
             st.write("")
             st.markdown("**Turno:**")
-            
             lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
             turno_selecionado = st.radio("Filtro de Turnos", lista_turnos, label_visibility="collapsed")
 
-    # 3. APLICAÇÃO DO FILTRO DE TURNO
     if turno_selecionado != "Todos":
         df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
     else:
         df_filtrado = df.copy()
 
-    # 4. PREENCHENDO OS ESPAÇOS VAZIOS LÁ DO TOPO
+    # PREENCHENDO O TOPO (AGORA COM O BOTÃO DE CALENDÁRIO)
     with espaco_titulo.container():
         st.title("📊 Monitor de Produtividade")
         st.markdown("Acompanhamento de desempenho da equipe.")
-        st.markdown(f"**Período Apurado:** de {dt_inicio} à {dt_fim}")
+        
+        # O novo botão de calendário na tela!
+        periodo_selecionado = st.date_input(
+            "📅 **Período Apurado:**",
+            value=(data_inicio_padrao, hoje),
+            max_value=hoje,
+            format="DD/MM/YYYY"
+        )
+        # Nota: Se o usuário selecionar apenas uma data, o Streamlit retorna uma tupla de tamanho 1.
+        # Precisamos tratar isso para não dar erro se ele estiver no meio de um clique.
+        if isinstance(periodo_selecionado, tuple) and len(periodo_selecionado) == 2:
+            dt_ini_tela, dt_fim_tela = periodo_selecionado
+        else:
+            dt_ini_tela = periodo_selecionado[0] if isinstance(periodo_selecionado, tuple) else periodo_selecionado
+            dt_fim_tela = dt_ini_tela
 
     with espaco_kpis.container():
         st.markdown("## 🎯 Visão Geral")
@@ -146,7 +141,6 @@ try:
         kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
         kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
-    # 5. DESENHANDO O GRÁFICO E A TABELA
     with area_grafico:
         df_grafico = df_filtrado[df_filtrado[opcao_grafico] > 0].copy()
         df_grafico = df_grafico.sort_values(by=opcao_grafico, ascending=True)
