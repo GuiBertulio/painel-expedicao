@@ -29,9 +29,14 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # TRATAMENTO DA COLUNA DATAAPURACAO (Convertendo para Datetime oficial do Pandas)
+    # ---------------------------------------------------------
+    # BLINDAGEM DA DATA (Resolve o erro NaTType)
+    # ---------------------------------------------------------
     if 'DATAAPURACAO' in df.columns:
-        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], format='%d/%m/%Y', errors='coerce')
+        # Tenta converter para data. O dayfirst=True ajuda a entender o padrão BR
+        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], errors='coerce', dayfirst=True)
+        # Joga fora qualquer linha onde a data ficou como 'NaT' (vazia/inválida)
+        df = df.dropna(subset=['DATAAPURACAO'])
     else:
         df['DATAAPURACAO'] = pd.Timestamp.now().normalize()
 
@@ -45,7 +50,7 @@ def carregar_dados():
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
 
-    # Filtro de Segurança
+    # Filtro de Segurança para Nomes e Cargos
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
         
@@ -58,6 +63,11 @@ def carregar_dados():
 # 3. MOTOR DO PAINEL (COM ACÚMULO AUTOMÁTICO)
 # ==========================================
 def desenhar_painel(df_entrada, chave_unica):
+    # Se não tiver dados, para tudo e avisa, evitando gráficos vazios e "nan"
+    if df_entrada.empty:
+        st.warning("⚠️ Nenhum dado de produtividade encontrado para este período ou filtro.")
+        return
+
     # FILTRO DE TURNO
     lista_turnos = ["Todos"] + sorted(df_entrada['TURNO'].dropna().unique().tolist())
     turno = st.radio("Selecione o Turno:", lista_turnos, horizontal=True, key=f"t_{chave_unica}")
@@ -65,6 +75,10 @@ def desenhar_painel(df_entrada, chave_unica):
     df_f = df_entrada.copy()
     if turno != "Todos":
         df_f = df_f[df_f['TURNO'] == turno]
+
+    if df_f.empty:
+        st.warning(f"Nenhum dado encontrado para o turno {turno}.")
+        return
 
     # AGRUPAMENTO
     df_acumulado = df_f.groupby(['NOME', 'TURNO']).agg({
@@ -89,13 +103,16 @@ def desenhar_painel(df_entrada, chave_unica):
         metrica = st.selectbox("Métrica do Gráfico:", ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"], key=f"m_{chave_unica}")
         df_graf = df_acumulado[df_acumulado[metrica] > 0].sort_values(by=metrica)
         
-        if metrica == "Jornada Líq.": textos = df_graf[metrica].apply(lambda x: f"{x:.0f}%")
-        elif metrica == "Horas": textos = df_graf[metrica].apply(lambda x: f"{x:.1f}h")
-        else: textos = df_graf[metrica].apply(lambda x: f"{x:.0f}")
+        if not df_graf.empty:
+            if metrica == "Jornada Líq.": textos = df_graf[metrica].apply(lambda x: f"{x:.0f}%")
+            elif metrica == "Horas": textos = df_graf[metrica].apply(lambda x: f"{x:.1f}h")
+            else: textos = df_graf[metrica].apply(lambda x: f"{x:.0f}")
 
-        fig = px.bar(df_graf, x=metrica, y="NOME", color="TURNO", orientation='h', text=textos)
-        fig.update_layout(showlegend=False, height=600, margin=dict(l=0, r=0, t=30, b=0))
-        st.plotly_chart(fig, use_container_width=True, key=f"fig_{chave_unica}")
+            fig = px.bar(df_graf, x=metrica, y="NOME", color="TURNO", orientation='h', text=textos)
+            fig.update_layout(showlegend=False, height=600, margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig, use_container_width=True, key=f"fig_{chave_unica}")
+        else:
+            st.info("Todos os colaboradores estão zerados nesta métrica.")
 
     with col_t:
         st.markdown("### 📋 Detalhamento")
@@ -116,9 +133,7 @@ def desenhar_painel(df_entrada, chave_unica):
 try:
     df_raw = carregar_dados()
     
-    # Lógica do Ciclo (Dia 26) usando Pandas Timestamps para evitar o erro de comparação
     hoje = pd.Timestamp.now().normalize()
-    
     if hoje.day >= 26:
         data_ini_ciclo = pd.Timestamp(year=hoje.year, month=hoje.month, day=26)
     else:
@@ -132,21 +147,32 @@ try:
 
     with aba_mes:
         st.info(f"Dados acumulados de {data_ini_ciclo.strftime('%d/%m/%Y')} até hoje.")
-        # Comparação segura entre Datetimes
-        df_ciclo = df_raw[df_raw['DATAAPURACAO'] >= data_ini_ciclo]
-        desenhar_painel(df_ciclo, "mes")
+        
+        if not df_raw.empty:
+            df_ciclo = df_raw[df_raw['DATAAPURACAO'] >= data_ini_ciclo]
+            desenhar_painel(df_ciclo, "mes")
+        else:
+            st.error("A base de dados parece estar vazia. Verifique sua planilha.")
 
     with aba_dia:
-        # Puxando a lista de datas únicas formatadas
-        datas_disponiveis = sorted(df_raw['DATAAPURACAO'].unique(), reverse=True)
-        data_sel = st.selectbox(
-            "Escolha o dia para visualizar:", 
-            datas_disponiveis, 
-            format_func=lambda x: pd.to_datetime(x).strftime('%d/%m/%Y')
-        )
-        
-        df_dia = df_raw[df_raw['DATAAPURACAO'] == data_sel]
-        desenhar_painel(df_dia, "dia")
+        if not df_raw.empty:
+            # Blindagem 2: Puxa a lista de datas garantindo que não vai passar nenhum 'NaT' ou valor vazio
+            datas_disponiveis = [d for d in df_raw['DATAAPURACAO'].unique() if pd.notnull(d)]
+            datas_disponiveis.sort(reverse=True)
+            
+            if len(datas_disponiveis) > 0:
+                data_sel = st.selectbox(
+                    "Escolha o dia para visualizar:", 
+                    datas_disponiveis, 
+                    format_func=lambda x: x.strftime('%d/%m/%Y')
+                )
+                
+                df_dia = df_raw[df_raw['DATAAPURACAO'] == data_sel]
+                desenhar_painel(df_dia, "dia")
+            else:
+                st.warning("Nenhuma data válida encontrada na planilha para gerar o filtro.")
+        else:
+            st.error("A base de dados está vazia.")
 
 except Exception as e:
-    st.error(f"Erro ao carregar o dashboard: {e}")
+    st.error(f"Erro ao processar o dashboard: {e}")
