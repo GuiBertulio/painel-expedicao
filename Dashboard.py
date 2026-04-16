@@ -20,23 +20,23 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO (CACHE DE 1 SEGUNDO PARA FORÇAR ATUALIZAÇÃO)
+# 2. CARREGAMENTO (SEM CACHE PARA FORÇAR ATUALIZAÇÃO)
 # ==========================================
-@st.cache_data(ttl=1) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # TRATAMENTO ABSOLUTO DA DATA
+    # 1. TRATAMENTO INTELIGENTE DA DATA (A SALVAÇÃO!)
     if 'DATAAPURACAO' in df.columns:
         df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], errors='coerce').dt.normalize()
-        df = df.dropna(subset=['DATAAPURACAO'])
+        # SE A DATA ESTIVER VAZIA (NaT), PREENCHE COM HOJE EM VEZ DE DELETAR A LINHA!
+        df['DATAAPURACAO'] = df['DATAAPURACAO'].fillna(pd.Timestamp.now().normalize())
     else:
         df['DATAAPURACAO'] = pd.Timestamp.now().normalize()
 
-    # TRATAMENTO DE NÚMEROS
+    # 2. TRATAMENTO DE NÚMEROS
     colunas_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
     for col in colunas_num:
         if col in df.columns:
@@ -46,13 +46,11 @@ def carregar_dados():
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
 
+    # 3. FILTROS DE SEGURANÇA
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
         
-    if 'NOME' in df.columns:
-        df = df.dropna(subset=['NOME'])
-        
-    # Devolvendo o filtro para puxar só os Separadores!
+    # VOLTAMOS A TRAVA PARA APARECER SOMENTE OS SEPARADORES (Sumiu os zerados!)
     if 'FUNÇÃO' in df.columns:
         df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
@@ -66,7 +64,6 @@ def desenhar_painel(df_entrada, chave_unica):
         st.warning("⚠️ Nenhum dado encontrado para este filtro.")
         return
 
-    # Filtro de Turno
     lista_turnos = ["Todos"] + sorted(df_entrada['TURNO'].dropna().unique().tolist())
     turno = st.radio("Selecione o Turno:", lista_turnos, horizontal=True, key=f"t_{chave_unica}")
 
@@ -78,7 +75,6 @@ def desenhar_painel(df_entrada, chave_unica):
         st.warning(f"Nenhum dado encontrado para o turno {turno}.")
         return
 
-    # Agrupamento
     df_acumulado = df_f.groupby(['NOME', 'TURNO']).agg({
         'Itens Sep': 'sum',
         'Horas': 'sum',
@@ -86,7 +82,6 @@ def desenhar_painel(df_entrada, chave_unica):
         'Jornada Líq.': 'mean'
     }).reset_index()
 
-    # KPIs
     c1, c2, c3 = st.columns(3)
     c1.metric("📦 Total Itens", f"{df_acumulado['Itens Sep'].sum():,.0f}".replace(',', '.'))
     
@@ -96,13 +91,10 @@ def desenhar_painel(df_entrada, chave_unica):
 
     st.divider()
 
-    # Gráfico e Tabela
     col_g, col_t = st.columns([1.2, 1])
 
     with col_g:
         metrica = st.selectbox("Métrica do Gráfico:", ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"], key=f"m_{chave_unica}")
-        
-        # Filtra quem tem mais de zero para não poluir o gráfico
         df_graf = df_acumulado[df_acumulado[metrica] > 0].sort_values(by=metrica)
         
         if not df_graf.empty:
@@ -114,7 +106,7 @@ def desenhar_painel(df_entrada, chave_unica):
             fig.update_layout(showlegend=False, height=600, margin=dict(l=0, r=0, t=30, b=0))
             st.plotly_chart(fig, use_container_width=True, key=f"fig_{chave_unica}")
         else:
-            st.info(f"O gráfico está oculto porque todos os colaboradores estão com ZERO na métrica '{metrica}'.")
+            st.info(f"O gráfico está oculto porque todos os colaboradores filtrados estão com ZERO na métrica '{metrica}'.")
 
     with col_t:
         st.markdown("### 📋 Detalhamento")
@@ -154,7 +146,7 @@ try:
             df_ciclo = df_raw[df_raw['DATAAPURACAO'] >= data_ini_ciclo]
             desenhar_painel(df_ciclo, "mes")
         else:
-            st.error("A base de dados parece estar vazia. Verifique a conexão com o Google Sheets.")
+            st.error("A base de dados retornou vazia após os filtros. Verifique se existem 'Separadores' na planilha.")
 
     with aba_dia:
         if not df_raw.empty:
@@ -173,7 +165,7 @@ try:
             else:
                 st.warning("Nenhuma data válida encontrada na planilha.")
         else:
-            st.error("A base de dados está vazia.")
+            st.error("A base de dados retornou vazia após os filtros.")
 
 except Exception as e:
     st.error(f"Erro ao processar o dashboard: {e}")
