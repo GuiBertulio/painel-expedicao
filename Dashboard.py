@@ -29,12 +29,11 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # Tratamento da Coluna DATAAPURACAO
+    # TRATAMENTO DA COLUNA DATAAPURACAO (Convertendo para Datetime oficial do Pandas)
     if 'DATAAPURACAO' in df.columns:
-        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], format='%d/%m/%Y', errors='coerce').dt.date
+        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], format='%d/%m/%Y', errors='coerce')
     else:
-        # Se não houver a coluna, cria uma com o dia de hoje para não quebrar
-        df['DATAAPURACAO'] = datetime.date.today()
+        df['DATAAPURACAO'] = pd.Timestamp.now().normalize()
 
     # Tratamento Numérico (Vírgula para Ponto)
     colunas_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
@@ -67,7 +66,7 @@ def desenhar_painel(df_entrada, chave_unica):
     if turno != "Todos":
         df_f = df_f[df_f['TURNO'] == turno]
 
-    # AGRUPAMENTO: Transforma várias linhas em um total acumulado por nome
+    # AGRUPAMENTO
     df_acumulado = df_f.groupby(['NOME', 'TURNO']).agg({
         'Itens Sep': 'sum',
         'Horas': 'sum',
@@ -90,7 +89,6 @@ def desenhar_painel(df_entrada, chave_unica):
         metrica = st.selectbox("Métrica do Gráfico:", ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"], key=f"m_{chave_unica}")
         df_graf = df_acumulado[df_acumulado[metrica] > 0].sort_values(by=metrica)
         
-        # Formatação do texto nas barras
         if metrica == "Jornada Líq.": textos = df_graf[metrica].apply(lambda x: f"{x:.0f}%")
         elif metrica == "Horas": textos = df_graf[metrica].apply(lambda x: f"{x:.1f}h")
         else: textos = df_graf[metrica].apply(lambda x: f"{x:.0f}")
@@ -118,10 +116,15 @@ def desenhar_painel(df_entrada, chave_unica):
 try:
     df_raw = carregar_dados()
     
-    # Lógica do Ciclo (Dia 26)
-    hoje = datetime.date.today()
-    if hoje.day >= 26: data_ini_ciclo = datetime.date(hoje.year, hoje.month, 26)
-    else: data_ini_ciclo = datetime.date(hoje.year if hoje.month > 1 else hoje.year-1, hoje.month-1 if hoje.month > 1 else 12, 26)
+    # Lógica do Ciclo (Dia 26) usando Pandas Timestamps para evitar o erro de comparação
+    hoje = pd.Timestamp.now().normalize()
+    
+    if hoje.day >= 26:
+        data_ini_ciclo = pd.Timestamp(year=hoje.year, month=hoje.month, day=26)
+    else:
+        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
+        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
+        data_ini_ciclo = pd.Timestamp(year=ano_ant, month=mes_ant, day=26)
 
     st.title("📊 Monitor de Produtividade")
     
@@ -129,16 +132,19 @@ try:
 
     with aba_mes:
         st.info(f"Dados acumulados de {data_ini_ciclo.strftime('%d/%m/%Y')} até hoje.")
-        # Usando a coluna DATAAPURACAO
+        # Comparação segura entre Datetimes
         df_ciclo = df_raw[df_raw['DATAAPURACAO'] >= data_ini_ciclo]
         desenhar_painel(df_ciclo, "mes")
 
     with aba_dia:
-        # Puxando a lista de datas da DATAAPURACAO
-        datas_lista = sorted(df_raw['DATAAPURACAO'].unique(), reverse=True)
-        data_sel = st.selectbox("Escolha o dia para visualizar:", datas_lista, format_func=lambda x: x.strftime('%d/%m/%Y'))
+        # Puxando a lista de datas únicas formatadas
+        datas_disponiveis = sorted(df_raw['DATAAPURACAO'].unique(), reverse=True)
+        data_sel = st.selectbox(
+            "Escolha o dia para visualizar:", 
+            datas_disponiveis, 
+            format_func=lambda x: pd.to_datetime(x).strftime('%d/%m/%Y')
+        )
         
-        # Filtrando pela DATAAPURACAO
         df_dia = df_raw[df_raw['DATAAPURACAO'] == data_sel]
         desenhar_painel(df_dia, "dia")
 
