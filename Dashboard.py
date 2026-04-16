@@ -29,12 +29,12 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # Tratamento da Coluna DATA
-    if 'DATA' in df.columns:
-        df['DATA'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+    # Tratamento da Coluna DATAAPURACAO
+    if 'DATAAPURACAO' in df.columns:
+        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], format='%d/%m/%Y', errors='coerce').dt.date
     else:
-        # Se não houver coluna DATA, cria uma com o dia de hoje para não quebrar
-        df['DATA'] = datetime.date.today()
+        # Se não houver a coluna, cria uma com o dia de hoje para não quebrar
+        df['DATAAPURACAO'] = datetime.date.today()
 
     # Tratamento Numérico (Vírgula para Ponto)
     colunas_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
@@ -47,8 +47,11 @@ def carregar_dados():
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
 
     # Filtro de Segurança
-    df = df.dropna(subset=['NOME'])
-    df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
+    if 'NOME' in df.columns:
+        df = df.dropna(subset=['NOME'])
+        
+    if 'FUNÇÃO' in df.columns:
+        df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
     return df
 
@@ -65,7 +68,6 @@ def desenhar_painel(df_entrada, chave_unica):
         df_f = df_f[df_f['TURNO'] == turno]
 
     # AGRUPAMENTO: Transforma várias linhas em um total acumulado por nome
-    # Aqui é onde a mágica das "15 separações" virarem uma só acontece
     df_acumulado = df_f.groupby(['NOME', 'TURNO']).agg({
         'Itens Sep': 'sum',
         'Horas': 'sum',
@@ -121,21 +123,23 @@ try:
     if hoje.day >= 26: data_ini_ciclo = datetime.date(hoje.year, hoje.month, 26)
     else: data_ini_ciclo = datetime.date(hoje.year if hoje.month > 1 else hoje.year-1, hoje.month-1 if hoje.month > 1 else 12, 26)
 
-    st.title("📊 Monitor de Produtividade - TAF")
+    st.title("📊 Monitor de Produtividade")
     
     aba_mes, aba_dia = st.tabs(["📈 Acumulado do Mês", "📅 Relatório Diário"])
 
     with aba_mes:
         st.info(f"Dados acumulados de {data_ini_ciclo.strftime('%d/%m/%Y')} até hoje.")
-        df_ciclo = df_raw[df_raw['DATA'] >= data_ini_ciclo]
+        # Usando a coluna DATAAPURACAO
+        df_ciclo = df_raw[df_raw['DATAAPURACAO'] >= data_ini_ciclo]
         desenhar_painel(df_ciclo, "mes")
 
     with aba_dia:
-        # LISTA SUSPENSA DE DATAS (O que você pediu!)
-        datas_lista = sorted(df_raw['DATA'].unique(), reverse=True)
+        # Puxando a lista de datas da DATAAPURACAO
+        datas_lista = sorted(df_raw['DATAAPURACAO'].unique(), reverse=True)
         data_sel = st.selectbox("Escolha o dia para visualizar:", datas_lista, format_func=lambda x: x.strftime('%d/%m/%Y'))
         
-        df_dia = df_raw[df_raw['DATA'] == data_sel]
+        # Filtrando pela DATAAPURACAO
+        df_dia = df_raw[df_raw['DATAAPURACAO'] == data_sel]
         desenhar_painel(df_dia, "dia")
 
 except Exception as e:
