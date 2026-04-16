@@ -122,7 +122,7 @@ def desenhar_painel(df_aba, chave_unica):
         
         fig = px.bar(df_grafico, x=opcao_grafico, y="NOME", color="TURNO", orientation='h', text=textos_barras)
         fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis_title=None, yaxis_title=None, height=650)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key=f"graf_plotly_{chave_unica}")
 
     with col_tab:
         st.markdown("### 📋 Tabela Dinâmica")
