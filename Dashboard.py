@@ -49,7 +49,12 @@ def carregar_dados():
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
         
-    # FILTRO DE FUNÇÃO REMOVIDO! Agora vai puxar todo mundo (Líder, Descarga, Conferente, etc).
+    if 'NOME' in df.columns:
+        df = df.dropna(subset=['NOME'])
+        
+    # Devolvendo o filtro para puxar só os Separadores!
+    if 'FUNÇÃO' in df.columns:
+        df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
     return df
 
