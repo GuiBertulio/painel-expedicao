@@ -34,7 +34,7 @@ def carregar_dados():
     # ---------------------------------------------------------
     if 'DATAAPURACAO' in df.columns:
         # Tenta converter para data. O dayfirst=True ajuda a entender o padrão BR
-        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], errors='coerce', dayfirst=True)
+        df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], errors='coerce').dt.normalize()
         # Joga fora qualquer linha onde a data ficou como 'NaT' (vazia/inválida)
         df = df.dropna(subset=['DATAAPURACAO'])
     else:
@@ -47,8 +47,8 @@ def carregar_dados():
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
-        df['Jornada Líq.'] = df['Jornada Líq.'] * 100
+    # if 'FUNÇÃO' in df.columns:
+    #     df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
 
     # Filtro de Segurança para Nomes e Cargos
     if 'NOME' in df.columns:
