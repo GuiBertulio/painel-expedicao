@@ -4,7 +4,7 @@ import plotly.express as px
 import datetime
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA E CSS
+# 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
@@ -20,55 +20,48 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO E LIMPEZA (TRANSFORMAÇÃO)
+# 2. CARREGAMENTO (CACHE DE 1 SEGUNDO PARA FORÇAR ATUALIZAÇÃO)
 # ==========================================
-@st.cache_data(ttl=600) 
+@st.cache_data(ttl=1) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # ---------------------------------------------------------
-    # BLINDAGEM DA DATA (Resolve o erro NaTType)
-    # ---------------------------------------------------------
+    # TRATAMENTO ABSOLUTO DA DATA
     if 'DATAAPURACAO' in df.columns:
-        # Tenta converter para data. O dayfirst=True ajuda a entender o padrão BR
         df['DATAAPURACAO'] = pd.to_datetime(df['DATAAPURACAO'], errors='coerce').dt.normalize()
-        # Joga fora qualquer linha onde a data ficou como 'NaT' (vazia/inválida)
         df = df.dropna(subset=['DATAAPURACAO'])
     else:
         df['DATAAPURACAO'] = pd.Timestamp.now().normalize()
 
-    # Tratamento Numérico (Vírgula para Ponto)
+    # TRATAMENTO DE NÚMEROS
     colunas_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
     for col in colunas_num:
         if col in df.columns:
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    # if 'FUNÇÃO' in df.columns:
-    #     df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
+    if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
+        df['Jornada Líq.'] = df['Jornada Líq.'] * 100
 
-    # Filtro de Segurança para Nomes e Cargos
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
         
-    if 'FUNÇÃO' in df.columns:
-        df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
+    # FILTRO DE FUNÇÃO REMOVIDO! Agora vai puxar todo mundo (Líder, Descarga, Conferente, etc).
             
     return df
 
 # ==========================================
-# 3. MOTOR DO PAINEL (COM ACÚMULO AUTOMÁTICO)
+# 3. MOTOR DO PAINEL
 # ==========================================
 def desenhar_painel(df_entrada, chave_unica):
-    # Se não tiver dados, para tudo e avisa, evitando gráficos vazios e "nan"
     if df_entrada.empty:
-        st.warning("⚠️ Nenhum dado de produtividade encontrado para este período ou filtro.")
+        st.warning("⚠️ Nenhum dado encontrado para este filtro.")
         return
 
-    # FILTRO DE TURNO
+    # Filtro de Turno
     lista_turnos = ["Todos"] + sorted(df_entrada['TURNO'].dropna().unique().tolist())
     turno = st.radio("Selecione o Turno:", lista_turnos, horizontal=True, key=f"t_{chave_unica}")
 
@@ -80,7 +73,7 @@ def desenhar_painel(df_entrada, chave_unica):
         st.warning(f"Nenhum dado encontrado para o turno {turno}.")
         return
 
-    # AGRUPAMENTO
+    # Agrupamento
     df_acumulado = df_f.groupby(['NOME', 'TURNO']).agg({
         'Itens Sep': 'sum',
         'Horas': 'sum',
@@ -88,19 +81,23 @@ def desenhar_painel(df_entrada, chave_unica):
         'Jornada Líq.': 'mean'
     }).reset_index()
 
-    # BLOCO DE INDICADORES (KPIs)
+    # KPIs
     c1, c2, c3 = st.columns(3)
     c1.metric("📦 Total Itens", f"{df_acumulado['Itens Sep'].sum():,.0f}".replace(',', '.'))
-    c2.metric("⚡ Média Equipe", f"{df_acumulado[df_acumulado['Itens/Hora']>0]['Itens/Hora'].mean():.0f}")
+    
+    media_eq = df_acumulado[df_acumulado['Itens/Hora']>0]['Itens/Hora'].mean()
+    c2.metric("⚡ Média Equipe", f"{media_eq:.0f}" if pd.notnull(media_eq) else "0")
     c3.metric("⏱️ Horas Totais", f"{df_acumulado['Horas'].sum():.1f}h")
 
     st.divider()
 
-    # GRÁFICO E TABELA
+    # Gráfico e Tabela
     col_g, col_t = st.columns([1.2, 1])
 
     with col_g:
         metrica = st.selectbox("Métrica do Gráfico:", ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"], key=f"m_{chave_unica}")
+        
+        # Filtra quem tem mais de zero para não poluir o gráfico
         df_graf = df_acumulado[df_acumulado[metrica] > 0].sort_values(by=metrica)
         
         if not df_graf.empty:
@@ -112,7 +109,7 @@ def desenhar_painel(df_entrada, chave_unica):
             fig.update_layout(showlegend=False, height=600, margin=dict(l=0, r=0, t=30, b=0))
             st.plotly_chart(fig, use_container_width=True, key=f"fig_{chave_unica}")
         else:
-            st.info("Todos os colaboradores estão zerados nesta métrica.")
+            st.info(f"O gráfico está oculto porque todos os colaboradores estão com ZERO na métrica '{metrica}'.")
 
     with col_t:
         st.markdown("### 📋 Detalhamento")
@@ -128,7 +125,7 @@ def desenhar_painel(df_entrada, chave_unica):
         )
 
 # ==========================================
-# 4. EXECUÇÃO PRINCIPAL (ABAS)
+# 4. EXECUÇÃO PRINCIPAL
 # ==========================================
 try:
     df_raw = carregar_dados()
@@ -152,11 +149,10 @@ try:
             df_ciclo = df_raw[df_raw['DATAAPURACAO'] >= data_ini_ciclo]
             desenhar_painel(df_ciclo, "mes")
         else:
-            st.error("A base de dados parece estar vazia. Verifique sua planilha.")
+            st.error("A base de dados parece estar vazia. Verifique a conexão com o Google Sheets.")
 
     with aba_dia:
         if not df_raw.empty:
-            # Blindagem 2: Puxa a lista de datas garantindo que não vai passar nenhum 'NaT' ou valor vazio
             datas_disponiveis = [d for d in df_raw['DATAAPURACAO'].unique() if pd.notnull(d)]
             datas_disponiveis.sort(reverse=True)
             
@@ -164,13 +160,13 @@ try:
                 data_sel = st.selectbox(
                     "Escolha o dia para visualizar:", 
                     datas_disponiveis, 
-                    format_func=lambda x: x.strftime('%d/%m/%Y')
+                    format_func=lambda x: pd.to_datetime(x).strftime('%d/%m/%Y')
                 )
                 
                 df_dia = df_raw[df_raw['DATAAPURACAO'] == data_sel]
                 desenhar_painel(df_dia, "dia")
             else:
-                st.warning("Nenhuma data válida encontrada na planilha para gerar o filtro.")
+                st.warning("Nenhuma data válida encontrada na planilha.")
         else:
             st.error("A base de dados está vazia.")
 
