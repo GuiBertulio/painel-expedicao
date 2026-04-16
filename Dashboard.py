@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import datetime
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -66,12 +67,27 @@ def carregar_dados():
 try:
     df = carregar_dados()
 
+    # --- CÁLCULO DO PERÍODO (DIA 26 ATÉ HOJE) PARA EXIBIR NA TELA ---
+    hoje = datetime.date.today()
+    if hoje.day >= 26:
+        dt_inicio = datetime.date(hoje.year, hoje.month, 26)
+    else:
+        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
+        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
+        dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+    
+    dt_inicio_str = dt_inicio.strftime('%d/%m/%Y')
+    dt_fim_str = hoje.strftime('%d/%m/%Y')
+
     # --- LINHA 1: TÍTULO + FILTRO NA ESQUERDA | KPIS NA DIREITA ---
     col_titulo, col_kpis = st.columns([1, 1.2])
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
         st.markdown("Acompanhamento de desempenho da equipe.")
+        
+        # AQUI ESTÁ A CAIXA AZUL COM O PERÍODO DE VOLTA!
+        st.info(f"📅 **Período Apurado:** de {dt_inicio_str} até {dt_fim_str}")
         
         # Filtro de Turno
         lista_turnos = ["Todos os Turnos"] + sorted(df['TURNO'].dropna().unique().tolist())
