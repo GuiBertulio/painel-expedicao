@@ -57,7 +57,6 @@ def carregar_dados():
     # Filtro de segurança clássico: tira os zerados e foca na Expedição
     if all(col in df.columns for col in ['Itens Sep', 'Horas', 'FUNÇÃO']):
         df = df[(df['Itens Sep'] > 0) | (df['Horas'] > 0)]
-        df = df[df['FUNÇÃO'].isin(['Separador F', 'Separador G'])]
             
     return df
 
