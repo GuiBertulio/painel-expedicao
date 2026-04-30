@@ -63,9 +63,16 @@ def carregar_dados():
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
         
-    # Filtro de segurança clássico: tira os zerados e foca na Expedição
-    if all(col in df.columns for col in ['Itens Sep', 'Horas', 'FUNÇÃO']):
-        df = df[(df['Itens Sep'] > 0) | (df['Horas'] > 0)]
+    # Filtro de segurança ATUALIZADO: Mostra quem separou itens, tem horas, OU fez movimentação/ressuprimento
+    if all(col in df.columns for col in ['Itens Sep', 'Horas', 'Ressup.', 'Mov. Vert.']):
+        df = df[
+            (df['Itens Sep'] > 0) | 
+            (df['Horas'] > 0) | 
+            (df['Ressup.'] > 0) | 
+            (df['Ressup. Eq.'] > 0) | 
+            (df['Mov. Horizontal'] > 0) | 
+            (df['Mov. Vert.'] > 0)
+        ]
             
     return df
 
