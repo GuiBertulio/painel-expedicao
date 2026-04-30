@@ -63,25 +63,23 @@ def carregar_dados():
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
         
-    # --- NOVO FILTRO SÊNIOR AQUI ---
-    # Garante que não tem nenhum "buraco" (NaN) que possa quebrar a conta antes de testar
+    # DESLIGANDO O FILTRO PARA MOSTRAR TODO MUNDO (ATÉ OS ZERADOS)
     if all(col in df.columns for col in ['Itens Sep', 'Horas', 'Ressup.', 'Mov. Vert.']):
         cols_para_testar = ['Itens Sep', 'Horas', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
         for c in cols_para_testar:
             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
             
-        # Agora sim: Só mantém quem tem MAIS QUE ZERO em pelo menos uma dessas coisas
-        df = df[
-            (df['Itens Sep'] > 0) | 
-            (df['Horas'] > 0) | 
-            (df['Ressup.'] > 0) | 
-            (df['Ressup. Eq.'] > 0) | 
-            (df['Mov. Horizontal'] > 0) | 
-            (df['Mov. Vert.'] > 0)
-        ]
+        # Coloquei um # na frente do df = df[...] para ele não deletar mais ninguém!
+        # df = df[
+        #     (df['Itens Sep'] > 0) | 
+        #     (df['Horas'] > 0) | 
+        #     (df['Ressup.'] > 0) | 
+        #     (df['Ressup. Eq.'] > 0) | 
+        #     (df['Mov. Horizontal'] > 0) | 
+        #     (df['Mov. Vert.'] > 0)
+        # ]
             
     return df
-
 # ==========================================
 # 3. CONSTRUÇÃO DA TELA E FILTROS
 # ==========================================
