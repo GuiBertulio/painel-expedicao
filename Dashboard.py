@@ -107,9 +107,9 @@ try:
         
         st.info(f"📅 **Período Apurado:** de {dt_inicio_str} até {dt_fim_str}")
         
-        # Filtro de Turno
+        # Filtro de Turno (Agora com botões horizontais iguais à legenda!)
         lista_turnos = ["Todos os Turnos"] + sorted(df['TURNO'].dropna().unique().tolist())
-        turno_selecionado = st.selectbox("Filtre por Turno:", lista_turnos)
+        turno_selecionado = st.radio("Filtre por Turno:", lista_turnos, horizontal=True)
 
     if turno_selecionado != "Todos os Turnos":
         df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
