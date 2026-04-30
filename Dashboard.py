@@ -167,7 +167,8 @@ try:
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None,
             yaxis_title=None,
-            height=650 
+            height=650,
+            showlegend=False
         )
         st.plotly_chart(fig, use_container_width=True)
 
