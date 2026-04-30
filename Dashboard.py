@@ -168,7 +168,7 @@ try:
             xaxis_title=None,
             yaxis_title=None,
             height=650,
-            showlegend=False
+            showlegend=False #Para tirar os botões de T1, T2 e T3
         )
         st.plotly_chart(fig, use_container_width=True)
 
