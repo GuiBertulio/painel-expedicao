@@ -39,16 +39,28 @@ def carregar_dados():
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
     
-    colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
+    # 1. Adicionamos as novas colunas aqui
+    colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
     try:
         df = df[colunas_desejadas]
     except KeyError:
         pass 
     
+    # 2. Tratamento das colunas originais
     colunas_numericas = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
     for col in colunas_numericas:
         if col in df.columns:
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+    # 3. TRATAMENTO SÊNIOR: Limpando a sujeira de data do Excel nas novas colunas
+    colunas_novas = ['Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
+    for col in colunas_novas:
+        if col in df.columns:
+            # Substitui as datas bizarramente formatadas por '0'
+            df[col] = df[col].astype(str).replace(r'.*1899-12-30.*', '0', regex=True)
+            df[col] = df[col].replace(r'.*1900-.*', '0', regex=True)
+            # Força a virar número de verdade
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
@@ -85,7 +97,6 @@ try:
         st.title("📊 Monitor de Produtividade")
         st.markdown("Acompanhamento de desempenho da equipe.")
         
-        # AQUI ESTÁ A CAIXA AZUL COM O PERÍODO DE VOLTA!
         st.info(f"📅 **Período Apurado:** de {dt_inicio_str} até {dt_fim_str}")
         
         # Filtro de Turno
@@ -118,9 +129,10 @@ try:
     with col_graf:
         st.markdown("### 📈 Análise por Colaborador")
         
+        # Adicionei as opções novas aqui no gráfico também!
         opcao_grafico = st.selectbox(
             "Selecione a métrica para o gráfico:",
-            ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas"]
+            ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas", "Ressup.", "Ressup. Eq.", "Mov. Horizontal", "Mov. Vert."]
         )
         
         df_grafico = df_filtrado[df_filtrado[opcao_grafico] > 0].copy()
@@ -154,8 +166,12 @@ try:
     with col_tab:
         st.markdown("### 📋 Tabela Dinâmica")
         
-        colunas_tabela = ['NOME', 'TURNO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
-        df_tabela = df_filtrado[colunas_tabela].sort_values(by='NOME', ascending=True)
+        # Adicionando as 4 novas colunas na visualização da tabela
+        colunas_tabela = ['NOME', 'TURNO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
+        
+        # Só vai exibir as colunas se elas realmente existirem no df (evita erro)
+        colunas_existentes = [col for col in colunas_tabela if col in df_filtrado.columns]
+        df_tabela = df_filtrado[colunas_existentes].sort_values(by='NOME', ascending=True)
         
         st.dataframe(
             df_tabela, 
@@ -166,7 +182,12 @@ try:
                 "Itens Sep": st.column_config.NumberColumn("Itens Sep", format="%d"),
                 "Horas": st.column_config.NumberColumn("Horas", format="%.2f"),
                 "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%d"),
-                "Jornada Líq.": st.column_config.NumberColumn("Jornada Líq.", format="%d%%") 
+                "Jornada Líq.": st.column_config.NumberColumn("Jornada Líq.", format="%d%%"),
+                # Configuração para as colunas novas:
+                "Ressup.": st.column_config.NumberColumn("Ressup.", format="%d"),
+                "Ressup. Eq.": st.column_config.NumberColumn("Ressup. Eq.", format="%d"),
+                "Mov. Horizontal": st.column_config.NumberColumn("Mov. Horiz.", format="%d"),
+                "Mov. Vert.": st.column_config.NumberColumn("Mov. Vert.", format="%d")
             }
         )
 
