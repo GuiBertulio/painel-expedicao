@@ -53,14 +53,11 @@ def carregar_dados():
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-    # 3. TRATAMENTO SÊNIOR: Limpando a sujeira de data do Excel nas novas colunas
+    # 3. TRATAMENTO SÊNIOR: Apenas convertendo as colunas novas para número
     colunas_novas = ['Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
     for col in colunas_novas:
         if col in df.columns:
-            # Substitui as datas bizarramente formatadas por '0'
-            df[col] = df[col].astype(str).replace(r'.*1899-12-30.*', '0', regex=True)
-            df[col] = df[col].replace(r'.*1900-.*', '0', regex=True)
-            # Força a virar número de verdade
+            # Puxa o número real que agora vem limpo do Sheets!
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
