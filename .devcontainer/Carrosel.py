@@ -33,6 +33,10 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
+    # Trava de colunas para deixar a TV mais leve
+    colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
+    df = df[[col for col in colunas_desejadas if col in df.columns]]
+    
     cols_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
     for col in cols_num:
         if col in df.columns:
@@ -52,7 +56,7 @@ try:
     # --- A. DATAS DO PERÍODO APURADO ---
     hoje = datetime.date.today()
     if hoje.day >= 26:
-        dt_inicio = datetime.date(hoje.year, hoy.month, 26)
+        dt_inicio = datetime.date(hoje.year, hoje.month, 26)
     else:
         mes_ant = hoje.month - 1 if hoje.month > 1 else 12
         ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
@@ -96,7 +100,7 @@ try:
         f_atual = conf_atual['funcao']
         i_atual = conf_atual['indicador']
 
-        # Busca exata pela função (para não misturar F com G)
+        # Busca exata pela função
         df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
         df_tela = df_tela[df_tela[i_atual] > 0] 
 
@@ -117,7 +121,7 @@ try:
         st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade do turno...</h2>", unsafe_allow_html=True)
     
     else:
-        # Título Único e Período (Ganho de espaço)
+        # Título Único e Período
         st.markdown(f"""
             <div style='text-align: center;'>
                 <h1 style='font-size: 3.2rem; margin-bottom: 0;'>{i_atual} - <span style='color: #ff4b4b;'>{f_atual}</span></h1>
@@ -125,7 +129,7 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-        # --- RANKING TOP 15 (Para não criar barra de rolagem) ---
+        # Ranking Top 15 para não criar barra de rolagem
         df_tela = df_tela.sort_values(by=i_atual, ascending=False).head(15)
         df_tela = df_tela.sort_values(by=i_atual, ascending=True)
 
@@ -134,7 +138,8 @@ try:
         else:
             txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}")
 
-       fig = px.bar(
+        # Gráfico
+        fig = px.bar(
             df_tela, 
             x=i_atual, 
             y="NOME", 
@@ -148,40 +153,25 @@ try:
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None, yaxis_title=None,
-            height=720, 
+            height=720,
             showlegend=True,
             margin=dict(l=20, r=20, t=20, b=20)
         )
         
-        # --- A MÁGICA QUE APAGA AS LINHAS DE FUNDO ---
-        # Isso esconde as linhas verticais (grid), a linha do zero e os números do rodapé
+        # --- LIMPEZA DO EIXO X (Remove números e linhas de fundo) ---
         fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
 
-        # =========================================================
-        # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO (PODE MEXER AQUI!)
-        # =========================================================
-        
-        # 1. TAMANHO DO NOME DOS COLABORADORES
-        # Para aumentar os nomes, mude o 24 para 28, 30, etc.
+        # --- ÁREA DE AJUSTES DE TAMANHO ---
         fig.update_yaxes(tickfont=dict(size=24))
-        
-        # 2. GROSSURA DA BARRA
-        # Se quiser forçar uma grossura padrão, troque toda essa linha abaixo por: largura_barra = 0.6
-        # (O valor vai de 0.1 que é um fio de cabelo, até 1.0 que é uma barra grudada na outra)
         largura_barra = 0.4 if len(df_tela) <= 4 else None
-        
-        # 3. TAMANHO DOS NÚMEROS NA PONTA DA BARRA
-        # Para aumentar o número do resultado, mude o textfont_size=26 para 30, 32, etc.
         fig.update_traces(textfont_size=26, textposition="outside", width=largura_barra)
-        
-        # =========================================================
 
         st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================
     # 5. TIMER E AVANÇO
     # ==========================================
-    time.sleep(20) 
+    time.sleep(60) 
     st.session_state.passo = (st.session_state.passo + 1) % total_comb
     st.rerun()
 
