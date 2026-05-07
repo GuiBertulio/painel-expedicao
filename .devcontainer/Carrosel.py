@@ -33,29 +33,25 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # Limpeza básica e conversão numérica
     cols_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
     for col in cols_num:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
 
-    # Criando a coluna Nome (Função) para o gráfico
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['NOME_FUNCAO'] = df['NOME'] + " (" + df['FUNÇÃO'] + ")"
-        # Padroniza para busca
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
             
     return df
 
 # ==========================================
-# 3. LÓGICA DE FILTROS (HORÁRIO E FUNÇÃO)
+# 3. LÓGICA DE FILTROS E BUSCA INTELIGENTE
 # ==========================================
 try:
     df_base = carregar_dados()
 
-    # --- A. FILTRO POR HORÁRIO (TURNOS) ---
+    # --- A. FILTRO POR HORÁRIO ---
     hora_atual = datetime.datetime.now().hour
-    # Das 18:00 às 05:59 -> T3 | Das 06:00 às 17:59 -> T1 e T2
     if 18 <= hora_atual or hora_atual < 6:
         turnos_permitidos = ['T3']
         periodo_nome = "🌙 Turno da Noite (T3)"
@@ -65,49 +61,61 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    # --- B. DEFINIÇÃO DO CICLO DO CARROSSEL ---
-    # Funções que você solicitou
+    # --- B. LISTA DE EXIBIÇÃO ---
     lista_funcoes = ['CONFERENTE', 'OPERADOR', 'RAMPA', 'SEPARADOR']
-    # Indicadores principais
     lista_indicadores = ['Itens Sep', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Mov. Horizontal', 'Mov. Vert.']
 
-    # Criamos uma lista de combinações (Função x Indicador)
     combinacoes = []
     for f in lista_funcoes:
         for ind in lista_indicadores:
             combinacoes.append({"funcao": f, "indicador": ind})
 
-    # Controle do índice via Session State
     if 'passo' not in st.session_state:
         st.session_state.passo = 0
 
-    conf_atual = combinacoes[st.session_state.passo]
-    f_atual = conf_atual['funcao']
-    i_atual = conf_atual['indicador']
+    total_comb = len(combinacoes)
+    combinacao_valida = False
+    tentativas = 0
+
+    # --- C. MOTOR DE BUSCA ANTECIPADA (O PULO AUTOMÁTICO) ---
+    # Fica testando até achar uma tela que tenha dados ou até esgotar as opções
+    while tentativas < total_comb:
+        conf_atual = combinacoes[st.session_state.passo]
+        f_atual = conf_atual['funcao']
+        i_atual = conf_atual['indicador']
+
+        df_tela = df[df['FUNCAO_BUSCA'].str.contains(f_atual, na=False)].copy()
+        df_tela = df_tela[df_tela[i_atual] > 0] 
+
+        if not df_tela.empty:
+            combinacao_valida = True
+            break # Achou uma tela com dados! Sai do loop de busca.
+
+        # Se a tela estaria vazia, pula silenciosamente para a próxima
+        st.session_state.passo = (st.session_state.passo + 1) % total_comb
+        tentativas += 1
 
     # ==========================================
-    # 4. CONSTRUÇÃO VISUAL
+    # 4. CONSTRUÇÃO VISUAL DA TV
     # ==========================================
     
-    # Cabeçalho da TV
-    st.markdown(f"""
-        <div style='text-align: center;'>
-            <h1 style='font-size: 3.5rem; margin-bottom: 0;'>{i_atual}</h1>
-            <h2 style='color: #ff4b4b; font-size: 2.5rem; margin-top: 0;'>Setor: {f_atual}</h2>
-            <p style='font-size: 1.2rem; color: gray;'>{periodo_nome} | Próxima atualização em 60s</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Filtrando os dados para a função e indicador da vez
-    df_tela = df[df['FUNCAO_BUSCA'].str.contains(f_atual, na=False)].copy()
-    df_tela = df_tela[df_tela[i_atual] > 0] # Só mostra quem produziu algo
-
-    if df_tela.empty:
-        st.info(f"Sem dados de {i_atual} para {f_atual} neste turno.")
+    # Se todo mundo do galpão estiver zerado em tudo (início de expediente)
+    if not combinacao_valida:
+        st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 15%;'>⏳ {periodo_nome}</h1>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade do turno...</h2>", unsafe_allow_html=True)
+    
+    # Se encontrou dados válidos, desenha o gráfico normalmente
     else:
+        st.markdown(f"""
+            <div style='text-align: center;'>
+                <h1 style='font-size: 3.5rem; margin-bottom: 0;'>{i_atual}</h1>
+                <h2 style='color: #ff4b4b; font-size: 2.5rem; margin-top: 0;'>Setor: {f_atual}</h2>
+                <p style='font-size: 1.2rem; color: gray;'>{periodo_nome} | Próxima tela em 60s</p>
+            </div>
+        """, unsafe_allow_html=True)
+
         df_tela = df_tela.sort_values(by=i_atual, ascending=True)
 
-        # Formatação do Label
         if i_atual == "Jornada Líq.":
             txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}%")
         else:
@@ -116,11 +124,11 @@ try:
         fig = px.bar(
             df_tela, 
             x=i_atual, 
-            y="NOME", # Usei só NOME aqui para não ficar repetindo a função na barra, já que o título já diz
+            y="NOME", 
             color="TURNO", 
             orientation='h',
             text=txt,
-            color_discrete_map={'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'} # Cores padrão
+            color_discrete_map={'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'}
         )
 
         fig.update_layout(
@@ -136,12 +144,12 @@ try:
         st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================
-    # 5. TIMER E REEXECUÇÃO
+    # 5. TIMER E AVANÇO
     # ==========================================
-    time.sleep(20) # Espera 1 minuto
+    time.sleep(20) 
     
-    # Avança o passo
-    st.session_state.passo = (st.session_state.passo + 1) % len(combinacoes)
+    # Prepara o passo seguinte para a próxima vez que a página recarregar
+    st.session_state.passo = (st.session_state.passo + 1) % total_comb
     
     st.rerun()
 
