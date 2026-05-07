@@ -51,7 +51,10 @@ try:
     df_base = carregar_dados()
 
     # --- A. FILTRO POR HORÁRIO ---
-    hora_atual = datetime.datetime.now().hour
+    # Pega a hora global do servidor (UTC) e diminui 3 horas para cravar o horário do Brasil
+    agora_brasil = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
+    hora_atual = agora_brasil.hour
+    
     if 18 <= hora_atual or hora_atual < 6:
         turnos_permitidos = ['T3']
         periodo_nome = "🌙 Turno da Noite (T3)"
