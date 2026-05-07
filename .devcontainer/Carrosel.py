@@ -80,7 +80,7 @@ try:
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], 
+        'CONFERENTE': ['Itens Conf.'],
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
         'RAMPA': ['Itens Rampa']
     }
