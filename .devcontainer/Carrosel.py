@@ -157,7 +157,7 @@ try:
         # =========================================================
         
         fig.update_yaxes(tickfont=dict(size=22))
-        largura_da_barra = 0.5 
+        largura_da_barra = 0.2 
         fig.update_traces(
             textfont_size=26, 
             textposition="outside", 
