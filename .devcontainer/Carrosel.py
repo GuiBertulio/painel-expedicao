@@ -18,7 +18,7 @@ st.markdown(
     .block-container {
         padding-top: 0.5rem !important;
         padding-bottom: 0rem !important;
-        max-width: 98% !important; /* Aproveita o máximo da borda da TV */
+        max-width: 98% !important; 
     }
     </style>
     """,
@@ -78,34 +78,32 @@ try:
 
     # ---------------------------------------------------------
     # 🧠 CÉREBRO DA TV: MAPEAMENTO DE FUNÇÃO X INDICADORES
-    # Se quiser mudar o que aparece na tela, é só editar aqui!
-    # Máximo de 3 indicadores por função para caber na tela.
     # ---------------------------------------------------------
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Sep', 'Ressup.'], # Ajuste conforme a sua base real
+        'CONFERENTE': ['Itens Sep', 'Ressup.'], 
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
-        'RAMPA': ['Itens Sep'] # Exemplo com 1 indicador só
+        'RAMPA': ['Itens Sep']
     }
 
     lista_funcoes = list(mapa_funcoes.keys())
 
-    if 'passo' not in st.session_state:
+    # --- A TRAVA DE SEGURANÇA (CORREÇÃO DO ERRO) ---
+    # Se a memória lembrar de um passo muito alto, ele zera e recomeça!
+    if 'passo' not in st.session_state or st.session_state.passo >= len(lista_funcoes):
         st.session_state.passo = 0
+    # -----------------------------------------------
 
     total_funcoes = len(lista_funcoes)
     combinacao_valida = False
     tentativas = 0
 
-    # Motor de Busca: Procura uma Função que tenha gente trabalhando
     while tentativas < total_funcoes:
         f_atual = lista_funcoes[st.session_state.passo]
         
-        # Pega só as pessoas dessa função
         df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
         
-        # Verifica se alguém dessa função fez algum dos indicadores
         indicadores_da_funcao = mapa_funcoes[f_atual]
         tem_dados = False
         for ind in indicadores_da_funcao:
@@ -130,7 +128,6 @@ try:
         st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade...</h2>", unsafe_allow_html=True)
     
     else:
-        # Título Gigante com a FUNÇÃO
         st.markdown(f"""
             <div style='text-align: center; margin-bottom: 20px;'>
                 <h1 style='font-size: 4rem; margin-bottom: 0; color: #ff4b4b; text-transform: uppercase;'>{f_atual}</h1>
@@ -138,21 +135,17 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-        # Fatiando a tela em 3 colunas iguais
         col1, col2, col3 = st.columns(3)
         colunas_ui = [col1, col2, col3]
         indicadores_para_mostrar = mapa_funcoes[f_atual]
 
-        # Mapeando cores para ficar padronizado
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'}
 
-        # Loop para preencher os 3 blocos
         for i in range(3):
             with colunas_ui[i]:
                 if i < len(indicadores_para_mostrar):
                     ind_atual = indicadores_para_mostrar[i]
                     
-                    # Filtra só quem pontuou neste indicador específico
                     df_col = df_tela[df_tela[ind_atual] > 0].copy()
                     
                     if df_col.empty:
@@ -160,7 +153,6 @@ try:
                         st.info("Sem dados.")
                         continue
                     
-                    # Top 15 e Ordenação
                     df_col = df_col.sort_values(by=ind_atual, ascending=False).head(15)
                     df_col = df_col.sort_values(by=ind_atual, ascending=True)
 
@@ -169,10 +161,8 @@ try:
                     else:
                         txt = df_col[ind_atual].apply(lambda x: f"{x:.0f}")
 
-                    # Título do Indicador
                     st.markdown(f"<h2 style='text-align: center; margin-bottom: 0px;'>{ind_atual}</h2>", unsafe_allow_html=True)
 
-                    # Gráfico do Bloco
                     fig = px.bar(
                         df_col, x=ind_atual, y="NOME", orientation='h', text=txt
                     )
@@ -181,29 +171,24 @@ try:
                         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                         xaxis_title=None, yaxis_title=None,
                         height=650, showlegend=False,
-                        margin=dict(l=5, r=5, t=5, b=5) # Margens espremidas para caber
+                        margin=dict(l=5, r=5, t=5, b=5) 
                     )
                     
                     fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
 
                     cores_aplicadas = df_col['TURNO'].map(mapa_cores).fillna('gray').tolist()
 
-                    # ==========================================
-                    # ÁREA DE AJUSTE (TAMANHOS MENORES AGORA)
-                    # ==========================================
-                    fig.update_yaxes(tickfont=dict(size=14)) # Nome menor para caber na coluna
+                    fig.update_yaxes(tickfont=dict(size=14)) 
                     largura_da_barra = 0.5 
                     fig.update_traces(
                         marker_color=cores_aplicadas, 
-                        textfont_size=16, # Número menor 
+                        textfont_size=16, 
                         textposition="outside", 
                         width=largura_da_barra
                     )
-                    # ==========================================
 
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    # Se não tem indicador para preencher o bloco, deixa em branco
                     st.empty()
 
     # ==========================================
