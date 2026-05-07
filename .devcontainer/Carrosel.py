@@ -110,7 +110,7 @@ try:
             <div style='text-align: center;'>
                 <h1 style='font-size: 3.5rem; margin-bottom: 0;'>{i_atual}</h1>
                 <h2 style='color: #ff4b4b; font-size: 2.5rem; margin-top: 0;'>Setor: {f_atual}</h2>
-                <p style='font-size: 1.2rem; color: gray;'>{periodo_nome} | Próxima tela em 60s</p>
+                <p style='font-size: 1.2rem; color: gray;'>{periodo_nome} | Próxima tela em 20s</p>
             </div>
         """, unsafe_allow_html=True)
 
