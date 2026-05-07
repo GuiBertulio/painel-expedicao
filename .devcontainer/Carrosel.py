@@ -252,7 +252,7 @@ try:
                     # Usa a chave fixa para renderizar por cima do que estava antes
                     st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
 
-    time.sleep(10)
+    time.sleep(10) 
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
     st.rerun()
 
