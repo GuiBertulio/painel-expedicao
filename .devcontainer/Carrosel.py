@@ -138,7 +138,7 @@ try:
     # ==========================================
     # 5. TIMER E REEXECUÇÃO
     # ==========================================
-    time.sleep(60) # Espera 1 minuto
+    time.sleep(20) # Espera 1 minuto
     
     # Avança o passo
     st.session_state.passo = (st.session_state.passo + 1) % len(combinacoes)
