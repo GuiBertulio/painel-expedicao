@@ -160,23 +160,32 @@ try:
         blocos_finais = blocos_finais[:3]
 
         # ==========================================
-        # 5. DESENHO NA TELA
+        # 5. DESENHO NA TELA (COM RENOVAÇÃO FORÇADA)
         # ==========================================
         colunas_ui = st.columns(3)
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
+        
+        # A CHAVE MESTRA: Pega o segundo exato atual. Isso força o site a destruir tudo e recriar!
+        chave_mestra = int(time.time())
 
         for i in range(3):
             with colunas_ui[i]:
                 bloco = blocos_finais[i]
                 
-                # A grande mudança: Se estiver vazio, não invocamos o Plotly de jeito nenhum!
                 if bloco['vazio']:
                     if bloco['titulo']:
                         st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
                         st.info("Sem dados no momento.")
+                        
+                        # Injeta o gráfico fantasma de limpeza por baixo da caixa azul de "Sem dados"
+                        fig_vazia = px.scatter()
+                        fig_vazia.update_layout(height=550, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False), yaxis=dict(visible=False))
+                        st.plotly_chart(fig_vazia, use_container_width=True, key=f"limpeza_parcial_{i}_{chave_mestra}")
                     else:
-                        # Coluna extra inutilizada fica apenas como um espaço em branco estrutural
-                        st.markdown("<div style='height: 650px;'></div>", unsafe_allow_html=True)
+                        # O BURACO NEGRO: Força a criação de um gráfico totalmente transparente para apagar a memória da coluna extra
+                        fig_vazia = px.scatter()
+                        fig_vazia.update_layout(height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False), yaxis=dict(visible=False))
+                        st.plotly_chart(fig_vazia, use_container_width=True, key=f"limpeza_total_{i}_{chave_mestra}")
                 else:
                     ind = bloco['ind']
                     df_graf = bloco['data']
@@ -218,10 +227,10 @@ try:
                         cliponaxis=False 
                     )
                     
-                    # Uma chave única e dinâmica mata qualquer chance de cache antigo da tela anterior
-                    st.plotly_chart(fig, use_container_width=True, key=f"plot_{f_atual}_{ind}_{i}")
+                    # Usa a chave mestra para gerar o gráfico novo e forçar a lixeira no antigo
+                    st.plotly_chart(fig, use_container_width=True, key=f"real_{f_atual}_{ind}_{i}_{chave_mestra}")
 
-    time.sleep(10)
+    time.sleep(10) 
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
     st.rerun()
 
