@@ -26,7 +26,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO E LIMPEZA DE DADOS
+# 2. CARREGAMENTO E LIMPEZA TOTAL DE DADOS
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -34,20 +34,19 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-    df = df[[col for col in colunas_desejadas if col in df.columns]]
+    if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
+        df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
     
-    for col in ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']:
-        if col in df.columns:
+    # Agora o robô limpa e lê TODAS as colunas que você inventar no Excel
+    colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA']
+    for col in df.columns:
+        if col not in colunas_texto:
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False).str.strip()
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-            if col == 'Jornada Líq.':
+            if 'Jornada' in col: # Cobre "Jornada Líq." e "Jornada Líq. Eq."
                 df.loc[(df[col] > 0) & (df[col] <= 2.0), col] = df[col] * 100
-
-    if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
-        df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
-            
+                
     return df
 
 # ==========================================
@@ -79,12 +78,16 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
+    # ---------------------------------------------------------
+    # 🧠 O CÉREBRO DA TV:
+    # Os nomes aqui têm que ser IDÊNTICOS aos cabeçalhos do Excel
+    # ---------------------------------------------------------
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Sep', 'Ressup.'], 
+        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], # Corrigido baseado no seu print!
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
-        'RAMPA': ['Itens Sep']
+        'RAMPA': ['Itens Rampa']
     }
 
     lista_funcoes = list(mapa_funcoes.keys())
@@ -129,7 +132,11 @@ try:
         blocos_extras = []
 
         for ind in inds_da_funcao:
-            df_ind = df_tela[df_tela[ind] > 0].copy()
+            if ind in df_tela.columns:
+                df_ind = df_tela[df_tela[ind] > 0].copy()
+            else:
+                df_ind = pd.DataFrame()
+                
             if df_ind.empty:
                 blocos_principais.append({"ind": ind, "data": pd.DataFrame(), "vazio": True, "titulo": ind})
             else:
@@ -158,29 +165,29 @@ try:
         blocos_finais = blocos_finais[:3]
 
         # ==========================================
-        # 5. DESENHANDO NA TELA
+        # 5. DESENHANDO NA TELA E MATANDO FANTASMAS
         # ==========================================
         colunas_ui = st.columns(3)
-        # Adicionei a cor transparente para os fantasmas passarem despercebidos
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
 
         for i in range(3):
             with colunas_ui[i]:
                 bloco = blocos_finais[i]
+                # A CHAVE FIXA garante que o Streamlit sobrescreve o espaço e mata o fantasma
+                chave_slot_fixo = f"grafico_tv_slot_{i}"
                 
                 if bloco['vazio']:
                     if bloco['titulo']:
                         st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
                         st.info("Sem dados no momento.")
                     else:
-                        # MATA O GRÁFICO FANTASMA DA 3ª COLUNA:
-                        # Cria um gráfico 100% vazio e transparente para forçar o Streamlit a apagar a imagem velha
+                        # Injeta um gráfico oco na chave fixa para destruir lixo antigo
                         fig_vazia = px.bar()
                         fig_vazia.update_layout(
                             height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                             xaxis=dict(visible=False), yaxis=dict(visible=False)
                         )
-                        st.plotly_chart(fig_vazia, use_container_width=True, key=f"vazio_{f_atual}_{i}")
+                        st.plotly_chart(fig_vazia, use_container_width=True, key=chave_slot_fixo)
                 else:
                     ind = bloco['ind']
                     df_graf = bloco['data']
@@ -188,10 +195,8 @@ try:
                     
                     st.markdown(f"<h3 style='text-align: center; color: #333;'>{titulo}</h3>", unsafe_allow_html=True)
 
-                    # --- CORREÇÃO DAS BARRAS GIGANTES ---
                     qtd_faltante = 15 - len(df_graf)
                     if qtd_faltante > 0:
-                        # O segredo: "\u200B" é um espaço de largura zero que o Plotly não apaga!
                         espaco_magico = "\u200B"
                         linhas_vazias = pd.DataFrame({
                             'NOME': [espaco_magico * (x+1) for x in range(qtd_faltante)],
@@ -200,14 +205,12 @@ try:
                         })
                         df_graf = pd.concat([linhas_vazias, df_graf], ignore_index=True)
 
-                    # Tira o texto do fantasma
-                    txt = df_graf[ind].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if ind == 'Jornada Líq.' else f"{x:.0f}"))
+                    txt = df_graf[ind].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if 'Jornada' in ind else f"{x:.0f}"))
 
                     fig = px.bar(df_graf, x=ind, y="NOME", orientation='h', text=txt)
                     
                     fig.update_yaxes(type='category', categoryorder='array', categoryarray=df_graf['NOME'].tolist(), tickfont=dict(size=14))
                     
-                    # A altura fica cravada em 650 para todas as colunas ficarem perfeitamente alinhadas
                     fig.update_layout(
                         height=650, 
                         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
@@ -226,9 +229,9 @@ try:
                         cliponaxis=False 
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True, key=f"plot_{f_atual}_{ind}_{i}")
+                    st.plotly_chart(fig, use_container_width=True, key=chave_slot_fixo)
 
-    time.sleep(10) 
+    time.sleep(10)
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
     st.rerun()
 
