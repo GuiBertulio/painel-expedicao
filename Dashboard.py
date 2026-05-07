@@ -170,14 +170,32 @@ try:
     with col_tab:
         st.markdown("### 📋 Tabela Dinâmica")
         
-        # A tabela agora exibe todas as colunas existentes no Dataframe atual
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
         
+        # --- MÁGICA DA FORMATAÇÃO DINÂMICA ---
+        configuracao_colunas = {}
+        for col in df_tabela.columns:
+            if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']:
+                continue # Deixa as colunas de texto em paz
+                
+            elif "%" in col or "Líq." in col:
+                # Se tiver % no nome ou for Jornada, coloca o sinal de porcentagem
+                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+                
+            elif col == "Horas":
+                # Horas mantemos com 2 casas decimais (ex: 7.50)
+                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+                
+            else:
+                # O resto todo (Itens, Ressup, etc) fica como número inteiro, sem zeros!
+                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+
         st.dataframe(
             df_tabela, 
             hide_index=True, 
             use_container_width=True,
-            height=650
+            height=650,
+            column_config=configuracao_colunas # Aplica a maquiagem aqui!
         )
 
 except Exception as e:
