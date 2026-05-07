@@ -37,6 +37,7 @@ def carregar_dados():
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
     
+    # Limpeza de dados numéricos (todas as colunas menos texto)
     colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA']
     for col in df.columns:
         if col not in colunas_texto:
@@ -54,6 +55,7 @@ def carregar_dados():
 try:
     df_base = carregar_dados()
 
+    # Cálculo do período (do dia 26 ao dia de hoje)
     hoje = datetime.date.today()
     if hoje.day >= 26:
         dt_inicio = datetime.date(hoje.year, hoje.month, 26)
@@ -65,6 +67,7 @@ try:
     dt_inicio_str = dt_inicio.strftime('%d/%m/%Y')
     dt_fim_str = hoje.strftime('%d/%m/%Y')
 
+    # Lógica de Turnos (fusos horários brasilienses)
     agora_brasil = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     hora_atual = agora_brasil.hour
     
@@ -77,16 +80,18 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
+    # 🧠 O CÉREBRO DA TV: MAPEAMENTO DE FUNÇÃO X INDICADORES
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Conf.'],
+        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], # Ajustado conforme Matriz
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
-        'RAMPA': ['Itens Rampa']
+        'RAMPA': ['Itens Sep']
     }
 
     lista_funcoes = list(mapa_funcoes.keys())
 
+    # Trava de segurança para a memória do carrossel
     if 'passo' not in st.session_state or st.session_state.passo >= len(lista_funcoes):
         st.session_state.passo = 0
 
@@ -94,6 +99,7 @@ try:
     combinacao_valida = False
     tentativas = 0
 
+    # Motor de busca para pular funções sem dados
     while tentativas < total_funcoes:
         f_atual = lista_funcoes[st.session_state.passo]
         df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
@@ -109,7 +115,7 @@ try:
         tentativas += 1
 
     # ==========================================
-    # 4. MOTOR DE COLUNAS
+    # 4. MOTOR INTELIGENTE DE COLUNAS
     # ==========================================
     if not combinacao_valida:
         st.markdown(f"<h1 style='text-align: center; margin-top: 15%;'>⏳ {periodo_nome}</h1>", unsafe_allow_html=True)
@@ -126,19 +132,19 @@ try:
         blocos_principais = []
         blocos_extras = []
 
+        # PASSO A: Carrega os principais (os primeiros de cada indicador)
         for ind in inds_da_funcao:
-            if ind in df_tela.columns:
-                df_ind = df_tela[df_tela[ind] > 0].copy()
-            else:
-                df_ind = pd.DataFrame()
-                
+            df_ind = df_tela[df_tela[ind] > 0].copy()
             if df_ind.empty:
+                # Cria bloco oco se o indicador não tem dados
                 blocos_principais.append({"ind": ind, "data": pd.DataFrame(), "vazio": True, "titulo": ind})
             else:
+                # Remove duplicatas (Sombra) e pega o Top 15
                 df_ind = df_ind.sort_values(by=ind, ascending=False).drop_duplicates(subset=['NOME'])
                 chunk1 = df_ind.head(15).sort_values(by=ind, ascending=True)
                 blocos_principais.append({"ind": ind, "data": chunk1, "vazio": False, "titulo": ind})
 
+                # Se tem mais de 15, joga o resto (Cont.) pra lista de espera
                 if len(df_ind) > 15:
                     chunk2 = df_ind.iloc[15:30].sort_values(by=ind, ascending=True)
                     blocos_extras.append({"ind": ind, "data": chunk2, "vazio": False, "titulo": f"{ind} (Cont.)"})
@@ -146,21 +152,26 @@ try:
                     chunk3 = df_ind.iloc[30:45].sort_values(by=ind, ascending=True)
                     blocos_extras.append({"ind": ind, "data": chunk3, "vazio": False, "titulo": f"{ind} (Cont. 2)"})
 
+        # PASSO B: Monta exatamente 3 blocos finais
         blocos_finais = []
+        # Começa pelos blocos principais
         for b in blocos_principais:
             blocos_finais.append(b)
             
+        # Se sobrou coluna vazia na TV, preenche com as "Continações" da fila de extras
         for b in blocos_extras:
             if len(blocos_finais) < 3:
                 blocos_finais.append(b)
 
+        # Se AINDA sobrar coluna (ex: Conferente que só tem 2), cria blocos invisíveis para limpar a tela
         while len(blocos_finais) < 3:
             blocos_finais.append({"ind": "", "data": pd.DataFrame(), "vazio": True, "titulo": ""})
 
+        # Trava de segurança para garantir apenas 3 (limita se der bug na soma)
         blocos_finais = blocos_finais[:3]
 
         # ==========================================
-        # 5. DESENHO NA TELA (SLOTS FIXOS INFALÍVEIS)
+        # 5. DESENHANDO NA TELA E MATANDO O FANTASMA
         # ==========================================
         colunas_ui = st.columns(3)
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
@@ -169,23 +180,30 @@ try:
             with colunas_ui[i]:
                 bloco = blocos_finais[i]
                 
-                # A CHAVE FIXA: Isso garante que o Streamlit substitua exatamente a mesma caixa e apague o passado!
-                chave_fixa = f"grafico_slot_numero_{i}"
+                # A CHAVE GIGANTE: Isso força o Streamlit a sobrescrever o espaço e matar qualquer resto de gráfico Rosa!
+                chave_slot_fixo = f"grafico_da_coluna_{i}"
                 
                 if bloco['vazio']:
+                    # Mostra o título e "Sem dados" na caixa azul
                     if bloco['titulo']:
                         st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
                         st.info("Sem dados no momento.")
                         
-                        # Injeta um gráfico 100% oco sobre a chave fixa (mata qualquer resto de gráfico)
-                        fig_vazia = px.scatter()
-                        fig_vazia.update_layout(height=550, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False), yaxis=dict(visible=False))
-                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_fixa)
+                        # Injeta o gráfico oco na chave fixa (mata qualquer resto de gráfico rosa antigo)
+                        fig_vazia = px.bar()
+                        fig_vazia.update_layout(
+                            height=550, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            xaxis=dict(visible=False), yaxis=dict(visible=False)
+                        )
+                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
                     else:
                         # O BURACO NEGRO DA 3ª COLUNA: Sobrescreve com o nada absoluto
-                        fig_vazia = px.scatter()
-                        fig_vazia.update_layout(height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False), yaxis=dict(visible=False))
-                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_fixa)
+                        fig_vazia = px.bar()
+                        fig_vazia.update_layout(
+                            height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            xaxis=dict(visible=False), yaxis=dict(visible=False)
+                        )
+                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
                 else:
                     ind = bloco['ind']
                     df_graf = bloco['data']
@@ -193,6 +211,7 @@ try:
                     
                     st.markdown(f"<h3 style='text-align: center; color: #333;'>{titulo}</h3>", unsafe_allow_html=True)
 
+                    # A GRANDE MÁGICA DOS FANTASMAS (Padrão de Barras)
                     qtd_faltante = 15 - len(df_graf)
                     if qtd_faltante > 0:
                         espaco_magico = "\u200B"
@@ -203,6 +222,7 @@ try:
                         })
                         df_graf = pd.concat([linhas_vazias, df_graf], ignore_index=True)
 
+                    # Tira o texto do fantasma (se valor for zero)
                     txt = df_graf[ind].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if 'Jornada' in ind else f"{x:.0f}"))
 
                     fig = px.bar(df_graf, x=ind, y="NOME", orientation='h', text=txt)
@@ -210,13 +230,13 @@ try:
                     fig.update_yaxes(type='category', categoryorder='array', categoryarray=df_graf['NOME'].tolist(), tickfont=dict(size=14))
                     
                     fig.update_layout(
-                        height=650, 
+                        height=650, # Altura travada!
                         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                         xaxis_title=None, yaxis_title=None, 
                         showlegend=False,
-                        hovermode=False, 
+                        hovermode=False, # MATA O BALÃOZINHO DO MOUSE
                         margin=dict(l=5, r=40, t=5, b=5), 
-                        bargap=0.3 
+                        bargap=0.3 # Mantém todas as barras padronizadas
                     )
                     fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
                     
@@ -225,12 +245,12 @@ try:
                         marker_color=cores, 
                         textfont_size=16, 
                         textposition="outside",
-                        hoverinfo="skip", 
-                        cliponaxis=False 
+                        hoverinfo="skip", # GARANTE QUE NÃO TEM HOVER
+                        cliponaxis=False # Impede que os números fiquem cortados na borda
                     )
                     
                     # Usa a chave fixa para renderizar por cima do que estava antes
-                    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=chave_fixa)
+                    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
 
     time.sleep(10)
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
