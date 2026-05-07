@@ -178,16 +178,20 @@ try:
             if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']:
                 continue # Deixa as colunas de texto em paz
                 
-            elif "%" in col or "Líq." in col:
-                # Se tiver % no nome ou for Jornada, coloca o sinal de porcentagem
+            elif col in ['Avaria', 'Corte %', 'Dev. %']:
+                # Regra nova: Porcentagem com duas casas decimais
+                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                
+            elif "Líq." in col:
+                # Mantém a Jornada Líq. como porcentagem inteira
                 configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
                 
             elif col == "Horas":
-                # Horas mantemos com 2 casas decimais (ex: 7.50)
+                # Horas mantemos com 2 casas decimais
                 configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
                 
             else:
-                # O resto todo (Itens, Ressup, etc) fica como número inteiro, sem zeros!
+                # O resto todo fica como número inteiro, sem zeros!
                 configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
         st.dataframe(
@@ -195,7 +199,7 @@ try:
             hide_index=True, 
             use_container_width=True,
             height=650,
-            column_config=configuracao_colunas # Aplica a maquiagem aqui!
+            column_config=configuracao_colunas 
         )
 
 except Exception as e:
