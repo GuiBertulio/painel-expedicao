@@ -179,7 +179,7 @@ try:
     # ==========================================
     # 5. TIMER E AVANÇO
     # ==========================================
-    time.sleep(60) 
+    time.sleep(20) 
     st.session_state.passo = (st.session_state.passo + 1) % total_comb
     st.rerun()
 
