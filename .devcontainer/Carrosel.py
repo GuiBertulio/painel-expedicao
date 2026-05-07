@@ -26,7 +26,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO E LIMPEZA TOTAL DE DADOS
+# 2. CARREGAMENTO E LIMPEZA DE DADOS
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -37,14 +37,13 @@ def carregar_dados():
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
     
-    # Agora o robô limpa e lê TODAS as colunas que você inventar no Excel
     colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA']
     for col in df.columns:
         if col not in colunas_texto:
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False).str.strip()
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-            if 'Jornada' in col: # Cobre "Jornada Líq." e "Jornada Líq. Eq."
+            if 'Jornada' in col: 
                 df.loc[(df[col] > 0) & (df[col] <= 2.0), col] = df[col] * 100
                 
     return df
@@ -78,14 +77,10 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    # ---------------------------------------------------------
-    # 🧠 O CÉREBRO DA TV:
-    # Os nomes aqui têm que ser IDÊNTICOS aos cabeçalhos do Excel
-    # ---------------------------------------------------------
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], # Corrigido baseado no seu print!
+        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], 
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
         'RAMPA': ['Itens Rampa']
     }
@@ -114,7 +109,7 @@ try:
         tentativas += 1
 
     # ==========================================
-    # 4. MOTOR INTELIGENTE DE COLUNAS
+    # 4. MOTOR DE COLUNAS
     # ==========================================
     if not combinacao_valida:
         st.markdown(f"<h1 style='text-align: center; margin-top: 15%;'>⏳ {periodo_nome}</h1>", unsafe_allow_html=True)
@@ -165,7 +160,7 @@ try:
         blocos_finais = blocos_finais[:3]
 
         # ==========================================
-        # 5. DESENHANDO NA TELA E MATANDO FANTASMAS
+        # 5. DESENHO NA TELA
         # ==========================================
         colunas_ui = st.columns(3)
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
@@ -173,21 +168,15 @@ try:
         for i in range(3):
             with colunas_ui[i]:
                 bloco = blocos_finais[i]
-                # A CHAVE FIXA garante que o Streamlit sobrescreve o espaço e mata o fantasma
-                chave_slot_fixo = f"grafico_tv_slot_{i}"
                 
+                # A grande mudança: Se estiver vazio, não invocamos o Plotly de jeito nenhum!
                 if bloco['vazio']:
                     if bloco['titulo']:
                         st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
                         st.info("Sem dados no momento.")
                     else:
-                        # Injeta um gráfico oco na chave fixa para destruir lixo antigo
-                        fig_vazia = px.bar()
-                        fig_vazia.update_layout(
-                            height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                            xaxis=dict(visible=False), yaxis=dict(visible=False)
-                        )
-                        st.plotly_chart(fig_vazia, use_container_width=True, key=chave_slot_fixo)
+                        # Coluna extra inutilizada fica apenas como um espaço em branco estrutural
+                        st.markdown("<div style='height: 650px;'></div>", unsafe_allow_html=True)
                 else:
                     ind = bloco['ind']
                     df_graf = bloco['data']
@@ -229,7 +218,8 @@ try:
                         cliponaxis=False 
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True, key=chave_slot_fixo)
+                    # Uma chave única e dinâmica mata qualquer chance de cache antigo da tela anterior
+                    st.plotly_chart(fig, use_container_width=True, key=f"plot_{f_atual}_{ind}_{i}")
 
     time.sleep(10)
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
