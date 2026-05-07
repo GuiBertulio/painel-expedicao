@@ -33,7 +33,6 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # Trava de colunas para deixar a TV mais leve
     colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
     df = df[[col for col in colunas_desejadas if col in df.columns]]
     
@@ -53,7 +52,6 @@ def carregar_dados():
 try:
     df_base = carregar_dados()
 
-    # --- A. DATAS DO PERÍODO APURADO ---
     hoje = datetime.date.today()
     if hoje.day >= 26:
         dt_inicio = datetime.date(hoje.year, hoje.month, 26)
@@ -65,7 +63,6 @@ try:
     dt_inicio_str = dt_inicio.strftime('%d/%m/%Y')
     dt_fim_str = hoje.strftime('%d/%m/%Y')
 
-    # --- B. FILTRO POR HORÁRIO (Sincronizado com Brasil) ---
     agora_brasil = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     hora_atual = agora_brasil.hour
     
@@ -78,7 +75,6 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    # --- C. LISTA DE EXIBIÇÃO ATUALIZADA (SEPARADO F e G) ---
     lista_funcoes = ['CONFERENTE', 'OPERADOR', 'RAMPA', 'SEPARADOR F', 'SEPARADOR G']
     lista_indicadores = ['Itens Sep', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Mov. Horizontal', 'Mov. Vert.']
 
@@ -94,13 +90,11 @@ try:
     combinacao_valida = False
     tentativas = 0
 
-    # Motor de Busca (pula os vazios e foca na categoria exata)
     while tentativas < total_comb:
         conf_atual = combinacoes[st.session_state.passo]
         f_atual = conf_atual['funcao']
         i_atual = conf_atual['indicador']
 
-        # Busca exata pela função
         df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
         df_tela = df_tela[df_tela[i_atual] > 0] 
 
@@ -118,10 +112,9 @@ try:
     if not combinacao_valida:
         st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 15%;'>⏳ {periodo_nome}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; font-size: 1.5rem; color: #004aad;'>📅 Período: {dt_inicio_str} até {dt_fim_str}</p>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade do turno...</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade...</h2>", unsafe_allow_html=True)
     
     else:
-        # Título Único e Período
         st.markdown(f"""
             <div style='text-align: center;'>
                 <h1 style='font-size: 3.2rem; margin-bottom: 0;'>{i_atual} - <span style='color: #ff4b4b;'>{f_atual}</span></h1>
@@ -129,7 +122,6 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-        # Ranking Top 15 para não criar barra de rolagem
         df_tela = df_tela.sort_values(by=i_atual, ascending=False).head(15)
         df_tela = df_tela.sort_values(by=i_atual, ascending=True)
 
@@ -138,7 +130,6 @@ try:
         else:
             txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}")
 
-        # Gráfico
         fig = px.bar(
             df_tela, 
             x=i_atual, 
@@ -153,18 +144,36 @@ try:
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None, yaxis_title=None,
-            height=720,
+            height=700,
             showlegend=True,
             margin=dict(l=20, r=20, t=20, b=20)
         )
         
-        # --- LIMPEZA DO EIXO X (Remove números e linhas de fundo) ---
+        # Limpa o eixo X invisível no fundo
         fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
 
-        # --- ÁREA DE AJUSTES DE TAMANHO ---
-        fig.update_yaxes(tickfont=dict(size=24))
-        largura_barra = 0.4 if len(df_tela) <= 4 else None
-        fig.update_traces(textfont_size=26, textposition="outside", width=largura_barra)
+        # =========================================================
+        # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO (PODE MEXER AQUI!)
+        # =========================================================
+        
+        # 1. TAMANHO DOS NOMES NA ESQUERDA
+        # Altere o número '22' abaixo para aumentar ou diminuir a letra dos nomes.
+        fig.update_yaxes(tickfont=dict(size=22))
+        
+        # 2. GROSSURA DA BARRA
+        # Mude o valor de '0.5' para ajustar a grossura. (0.3 é bem fino, 0.8 é bem grosso)
+        # Se você apagar esse número e escrever None, o gráfico ajusta sozinho.
+        largura_da_barra = 0.5 
+        
+        # 3. TAMANHO DOS NÚMEROS DE RESULTADO NA DIREITA
+        # Altere o número '26' abaixo para aumentar o número que fica na ponta da barra.
+        fig.update_traces(
+            textfont_size=26, 
+            textposition="outside", 
+            width=largura_da_barra
+        )
+        
+        # =========================================================
 
         st.plotly_chart(fig, use_container_width=True)
 
