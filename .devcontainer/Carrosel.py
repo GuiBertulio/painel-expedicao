@@ -18,6 +18,7 @@ st.markdown(
     .block-container {
         padding-top: 0.5rem !important;
         padding-bottom: 0rem !important;
+        max-width: 98% !important; /* Aproveita o máximo da borda da TV */
     }
     </style>
     """,
@@ -47,7 +48,7 @@ def carregar_dados():
     return df
 
 # ==========================================
-# 3. LÓGICA DE FILTROS E BUSCA INTELIGENTE
+# 3. LÓGICA DE FILTROS E DICIONÁRIO DE METAS
 # ==========================================
 try:
     df_base = carregar_dados()
@@ -75,38 +76,52 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    lista_funcoes = ['CONFERENTE', 'OPERADOR', 'RAMPA', 'SEPARADOR F', 'SEPARADOR G']
-    lista_indicadores = ['Itens Sep', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Mov. Horizontal', 'Mov. Vert.']
+    # ---------------------------------------------------------
+    # 🧠 CÉREBRO DA TV: MAPEAMENTO DE FUNÇÃO X INDICADORES
+    # Se quiser mudar o que aparece na tela, é só editar aqui!
+    # Máximo de 3 indicadores por função para caber na tela.
+    # ---------------------------------------------------------
+    mapa_funcoes = {
+        'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
+        'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
+        'CONFERENTE': ['Itens Sep', 'Ressup.'], # Ajuste conforme a sua base real
+        'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
+        'RAMPA': ['Itens Sep'] # Exemplo com 1 indicador só
+    }
 
-    combinacoes = []
-    for f in lista_funcoes:
-        for ind in lista_indicadores:
-            combinacoes.append({"funcao": f, "indicador": ind})
+    lista_funcoes = list(mapa_funcoes.keys())
 
     if 'passo' not in st.session_state:
         st.session_state.passo = 0
 
-    total_comb = len(combinacoes)
+    total_funcoes = len(lista_funcoes)
     combinacao_valida = False
     tentativas = 0
 
-    while tentativas < total_comb:
-        conf_atual = combinacoes[st.session_state.passo]
-        f_atual = conf_atual['funcao']
-        i_atual = conf_atual['indicador']
-
+    # Motor de Busca: Procura uma Função que tenha gente trabalhando
+    while tentativas < total_funcoes:
+        f_atual = lista_funcoes[st.session_state.passo]
+        
+        # Pega só as pessoas dessa função
         df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
-        df_tela = df_tela[df_tela[i_atual] > 0] 
+        
+        # Verifica se alguém dessa função fez algum dos indicadores
+        indicadores_da_funcao = mapa_funcoes[f_atual]
+        tem_dados = False
+        for ind in indicadores_da_funcao:
+            if ind in df_tela.columns and df_tela[ind].sum() > 0:
+                tem_dados = True
+                break
 
-        if not df_tela.empty:
+        if tem_dados:
             combinacao_valida = True
             break
 
-        st.session_state.passo = (st.session_state.passo + 1) % total_comb
+        st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
         tentativas += 1
 
     # ==========================================
-    # 4. CONSTRUÇÃO VISUAL DA TV
+    # 4. CONSTRUÇÃO VISUAL DA TV (COLUNAS)
     # ==========================================
     
     if not combinacao_valida:
@@ -115,72 +130,87 @@ try:
         st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade...</h2>", unsafe_allow_html=True)
     
     else:
+        # Título Gigante com a FUNÇÃO
         st.markdown(f"""
-            <div style='text-align: center;'>
-                <h1 style='font-size: 3.2rem; margin-bottom: 0;'>{i_atual} - <span style='color: #ff4b4b;'>{f_atual}</span></h1>
-                <p style='font-size: 1.4rem; color: #004aad; margin-top: 5px;'><b>📅 Período: de {dt_inicio_str} até {dt_fim_str}</b> | {periodo_nome}</p>
+            <div style='text-align: center; margin-bottom: 20px;'>
+                <h1 style='font-size: 4rem; margin-bottom: 0; color: #ff4b4b; text-transform: uppercase;'>{f_atual}</h1>
+                <p style='font-size: 1.2rem; color: gray; margin-top: 0px;'><b>📅 de {dt_inicio_str} até {dt_fim_str}</b> | {periodo_nome}</p>
             </div>
         """, unsafe_allow_html=True)
 
-        df_tela = df_tela.sort_values(by=i_atual, ascending=False).head(15)
-        df_tela = df_tela.sort_values(by=i_atual, ascending=True)
+        # Fatiando a tela em 3 colunas iguais
+        col1, col2, col3 = st.columns(3)
+        colunas_ui = [col1, col2, col3]
+        indicadores_para_mostrar = mapa_funcoes[f_atual]
 
-        if i_atual == "Jornada Líq.":
-            txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}%")
-        else:
-            txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}")
-
-        # --- CORREÇÃO DO BUG DAS BARRAS ---
-        # Tiramos o color="TURNO" automático para ele não esmagar as barras
-        fig = px.bar(
-            df_tela, 
-            x=i_atual, 
-            y="NOME", 
-            orientation='h',
-            text=txt
-        )
-
-        fig.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title=None, yaxis_title=None,
-            height=700,
-            showlegend=False, # Como pintamos manualmente, desligamos a legenda nativa
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        
-        # Limpa o eixo X invisível no fundo
-        fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
-
-        # Mapeando e pintando as barras na força bruta para garantir o tamanho
+        # Mapeando cores para ficar padronizado
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'}
-        cores_aplicadas = df_tela['TURNO'].map(mapa_cores).fillna('gray').tolist()
 
-        # =========================================================
-        # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO
-        # =========================================================
-        
-        fig.update_yaxes(tickfont=dict(size=22))
-        
-        # Agora essa grossura vai ser idêntica para absolutamente todas as barras!
-        largura_da_barra = 0.5 
-        
-        fig.update_traces(
-            marker_color=cores_aplicadas, # Aplica a cor certa do turno
-            textfont_size=26, 
-            textposition="outside", 
-            width=largura_da_barra # Trava a grossura
-        )
-        
-        # =========================================================
+        # Loop para preencher os 3 blocos
+        for i in range(3):
+            with colunas_ui[i]:
+                if i < len(indicadores_para_mostrar):
+                    ind_atual = indicadores_para_mostrar[i]
+                    
+                    # Filtra só quem pontuou neste indicador específico
+                    df_col = df_tela[df_tela[ind_atual] > 0].copy()
+                    
+                    if df_col.empty:
+                        st.markdown(f"<h3 style='text-align: center;'>{ind_atual}</h3>", unsafe_allow_html=True)
+                        st.info("Sem dados.")
+                        continue
+                    
+                    # Top 15 e Ordenação
+                    df_col = df_col.sort_values(by=ind_atual, ascending=False).head(15)
+                    df_col = df_col.sort_values(by=ind_atual, ascending=True)
 
-        st.plotly_chart(fig, use_container_width=True)
+                    if ind_atual == "Jornada Líq.":
+                        txt = df_col[ind_atual].apply(lambda x: f"{x:.0f}%")
+                    else:
+                        txt = df_col[ind_atual].apply(lambda x: f"{x:.0f}")
+
+                    # Título do Indicador
+                    st.markdown(f"<h2 style='text-align: center; margin-bottom: 0px;'>{ind_atual}</h2>", unsafe_allow_html=True)
+
+                    # Gráfico do Bloco
+                    fig = px.bar(
+                        df_col, x=ind_atual, y="NOME", orientation='h', text=txt
+                    )
+
+                    fig.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        xaxis_title=None, yaxis_title=None,
+                        height=650, showlegend=False,
+                        margin=dict(l=5, r=5, t=5, b=5) # Margens espremidas para caber
+                    )
+                    
+                    fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
+
+                    cores_aplicadas = df_col['TURNO'].map(mapa_cores).fillna('gray').tolist()
+
+                    # ==========================================
+                    # ÁREA DE AJUSTE (TAMANHOS MENORES AGORA)
+                    # ==========================================
+                    fig.update_yaxes(tickfont=dict(size=14)) # Nome menor para caber na coluna
+                    largura_da_barra = 0.5 
+                    fig.update_traces(
+                        marker_color=cores_aplicadas, 
+                        textfont_size=16, # Número menor 
+                        textposition="outside", 
+                        width=largura_da_barra
+                    )
+                    # ==========================================
+
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    # Se não tem indicador para preencher o bloco, deixa em branco
+                    st.empty()
 
     # ==========================================
     # 5. TIMER E AVANÇO
     # ==========================================
-    time.sleep(20) 
-    st.session_state.passo = (st.session_state.passo + 1) % total_comb
+    time.sleep(15) 
+    st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
     st.rerun()
 
 except Exception as e:
