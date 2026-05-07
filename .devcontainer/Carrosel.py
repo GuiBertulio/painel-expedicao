@@ -7,9 +7,8 @@ import datetime
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (MODO TV)
 # ==========================================
-st.set_page_config(page_title="TV Expedição", page_icon="📺", layout="wide")
+st.set_page_config(page_title="TV Gestão à Vista", page_icon="📺", layout="wide")
 
-# CSS para esconder menus do Streamlit e deixar em tela cheia limpa
 st.markdown(
     """
     <style>
@@ -26,138 +25,127 @@ st.markdown(
 )
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS DA NUVEM
+# 2. CARREGAMENTO E LIMPEZA DE DADOS
 # ==========================================
-# Tempo de cache menor (3 minutos) para a TV sempre pegar dados novos sozinha
-@st.cache_data(ttl=180) 
+@st.cache_data(ttl=60) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
-    
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    if 'NOME' in df.columns:
-        df = df.dropna(subset=['NOME'])
-    
-    colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-    try:
-        df = df[colunas_desejadas]
-    except KeyError:
-        pass 
-    
-    colunas_numericas = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
-    for col in colunas_numericas:
+    # Limpeza básica e conversão numérica
+    cols_num = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
+    for col in cols_num:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-            
-    colunas_novas = ['Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-    for col in colunas_novas:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-    
-    if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
-        df['Jornada Líq.'] = df['Jornada Líq.'] * 100
-        
-    # Filtro Sênior Blindado
-    if all(col in df.columns for col in ['Itens Sep', 'Horas', 'Ressup.', 'Mov. Vert.']):
-        cols_para_testar = ['Itens Sep', 'Horas', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-        for c in cols_para_testar:
-            df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
-            
-        df = df[
-            (df['Itens Sep'] > 0) | 
-            (df['Horas'] > 0) | 
-            (df['Ressup.'] > 0) | 
-            (df['Ressup. Eq.'] > 0) | 
-            (df['Mov. Horizontal'] > 0) | 
-            (df['Mov. Vert.'] > 0)
-        ]
-        
-    # --- NOVO: Juntando Nome e Função para mostrar na TV ---
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+
+    # Criando a coluna Nome (Função) para o gráfico
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['NOME_FUNCAO'] = df['NOME'] + " (" + df['FUNÇÃO'] + ")"
+        # Padroniza para busca
+        df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
             
     return df
 
 # ==========================================
-# 3. MOTOR DO CARROSSEL
+# 3. LÓGICA DE FILTROS (HORÁRIO E FUNÇÃO)
 # ==========================================
 try:
-    df = carregar_dados()
+    df_base = carregar_dados()
 
-    # Lista dos indicadores que vão ficar rodando na tela
-    indicadores = ["Itens Sep", "Itens/Hora", "Jornada Líq.", "Horas", "Ressup.", "Ressup. Eq.", "Mov. Horizontal", "Mov. Vert."]
-
-    # Cria uma memória para o Streamlit saber em qual indicador estamos
-    if 'indice_carrossel' not in st.session_state:
-        st.session_state.indice_carrossel = 0
-
-    # Puxa o indicador atual baseado na memória
-    indicador_atual = indicadores[st.session_state.indice_carrossel]
-
-    # ==========================================
-    # 4. CONSTRUÇÃO DA TELA DA TV
-    # ==========================================
-    st.markdown(f"<h1 style='text-align: center; font-size: 3rem;'>📺 Desempenho em Tempo Real: <span style='color: #ff4b4b;'>{indicador_atual}</span></h1>", unsafe_allow_html=True)
-    st.divider()
-    
-    # Filtra apenas quem tem resultado maior que zero naquele indicador específico
-    df_grafico = df[df[indicador_atual] > 0].copy()
-    
-    if df_grafico.empty:
-        st.warning(f"Nenhum dado registrado para {indicador_atual} no momento.")
+    # --- A. FILTRO POR HORÁRIO (TURNOS) ---
+    hora_atual = datetime.datetime.now().hour
+    # Das 18:00 às 05:59 -> T3 | Das 06:00 às 17:59 -> T1 e T2
+    if 18 <= hora_atual or hora_atual < 6:
+        turnos_permitidos = ['T3']
+        periodo_nome = "🌙 Turno da Noite (T3)"
     else:
-        # Ordena do maior para o menor (Ranking)
-        df_grafico = df_grafico.sort_values(by=indicador_atual, ascending=True)
-        
-        # Formatação dos textos nas barras
-        if indicador_atual == "Jornada Líq.":
-            textos_barras = df_grafico[indicador_atual].apply(lambda x: f"{x:.0f}%")
-        elif indicador_atual == "Horas":
-            textos_barras = df_grafico[indicador_atual].apply(lambda x: f"{x:.2f}h")
+        turnos_permitidos = ['T1', 'T2']
+        periodo_nome = "☀️ Turnos do Dia (T1 e T2)"
+
+    df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
+
+    # --- B. DEFINIÇÃO DO CICLO DO CARROSSEL ---
+    # Funções que você solicitou
+    lista_funcoes = ['CONFERENTE', 'OPERADOR', 'RAMPA', 'SEPARADOR']
+    # Indicadores principais
+    lista_indicadores = ['Itens Sep', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Mov. Horizontal', 'Mov. Vert.']
+
+    # Criamos uma lista de combinações (Função x Indicador)
+    combinacoes = []
+    for f in lista_funcoes:
+        for ind in lista_indicadores:
+            combinacoes.append({"funcao": f, "indicador": ind})
+
+    # Controle do índice via Session State
+    if 'passo' not in st.session_state:
+        st.session_state.passo = 0
+
+    conf_atual = combinacoes[st.session_state.passo]
+    f_atual = conf_atual['funcao']
+    i_atual = conf_atual['indicador']
+
+    # ==========================================
+    # 4. CONSTRUÇÃO VISUAL
+    # ==========================================
+    
+    # Cabeçalho da TV
+    st.markdown(f"""
+        <div style='text-align: center;'>
+            <h1 style='font-size: 3.5rem; margin-bottom: 0;'>{i_atual}</h1>
+            <h2 style='color: #ff4b4b; font-size: 2.5rem; margin-top: 0;'>Setor: {f_atual}</h2>
+            <p style='font-size: 1.2rem; color: gray;'>{periodo_nome} | Próxima atualização em 60s</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Filtrando os dados para a função e indicador da vez
+    df_tela = df[df['FUNCAO_BUSCA'].str.contains(f_atual, na=False)].copy()
+    df_tela = df_tela[df_tela[i_atual] > 0] # Só mostra quem produziu algo
+
+    if df_tela.empty:
+        st.info(f"Sem dados de {i_atual} para {f_atual} neste turno.")
+    else:
+        df_tela = df_tela.sort_values(by=i_atual, ascending=True)
+
+        # Formatação do Label
+        if i_atual == "Jornada Líq.":
+            txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}%")
         else:
-            textos_barras = df_grafico[indicador_atual].apply(lambda x: f"{x:.0f}")
-        
-        # Gráfico Gigante
+            txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}")
+
         fig = px.bar(
-            df_grafico, 
-            x=indicador_atual, 
-            y="NOME_FUNCAO", # Usa a nossa coluna nova que tem Nome + Função
+            df_tela, 
+            x=i_atual, 
+            y="NOME", # Usei só NOME aqui para não ficar repetindo a função na barra, já que o título já diz
             color="TURNO", 
             orientation='h',
-            text=textos_barras
+            text=txt,
+            color_discrete_map={'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'} # Cores padrão
         )
-        
+
         fig.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)", 
+            plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title=None,
-            yaxis_title=None,
-            height=750, # Altura maior para preencher a TV
-            showlegend=True,
-            font=dict(size=16) # Letra maior para ler de longe
+            xaxis_title=None, yaxis_title=None,
+            height=700,
+            font=dict(size=18),
+            showlegend=True
         )
-        
-        # Aumenta a fonte dos números dentro das barras
-        fig.update_traces(textfont_size=20, textposition="outside")
-        
+        fig.update_traces(textfont_size=22, textposition="outside")
+
         st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================
-    # 5. O TIMER DO REFRESH (A MÁGICA ACONTECE AQUI)
+    # 5. TIMER E REEXECUÇÃO
     # ==========================================
-    # Mostra uma barrinha de progresso visual simulada no rodapé (opcional, só para ficar chique)
-    st.markdown("<p style='text-align: center; color: gray;'>Próximo indicador em 60 segundos...</p>", unsafe_allow_html=True)
+    time.sleep(60) # Espera 1 minuto
     
-    # Para o código por 60 segundos
-    time.sleep(60)
+    # Avança o passo
+    st.session_state.passo = (st.session_state.passo + 1) % len(combinacoes)
     
-    # Avança para o próximo indicador (se chegar no final da lista, volta pro começo)
-    st.session_state.indice_carrossel = (st.session_state.indice_carrossel + 1) % len(indicadores)
-    
-    # Força a página a recarregar sozinha
     st.rerun()
 
 except Exception as e:
-    st.error(f"⚠️ Ocorreu um erro: {e}")
+    st.error(f"Erro no sistema de TV: {e}")
+    time.sleep(10)
+    st.rerun()
