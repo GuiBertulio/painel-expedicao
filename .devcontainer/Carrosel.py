@@ -16,7 +16,7 @@ st.markdown(
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 0.5rem !important;
         padding-bottom: 0rem !important;
     }
     </style>
@@ -39,7 +39,6 @@ def carregar_dados():
             df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
 
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
-        df['NOME_FUNCAO'] = df['NOME'] + " (" + df['FUNÇÃO'] + ")"
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
             
     return df
@@ -50,8 +49,19 @@ def carregar_dados():
 try:
     df_base = carregar_dados()
 
-    # --- A. FILTRO POR HORÁRIO ---
-    # Pega a hora global do servidor (UTC) e diminui 3 horas para cravar o horário do Brasil
+    # --- A. DATAS DO PERÍODO APURADO ---
+    hoje = datetime.date.today()
+    if hoje.day >= 26:
+        dt_inicio = datetime.date(hoje.year, hoy.month, 26)
+    else:
+        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
+        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
+        dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+    
+    dt_inicio_str = dt_inicio.strftime('%d/%m/%Y')
+    dt_fim_str = hoje.strftime('%d/%m/%Y')
+
+    # --- B. FILTRO POR HORÁRIO (Sincronizado com Brasil) ---
     agora_brasil = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
     hora_atual = agora_brasil.hour
     
@@ -64,8 +74,8 @@ try:
 
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    # --- B. LISTA DE EXIBIÇÃO ---
-    lista_funcoes = ['CONFERENTE', 'OPERADOR', 'RAMPA', 'SEPARADOR']
+    # --- C. LISTA DE EXIBIÇÃO ATUALIZADA (SEPARADO F e G) ---
+    lista_funcoes = ['CONFERENTE', 'OPERADOR', 'RAMPA', 'SEPARADOR F', 'SEPARADOR G']
     lista_indicadores = ['Itens Sep', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Mov. Horizontal', 'Mov. Vert.']
 
     combinacoes = []
@@ -80,21 +90,20 @@ try:
     combinacao_valida = False
     tentativas = 0
 
-    # --- C. MOTOR DE BUSCA ANTECIPADA (O PULO AUTOMÁTICO) ---
-    # Fica testando até achar uma tela que tenha dados ou até esgotar as opções
+    # Motor de Busca (pula os vazios e foca na categoria exata)
     while tentativas < total_comb:
         conf_atual = combinacoes[st.session_state.passo]
         f_atual = conf_atual['funcao']
         i_atual = conf_atual['indicador']
 
-        df_tela = df[df['FUNCAO_BUSCA'].str.contains(f_atual, na=False)].copy()
+        # Busca exata pela função (para não misturar F com G)
+        df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
         df_tela = df_tela[df_tela[i_atual] > 0] 
 
         if not df_tela.empty:
             combinacao_valida = True
-            break # Achou uma tela com dados! Sai do loop de busca.
+            break
 
-        # Se a tela estaria vazia, pula silenciosamente para a próxima
         st.session_state.passo = (st.session_state.passo + 1) % total_comb
         tentativas += 1
 
@@ -102,21 +111,22 @@ try:
     # 4. CONSTRUÇÃO VISUAL DA TV
     # ==========================================
     
-    # Se todo mundo do galpão estiver zerado em tudo (início de expediente)
     if not combinacao_valida:
         st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 15%;'>⏳ {periodo_nome}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-size: 1.5rem; color: #004aad;'>📅 Período: {dt_inicio_str} até {dt_fim_str}</p>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center; color: gray;'>Aguardando os primeiros registros de produtividade do turno...</h2>", unsafe_allow_html=True)
     
-    # Se encontrou dados válidos, desenha o gráfico normalmente
     else:
+        # Título Único e Período (Ganho de espaço)
         st.markdown(f"""
             <div style='text-align: center;'>
-                <h1 style='font-size: 3.5rem; margin-bottom: 0;'>{i_atual}</h1>
-                <h2 style='color: #ff4b4b; font-size: 2.5rem; margin-top: 0;'>Setor: {f_atual}</h2>
-                <p style='font-size: 1.2rem; color: gray;'>{periodo_nome} | Próxima tela em 20s</p>
+                <h1 style='font-size: 3.2rem; margin-bottom: 0;'>{i_atual} - <span style='color: #ff4b4b;'>{f_atual}</span></h1>
+                <p style='font-size: 1.4rem; color: #004aad; margin-top: 5px;'><b>📅 Período: de {dt_inicio_str} até {dt_fim_str}</b> | {periodo_nome}</p>
             </div>
         """, unsafe_allow_html=True)
 
+        # --- RANKING TOP 15 (Para não criar barra de rolagem) ---
+        df_tela = df_tela.sort_values(by=i_atual, ascending=False).head(15)
         df_tela = df_tela.sort_values(by=i_atual, ascending=True)
 
         if i_atual == "Jornada Líq.":
@@ -138,11 +148,16 @@ try:
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None, yaxis_title=None,
-            height=700,
+            height=720, # Otimizado para TVs 1080p
             font=dict(size=18),
-            showlegend=True
+            showlegend=True,
+            margin=dict(l=20, r=20, t=20, b=20)
         )
-        fig.update_traces(textfont_size=22, textposition="outside")
+        
+        # Nomes maiores e controle de largura para telas com pouca gente
+        fig.update_yaxes(tickfont=dict(size=24))
+        largura_barra = 0.4 if len(df_tela) <= 4 else None
+        fig.update_traces(textfont_size=26, textposition="outside", width=largura_barra)
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -150,10 +165,7 @@ try:
     # 5. TIMER E AVANÇO
     # ==========================================
     time.sleep(20) 
-    
-    # Prepara o passo seguinte para a próxima vez que a página recarregar
     st.session_state.passo = (st.session_state.passo + 1) % total_comb
-    
     st.rerun()
 
 except Exception as e:
