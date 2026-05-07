@@ -160,7 +160,7 @@ try:
         largura_da_barra = 0.2 
         fig.update_traces(
             textfont_size=26, 
-            textposition="middle", 
+            textposition="outside", 
             width=largura_da_barra
         )
         
