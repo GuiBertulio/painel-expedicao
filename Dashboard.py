@@ -39,47 +39,33 @@ def carregar_dados():
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
     
-    # 1. Adicionamos as novas colunas aqui
-    colunas_desejadas = ['NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-    try:
-        df = df[colunas_desejadas]
-    except KeyError:
-        pass 
+    # 1. LISTA ATUALIZADA COM TODAS AS SUAS COLUNAS
+    colunas_desejadas = [
+        'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 
+        'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
+        'Mov. Horizontal', 'Mov. Vert.', 'Avaria', 'Corte %', 'Dev. %', 'Itens Conf.', 
+        'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
+        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.'
+    ]
     
-    # 2. Tratamento das colunas originais
-    colunas_numericas = ['Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.']
+    # Filtra mantendo apenas as colunas que realmente vieram do Sheets (evita erro se faltar alguma)
+    colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
+    df = df[colunas_existentes]
+    
+    # 2. TRATAMENTO DINÂMICO: Transforma todas as métricas em números automaticamente
+    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
+    colunas_numericas = [col for col in df.columns if col not in colunas_texto]
+
     for col in colunas_numericas:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-            
-    # 3. TRATAMENTO SÊNIOR: Apenas convertendo as colunas novas para número
-    colunas_novas = ['Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-    for col in colunas_novas:
-        if col in df.columns:
-            # Puxa o número real que agora vem limpo do Sheets!
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        # Tira o % e troca vírgula por ponto antes de converter
+        df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
         df['Jornada Líq.'] = df['Jornada Líq.'] * 100
         
-    # DESLIGANDO O FILTRO PARA MOSTRAR TODO MUNDO (ATÉ OS ZERADOS)
-    if all(col in df.columns for col in ['Itens Sep', 'Horas', 'Ressup.', 'Mov. Vert.']):
-        cols_para_testar = ['Itens Sep', 'Horas', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-        for c in cols_para_testar:
-            df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
-            
-        # Coloquei um # na frente do df = df[...] para ele não deletar mais ninguém!
-        # df = df[
-        #     (df['Itens Sep'] > 0) | 
-        #     (df['Horas'] > 0) | 
-        #     (df['Ressup.'] > 0) | 
-        #     (df['Ressup. Eq.'] > 0) | 
-        #     (df['Mov. Horizontal'] > 0) | 
-        #     (df['Mov. Vert.'] > 0)
-        # ]
-            
     return df
+
 # ==========================================
 # 3. CONSTRUÇÃO DA TELA E FILTROS
 # ==========================================
@@ -107,7 +93,6 @@ try:
         
         st.info(f"📅 **Período Apurado:** de {dt_inicio_str} até {dt_fim_str}")
         
-        # Filtro de Turno (Agora com botões horizontais iguais à legenda!)
         lista_turnos = ["Todos os Turnos"] + sorted(df['TURNO'].dropna().unique().tolist())
         turno_selecionado = st.radio("Filtre por Turno:", lista_turnos, horizontal=True)
 
@@ -120,10 +105,16 @@ try:
         st.markdown("## 🎯 Visão Geral")
         kpi1, kpi2, kpi3 = st.columns(3)
 
-        total_itens = df_filtrado['Itens Sep'].sum()
-        media_velocidade = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean()
+        total_itens = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
+        
+        if 'Itens/Hora' in df_filtrado.columns:
+            media_velocidade = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean()
+        else:
+            media_velocidade = 0
+            
         if pd.isna(media_velocidade): media_velocidade = 0
-        total_horas = df_filtrado['Horas'].sum()
+        
+        total_horas = df_filtrado['Horas'].sum() if 'Horas' in df_filtrado.columns else 0
 
         kpi1.metric("📦 Total de Itens", f"{total_itens:,.0f}".replace(',', '.'))
         kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
@@ -137,16 +128,20 @@ try:
     with col_graf:
         st.markdown("### 📈 Análise por Colaborador")
         
-        # Adicionei as opções novas aqui no gráfico também!
+        # O Selectbox agora puxa as opções automaticamente baseado nas colunas numéricas
+        colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
+        opcoes_grafico = [col for col in df_filtrado.columns if col not in colunas_texto]
+        
         opcao_grafico = st.selectbox(
             "Selecione a métrica para o gráfico:",
-            ["Jornada Líq.", "Itens Sep", "Itens/Hora", "Horas", "Ressup.", "Ressup. Eq.", "Mov. Horizontal", "Mov. Vert."]
+            opcoes_grafico
         )
         
         df_grafico = df_filtrado[df_filtrado[opcao_grafico] > 0].copy()
         df_grafico = df_grafico.sort_values(by=opcao_grafico, ascending=True)
         
-        if opcao_grafico == "Jornada Líq.":
+        # Formatação dinâmica das barras
+        if "Líq." in opcao_grafico or "%" in opcao_grafico:
             textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}%")
         elif opcao_grafico == "Horas":
             textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.2f}h")
@@ -168,36 +163,21 @@ try:
             xaxis_title=None,
             yaxis_title=None,
             height=650,
-            showlegend=False #Para tirar os botões de T1, T2 e T3
+            showlegend=False
         )
         st.plotly_chart(fig, use_container_width=True)
 
     with col_tab:
         st.markdown("### 📋 Tabela Dinâmica")
         
-        # Adicionando as 4 novas colunas na visualização da tabela
-        colunas_tabela = ['NOME', 'TURNO', 'Itens Sep', 'Horas', 'Itens/Hora', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.']
-        
-        # Só vai exibir as colunas se elas realmente existirem no df (evita erro)
-        colunas_existentes = [col for col in colunas_tabela if col in df_filtrado.columns]
-        df_tabela = df_filtrado[colunas_existentes].sort_values(by='NOME', ascending=True)
+        # A tabela agora exibe todas as colunas existentes no Dataframe atual
+        df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
         
         st.dataframe(
             df_tabela, 
             hide_index=True, 
             use_container_width=True,
-            height=650, 
-            column_config={
-                "Itens Sep": st.column_config.NumberColumn("Itens Sep", format="%d"),
-                "Horas": st.column_config.NumberColumn("Horas", format="%.2f"),
-                "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%d"),
-                "Jornada Líq.": st.column_config.NumberColumn("Jornada Líq.", format="%d%%"),
-                # Configuração para as colunas novas:
-                "Ressup.": st.column_config.NumberColumn("Ressup.", format="%d"),
-                "Ressup. Eq.": st.column_config.NumberColumn("Ressup. Eq.", format="%d"),
-                "Mov. Horizontal": st.column_config.NumberColumn("Mov. Horiz.", format="%d"),
-                "Mov. Vert.": st.column_config.NumberColumn("Mov. Vert.", format="%d")
-            }
+            height=650
         )
 
 except Exception as e:
