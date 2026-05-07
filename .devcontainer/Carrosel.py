@@ -153,20 +153,11 @@ try:
         fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
 
         # =========================================================
-        # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO (PODE MEXER AQUI!)
+        # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO
         # =========================================================
         
-        # 1. TAMANHO DOS NOMES NA ESQUERDA
-        # Altere o número '22' abaixo para aumentar ou diminuir a letra dos nomes.
         fig.update_yaxes(tickfont=dict(size=22))
-        
-        # 2. GROSSURA DA BARRA
-        # Mude o valor de '0.5' para ajustar a grossura. (0.3 é bem fino, 0.8 é bem grosso)
-        # Se você apagar esse número e escrever None, o gráfico ajusta sozinho.
         largura_da_barra = 0.5 
-        
-        # 3. TAMANHO DOS NÚMEROS DE RESULTADO NA DIREITA
-        # Altere o número '26' abaixo para aumentar o número que fica na ponta da barra.
         fig.update_traces(
             textfont_size=26, 
             textposition="outside", 
