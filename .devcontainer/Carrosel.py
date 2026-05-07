@@ -160,7 +160,7 @@ try:
         blocos_finais = blocos_finais[:3]
 
         # ==========================================
-        # 5. DESENHO NA TELA (MODO ESTÁTICO DE TV)
+        # 5. DESENHO NA TELA (SLOTS FIXOS INFALÍVEIS)
         # ==========================================
         colunas_ui = st.columns(3)
         mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
@@ -169,12 +169,23 @@ try:
             with colunas_ui[i]:
                 bloco = blocos_finais[i]
                 
+                # A CHAVE FIXA: Isso garante que o Streamlit substitua exatamente a mesma caixa e apague o passado!
+                chave_fixa = f"grafico_slot_numero_{i}"
+                
                 if bloco['vazio']:
                     if bloco['titulo']:
                         st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
                         st.info("Sem dados no momento.")
+                        
+                        # Injeta um gráfico 100% oco sobre a chave fixa (mata qualquer resto de gráfico)
+                        fig_vazia = px.scatter()
+                        fig_vazia.update_layout(height=550, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False), yaxis=dict(visible=False))
+                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_fixa)
                     else:
-                        st.markdown("<div style='height: 650px;'></div>", unsafe_allow_html=True)
+                        # O BURACO NEGRO DA 3ª COLUNA: Sobrescreve com o nada absoluto
+                        fig_vazia = px.scatter()
+                        fig_vazia.update_layout(height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False), yaxis=dict(visible=False))
+                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_fixa)
                 else:
                     ind = bloco['ind']
                     df_graf = bloco['data']
@@ -203,7 +214,7 @@ try:
                         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                         xaxis_title=None, yaxis_title=None, 
                         showlegend=False,
-                        hovermode=False, # MATA O BALÃOZINHO DO MOUSE
+                        hovermode=False, 
                         margin=dict(l=5, r=40, t=5, b=5), 
                         bargap=0.3 
                     )
@@ -214,14 +225,14 @@ try:
                         marker_color=cores, 
                         textfont_size=16, 
                         textposition="outside",
-                        hoverinfo="skip", # GARANTE QUE NÃO TEM HOVER
+                        hoverinfo="skip", 
                         cliponaxis=False 
                     )
                     
-                    # RENDERIZAÇÃO ESTÁTICA (Imune a bugs de navegador)
-                    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
+                    # Usa a chave fixa para renderizar por cima do que estava antes
+                    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=chave_fixa)
 
-    time.sleep(10) 
+    time.sleep(10)
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
     st.rerun()
 
