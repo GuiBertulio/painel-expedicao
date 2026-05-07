@@ -5,18 +5,24 @@ import time
 import datetime
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA (MODO TV)
+# 1. CONFIGURAÇÃO DA PÁGINA (TRAVA TOTAL)
 # ==========================================
 st.set_page_config(page_title="TV Gestão à Vista", page_icon="📺", layout="wide")
 
+# CSS para matar o scroll e esconder qualquer "fantasma" que tente fugir pro rodapé
 st.markdown(
     """
     <style>
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
+    /* Trava a tela para não ter scroll de jeito nenhum */
+    html, body, [data-testid="stAppViewContainer"] {
+        overflow: hidden;
+        height: 100vh;
+    }
     .block-container {
-        padding-top: 0.5rem !important;
+        padding-top: 0rem !important;
         padding-bottom: 0rem !important;
         max-width: 98% !important; 
     }
@@ -25,8 +31,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# CRIAMOS UM ESPAÇO VAZIO QUE OCUPA A TELA TODA
+placeholder = st.empty()
+
 # ==========================================
-# 2. CARREGAMENTO E LIMPEZA DE DADOS
+# 2. CARREGAMENTO DE DADOS
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -37,223 +46,91 @@ def carregar_dados():
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
     
-    # Limpeza de dados numéricos (todas as colunas menos texto)
     colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA']
     for col in df.columns:
         if col not in colunas_texto:
             df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False).str.strip()
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-            
             if 'Jornada' in col: 
                 df.loc[(df[col] > 0) & (df[col] <= 2.0), col] = df[col] * 100
-                
     return df
 
 # ==========================================
-# 3. LÓGICA DE FILTROS E DICIONÁRIO
+# 3. LÓGICA DO CARROSSEL
 # ==========================================
 try:
     df_base = carregar_dados()
-
-    # Cálculo do período (do dia 26 ao dia de hoje)
     hoje = datetime.date.today()
-    if hoje.day >= 26:
-        dt_inicio = datetime.date(hoje.year, hoje.month, 26)
-    else:
-        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
-        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
-        dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+    dt_inicio = datetime.date(hoje.year, hoje.month, 26) if hoje.day >= 26 else datetime.date(hoje.year if hoje.month > 1 else hoje.year - 1, hoje.month - 1 if hoje.month > 1 else 12, 26)
     
-    dt_inicio_str = dt_inicio.strftime('%d/%m/%Y')
-    dt_fim_str = hoje.strftime('%d/%m/%Y')
-
-    # Lógica de Turnos (fusos horários brasilienses)
     agora_brasil = datetime.datetime.utcnow() - datetime.timedelta(hours=3)
-    hora_atual = agora_brasil.hour
-    
-    if 18 <= hora_atual or hora_atual < 6:
-        turnos_permitidos = ['T3']
-        periodo_nome = "🌙 Turno da Noite (T3)"
-    else:
-        turnos_permitidos = ['T1', 'T2']
-        periodo_nome = "☀️ Turnos do Dia (T1 e T2)"
-
+    turnos_permitidos = ['T3'] if (18 <= agora_brasil.hour or agora_brasil.hour < 6) else ['T1', 'T2']
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    # 🧠 O CÉREBRO DA TV: MAPEAMENTO DE FUNÇÃO X INDICADORES
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], # Ajustado conforme Matriz
+        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], 
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
-        'RAMPA': ['Itens Sep']
+        'RAMPA': ['Itens Rampa']
     }
 
     lista_funcoes = list(mapa_funcoes.keys())
-
-    # Trava de segurança para a memória do carrossel
     if 'passo' not in st.session_state or st.session_state.passo >= len(lista_funcoes):
         st.session_state.passo = 0
 
-    total_funcoes = len(lista_funcoes)
-    combinacao_valida = False
-    tentativas = 0
-
-    # Motor de busca para pular funções sem dados
-    while tentativas < total_funcoes:
+    # TUDO O QUE FOR DESENHADO VAI DENTRO DESSE CONTAINER
+    with placeholder.container():
         f_atual = lista_funcoes[st.session_state.passo]
         df_tela = df[df['FUNCAO_BUSCA'] == f_atual].copy()
+        inds_f = mapa_funcoes[f_atual]
         
-        inds_da_funcao = mapa_funcoes[f_atual]
-        tem_dados = any(df_tela[ind].sum() > 0 for ind in inds_da_funcao if ind in df_tela.columns)
+        # Se não tem dados, pula para o próximo
+        if not any(df_tela[ind].sum() > 0 for ind in inds_f if ind in df_tela.columns):
+            st.session_state.passo = (st.session_state.passo + 1) % len(lista_funcoes)
+            st.rerun()
 
-        if tem_dados:
-            combinacao_valida = True
-            break
+        # Cabeçalho
+        st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; font-size: 3.5rem;'>{f_atual}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: gray;'>📅 {dt_inicio.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')}</p>", unsafe_allow_html=True)
 
-        st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
-        tentativas += 1
-
-    # ==========================================
-    # 4. MOTOR INTELIGENTE DE COLUNAS
-    # ==========================================
-    if not combinacao_valida:
-        st.markdown(f"<h1 style='text-align: center; margin-top: 15%;'>⏳ {periodo_nome}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center;'>📅 Período: {dt_inicio_str} a {dt_fim_str}</p>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <h1 style='font-size: 3.8rem; margin-bottom: 0; color: #ff4b4b;'>{f_atual}</h1>
-                <p style='font-size: 1.2rem; color: gray;'>📅 <b>{dt_inicio_str} a {dt_fim_str}</b> | {periodo_nome}</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        inds_da_funcao = mapa_funcoes[f_atual]
-        blocos_principais = []
-        blocos_extras = []
-
-        # PASSO A: Carrega os principais (os primeiros de cada indicador)
-        for ind in inds_da_funcao:
-            df_ind = df_tela[df_tela[ind] > 0].copy()
-            if df_ind.empty:
-                # Cria bloco oco se o indicador não tem dados
-                blocos_principais.append({"ind": ind, "data": pd.DataFrame(), "vazio": True, "titulo": ind})
-            else:
-                # Remove duplicatas (Sombra) e pega o Top 15
-                df_ind = df_ind.sort_values(by=ind, ascending=False).drop_duplicates(subset=['NOME'])
-                chunk1 = df_ind.head(15).sort_values(by=ind, ascending=True)
-                blocos_principais.append({"ind": ind, "data": chunk1, "vazio": False, "titulo": ind})
-
-                # Se tem mais de 15, joga o resto (Cont.) pra lista de espera
-                if len(df_ind) > 15:
-                    chunk2 = df_ind.iloc[15:30].sort_values(by=ind, ascending=True)
-                    blocos_extras.append({"ind": ind, "data": chunk2, "vazio": False, "titulo": f"{ind} (Cont.)"})
-                if len(df_ind) > 30:
-                    chunk3 = df_ind.iloc[30:45].sort_values(by=ind, ascending=True)
-                    blocos_extras.append({"ind": ind, "data": chunk3, "vazio": False, "titulo": f"{ind} (Cont. 2)"})
-
-        # PASSO B: Monta exatamente 3 blocos finais
-        blocos_finais = []
-        # Começa pelos blocos principais
-        for b in blocos_principais:
-            blocos_finais.append(b)
-            
-        # Se sobrou coluna vazia na TV, preenche com as "Continações" da fila de extras
-        for b in blocos_extras:
-            if len(blocos_finais) < 3:
-                blocos_finais.append(b)
-
-        # Se AINDA sobrar coluna (ex: Conferente que só tem 2), cria blocos invisíveis para limpar a tela
-        while len(blocos_finais) < 3:
-            blocos_finais.append({"ind": "", "data": pd.DataFrame(), "vazio": True, "titulo": ""})
-
-        # Trava de segurança para garantir apenas 3 (limita se der bug na soma)
-        blocos_finais = blocos_finais[:3]
-
-        # ==========================================
-        # 5. DESENHANDO NA TELA E MATANDO O FANTASMA
-        # ==========================================
         colunas_ui = st.columns(3)
-        mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
+        blocos = []
+        for ind in inds_f:
+            df_ind = df_tela[df_tela[ind] > 0].copy()
+            if not df_ind.empty:
+                df_ind = df_ind.sort_values(by=ind, ascending=False).drop_duplicates(subset=['NOME'])
+                blocos.append({"titulo": ind, "data": df_ind.head(15).sort_values(by=ind, ascending=True), "ind": ind})
+                if len(df_ind) > 15:
+                    blocos.append({"titulo": f"{ind} (Cont.)", "data": df_ind.iloc[15:30].sort_values(by=ind, ascending=True), "ind": ind})
 
+        # Desenha exatamente nos 3 slots
+        mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
         for i in range(3):
             with colunas_ui[i]:
-                bloco = blocos_finais[i]
-                
-                # A CHAVE GIGANTE: Isso força o Streamlit a sobrescrever o espaço e matar qualquer resto de gráfico Rosa!
-                chave_slot_fixo = f"grafico_da_coluna_{i}"
-                
-                if bloco['vazio']:
-                    # Mostra o título e "Sem dados" na caixa azul
-                    if bloco['titulo']:
-                        st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
-                        st.info("Sem dados no momento.")
-                        
-                        # Injeta o gráfico oco na chave fixa (mata qualquer resto de gráfico rosa antigo)
-                        fig_vazia = px.bar()
-                        fig_vazia.update_layout(
-                            height=550, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                            xaxis=dict(visible=False), yaxis=dict(visible=False)
-                        )
-                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
-                    else:
-                        # O BURACO NEGRO DA 3ª COLUNA: Sobrescreve com o nada absoluto
-                        fig_vazia = px.bar()
-                        fig_vazia.update_layout(
-                            height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                            xaxis=dict(visible=False), yaxis=dict(visible=False)
-                        )
-                        st.plotly_chart(fig_vazia, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
+                if i < len(blocos):
+                    b = blocos[i]
+                    st.markdown(f"<h3 style='text-align: center;'>{b['titulo']}</h3>", unsafe_allow_html=True)
+                    
+                    # Preenchimento de barras (Fantasmas)
+                    df_graf = b['data']
+                    qtd = 15 - len(df_graf)
+                    if qtd > 0:
+                        fantasmas = pd.DataFrame({'NOME': ["\u200B"*(x+1) for x in range(qtd)], b['ind']: [0.0]*qtd, 'TURNO': ['FANTASMA']*qtd})
+                        df_graf = pd.concat([fantasmas, df_graf], ignore_index=True)
+
+                    txt = df_graf[b['ind']].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if 'Jornada' in b['ind'] else f"{x:.0f}"))
+                    fig = px.bar(df_graf, x=b['ind'], y="NOME", orientation='h', text=txt)
+                    fig.update_yaxes(type='category', tickfont=dict(size=14))
+                    fig.update_layout(height=600, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", showlegend=False, margin=dict(l=5, r=40, t=5, b=5), bargap=0.3)
+                    fig.update_xaxes(visible=False)
+                    fig.update_traces(marker_color=df_graf['TURNO'].map(mapa_cores).fillna('gray').tolist(), textposition="outside", cliponaxis=False)
+                    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=f"slot_{i}")
                 else:
-                    ind = bloco['ind']
-                    df_graf = bloco['data']
-                    titulo = bloco['titulo']
-                    
-                    st.markdown(f"<h3 style='text-align: center; color: #333;'>{titulo}</h3>", unsafe_allow_html=True)
+                    st.empty() # Coluna vazia real
 
-                    # A GRANDE MÁGICA DOS FANTASMAS (Padrão de Barras)
-                    qtd_faltante = 15 - len(df_graf)
-                    if qtd_faltante > 0:
-                        espaco_magico = "\u200B"
-                        linhas_vazias = pd.DataFrame({
-                            'NOME': [espaco_magico * (x+1) for x in range(qtd_faltante)],
-                            ind: [0.0] * qtd_faltante,
-                            'TURNO': ['FANTASMA'] * qtd_faltante
-                        })
-                        df_graf = pd.concat([linhas_vazias, df_graf], ignore_index=True)
-
-                    # Tira o texto do fantasma (se valor for zero)
-                    txt = df_graf[ind].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if 'Jornada' in ind else f"{x:.0f}"))
-
-                    fig = px.bar(df_graf, x=ind, y="NOME", orientation='h', text=txt)
-                    
-                    fig.update_yaxes(type='category', categoryorder='array', categoryarray=df_graf['NOME'].tolist(), tickfont=dict(size=14))
-                    
-                    fig.update_layout(
-                        height=650, # Altura travada!
-                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                        xaxis_title=None, yaxis_title=None, 
-                        showlegend=False,
-                        hovermode=False, # MATA O BALÃOZINHO DO MOUSE
-                        margin=dict(l=5, r=40, t=5, b=5), 
-                        bargap=0.3 # Mantém todas as barras padronizadas
-                    )
-                    fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
-                    
-                    cores = df_graf['TURNO'].map(mapa_cores).fillna('gray').tolist()
-                    fig.update_traces(
-                        marker_color=cores, 
-                        textfont_size=16, 
-                        textposition="outside",
-                        hoverinfo="skip", # GARANTE QUE NÃO TEM HOVER
-                        cliponaxis=False # Impede que os números fiquem cortados na borda
-                    )
-                    
-                    # Usa a chave fixa para renderizar por cima do que estava antes
-                    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=chave_slot_fixo)
-
-    time.sleep(10) 
-    st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
+    time.sleep(10)
+    st.session_state.passo = (st.session_state.passo + 1) % len(lista_funcoes)
     st.rerun()
 
 except Exception as e:
