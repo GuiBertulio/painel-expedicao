@@ -134,7 +134,7 @@ try:
         else:
             txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}")
 
-        fig = px.bar(
+       fig = px.bar(
             df_tela, 
             x=i_atual, 
             y="NOME", 
@@ -148,16 +148,33 @@ try:
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None, yaxis_title=None,
-            height=720, # Otimizado para TVs 1080p
-            font=dict(size=18),
+            height=720, 
             showlegend=True,
             margin=dict(l=20, r=20, t=20, b=20)
         )
         
-        # Nomes maiores e controle de largura para telas com pouca gente
+        # --- A MÁGICA QUE APAGA AS LINHAS DE FUNDO ---
+        # Isso esconde as linhas verticais (grid), a linha do zero e os números do rodapé
+        fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
+
+        # =========================================================
+        # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO (PODE MEXER AQUI!)
+        # =========================================================
+        
+        # 1. TAMANHO DO NOME DOS COLABORADORES
+        # Para aumentar os nomes, mude o 24 para 28, 30, etc.
         fig.update_yaxes(tickfont=dict(size=24))
+        
+        # 2. GROSSURA DA BARRA
+        # Se quiser forçar uma grossura padrão, troque toda essa linha abaixo por: largura_barra = 0.6
+        # (O valor vai de 0.1 que é um fio de cabelo, até 1.0 que é uma barra grudada na outra)
         largura_barra = 0.4 if len(df_tela) <= 4 else None
+        
+        # 3. TAMANHO DOS NÚMEROS NA PONTA DA BARRA
+        # Para aumentar o número do resultado, mude o textfont_size=26 para 30, 32, etc.
         fig.update_traces(textfont_size=26, textposition="outside", width=largura_barra)
+        
+        # =========================================================
 
         st.plotly_chart(fig, use_container_width=True)
 
