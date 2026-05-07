@@ -128,7 +128,6 @@ try:
         blocos_principais = []
         blocos_extras = []
 
-        # PASSO 1: Organiza os blocos principais
         for ind in inds_da_funcao:
             df_ind = df_tela[df_tela[ind] > 0].copy()
             if df_ind.empty:
@@ -138,7 +137,6 @@ try:
                 chunk1 = df_ind.head(15).sort_values(by=ind, ascending=True)
                 blocos_principais.append({"ind": ind, "data": chunk1, "vazio": False, "titulo": ind})
 
-                # Se tem mais de 15, joga o resto pra fila de extras
                 if len(df_ind) > 15:
                     chunk2 = df_ind.iloc[15:30].sort_values(by=ind, ascending=True)
                     blocos_extras.append({"ind": ind, "data": chunk2, "vazio": False, "titulo": f"{ind} (Cont.)"})
@@ -146,7 +144,6 @@ try:
                     chunk3 = df_ind.iloc[30:45].sort_values(by=ind, ascending=True)
                     blocos_extras.append({"ind": ind, "data": chunk3, "vazio": False, "titulo": f"{ind} (Cont. 2)"})
 
-        # PASSO 2: Monta exatamente 3 blocos para as 3 colunas
         blocos_finais = []
         for b in blocos_principais:
             blocos_finais.append(b)
@@ -155,18 +152,17 @@ try:
             if len(blocos_finais) < 3:
                 blocos_finais.append(b)
 
-        # Se ainda faltar bloco para fechar as 3 colunas, cria blocos totalmente ocos para limpar a tela
         while len(blocos_finais) < 3:
             blocos_finais.append({"ind": "", "data": pd.DataFrame(), "vazio": True, "titulo": ""})
 
-        # Trava de segurança para garantir apenas 3
         blocos_finais = blocos_finais[:3]
 
         # ==========================================
-        # 5. DESENHANDO NA TELA COM OS "FANTASMAS"
+        # 5. DESENHANDO NA TELA
         # ==========================================
         colunas_ui = st.columns(3)
-        mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'}
+        # Adicionei a cor transparente para os fantasmas passarem despercebidos
+        mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
 
         for i in range(3):
             with colunas_ui[i]:
@@ -177,7 +173,14 @@ try:
                         st.markdown(f"<h3 style='text-align: center; color: #333;'>{bloco['titulo']}</h3>", unsafe_allow_html=True)
                         st.info("Sem dados no momento.")
                     else:
-                        st.empty() # Garante que o espaço sobra branco
+                        # MATA O GRÁFICO FANTASMA DA 3ª COLUNA:
+                        # Cria um gráfico 100% vazio e transparente para forçar o Streamlit a apagar a imagem velha
+                        fig_vazia = px.bar()
+                        fig_vazia.update_layout(
+                            height=650, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            xaxis=dict(visible=False), yaxis=dict(visible=False)
+                        )
+                        st.plotly_chart(fig_vazia, use_container_width=True, key=f"vazio_{f_atual}_{i}")
                 else:
                     ind = bloco['ind']
                     df_graf = bloco['data']
@@ -185,28 +188,26 @@ try:
                     
                     st.markdown(f"<h3 style='text-align: center; color: #333;'>{titulo}</h3>", unsafe_allow_html=True)
 
-                    # --- A GRANDE MÁGICA DOS FANTASMAS ---
-                    # Calcula quantos faltam para chegar a 15 barras
+                    # --- CORREÇÃO DAS BARRAS GIGANTES ---
                     qtd_faltante = 15 - len(df_graf)
                     if qtd_faltante > 0:
-                        # Cria linhas falsas invisíveis só para preencher espaço
+                        # O segredo: "\u200B" é um espaço de largura zero que o Plotly não apaga!
+                        espaco_magico = "\u200B"
                         linhas_vazias = pd.DataFrame({
-                            'NOME': [" " * (x+1) for x in range(qtd_faltante)], # Cria nomes vazios (" ", "  ", "   ")
+                            'NOME': [espaco_magico * (x+1) for x in range(qtd_faltante)],
                             ind: [0.0] * qtd_faltante,
-                            'TURNO': ['T1'] * qtd_faltante
+                            'TURNO': ['FANTASMA'] * qtd_faltante
                         })
-                        # Gruda os fantasmas embaixo dos funcionários reais
                         df_graf = pd.concat([linhas_vazias, df_graf], ignore_index=True)
-                    # -------------------------------------
 
-                    # Se o valor for 0 (fantasma), a letra não aparece!
+                    # Tira o texto do fantasma
                     txt = df_graf[ind].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if ind == 'Jornada Líq.' else f"{x:.0f}"))
 
                     fig = px.bar(df_graf, x=ind, y="NOME", orientation='h', text=txt)
                     
-                    fig.update_yaxes(type='category', categoryorder='array', categoryarray=df_graf['NOME'], tickfont=dict(size=14))
+                    fig.update_yaxes(type='category', categoryorder='array', categoryarray=df_graf['NOME'].tolist(), tickfont=dict(size=14))
                     
-                    # Altura travada! Como sempre tem 15 barras (reais ou fantasmas), o tamanho é perfeito.
+                    # A altura fica cravada em 650 para todas as colunas ficarem perfeitamente alinhadas
                     fig.update_layout(
                         height=650, 
                         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
@@ -225,10 +226,9 @@ try:
                         cliponaxis=False 
                     )
                     
-                    # O 'key' com o número da coluna impede o fantasma da tela anterior de voltar!
-                    st.plotly_chart(fig, use_container_width=True, key=f"plot_{f_atual}_{i}")
+                    st.plotly_chart(fig, use_container_width=True, key=f"plot_{f_atual}_{ind}_{i}")
 
-    time.sleep(20) 
+    time.sleep(10) 
     st.session_state.passo = (st.session_state.passo + 1) % total_funcoes
     st.rerun()
 
