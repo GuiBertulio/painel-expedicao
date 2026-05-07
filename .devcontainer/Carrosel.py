@@ -130,14 +130,14 @@ try:
         else:
             txt = df_tela[i_atual].apply(lambda x: f"{x:.0f}")
 
+        # --- CORREÇÃO DO BUG DAS BARRAS ---
+        # Tiramos o color="TURNO" automático para ele não esmagar as barras
         fig = px.bar(
             df_tela, 
             x=i_atual, 
             y="NOME", 
-            color="TURNO", 
             orientation='h',
-            text=txt,
-            color_discrete_map={'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'}
+            text=txt
         )
 
         fig.update_layout(
@@ -145,23 +145,31 @@ try:
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title=None, yaxis_title=None,
             height=700,
-            showlegend=True,
+            showlegend=False, # Como pintamos manualmente, desligamos a legenda nativa
             margin=dict(l=20, r=20, t=20, b=20)
         )
         
         # Limpa o eixo X invisível no fundo
         fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
 
+        # Mapeando e pintando as barras na força bruta para garantir o tamanho
+        mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b'}
+        cores_aplicadas = df_tela['TURNO'].map(mapa_cores).fillna('gray').tolist()
+
         # =========================================================
         # 🛠️ ÁREA DE AJUSTES MANUAIS DE TAMANHO
         # =========================================================
         
         fig.update_yaxes(tickfont=dict(size=22))
-        largura_da_barra = 0.2 
+        
+        # Agora essa grossura vai ser idêntica para absolutamente todas as barras!
+        largura_da_barra = 0.5 
+        
         fig.update_traces(
+            marker_color=cores_aplicadas, # Aplica a cor certa do turno
             textfont_size=26, 
             textposition="outside", 
-            width=largura_da_barra
+            width=largura_da_barra # Trava a grossura
         )
         
         # =========================================================
@@ -171,7 +179,7 @@ try:
     # ==========================================
     # 5. TIMER E AVANÇO
     # ==========================================
-    time.sleep(20) 
+    time.sleep(60) 
     st.session_state.passo = (st.session_state.passo + 1) % total_comb
     st.rerun()
 
