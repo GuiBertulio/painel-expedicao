@@ -34,8 +34,9 @@ placeholder = st.empty()
 # ==========================================
 # 2. CARREGAMENTO E LIMPEZA DE DADOS
 # ==========================================
+# Mudei o nome da função para FORÇAR o cache a resetar!
 @st.cache_data(ttl=60) 
-def carregar_dados():
+def baixar_planilha_tv():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
@@ -43,13 +44,19 @@ def carregar_dados():
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
     
-    colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA', 'Tempo Médio']
+    colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA']
     for col in df.columns:
         if col not in colunas_texto:
-            df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False).str.strip()
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-            if 'Jornada' in col: 
-                df.loc[(df[col] > 0) & (df[col] <= 2.0), col] = df[col] * 100
+            if col == 'Tempo Médio': 
+                # Corta o ".017000" fora primeiro, depois transforma em Segundos Matemáticos
+                texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
+                df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
+            else:
+                # Transforma indicadores normais em números
+                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False).str.strip()
+                df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
+                if 'Jornada' in col: 
+                    df.loc[(df[col] > 0) & (df[col] <= 2.0), col] = df[col] * 100
     return df
 
 # ==========================================
@@ -83,7 +90,7 @@ apelidos_cargos = {
 }
 
 try:
-    df_base = carregar_dados()
+    df_base = baixar_planilha_tv()
     hoje = datetime.date.today()
     dt_inicio = datetime.date(hoje.year, hoje.month, 26) if hoje.day >= 26 else datetime.date(hoje.year if hoje.month > 1 else hoje.year - 1, hoje.month - 1 if hoje.month > 1 else 12, 26)
     
@@ -109,13 +116,8 @@ try:
         f_exibicao = apelidos_cargos.get(f_planilha, f_planilha)
         df_tela = df[(df['TURNO'] == t_atual) & (df['FUNCAO_BUSCA'] == f_planilha)].copy()
         
-        # === FILTRO INTELIGENTE ANTI-ERRO (Aceita tanto número quanto texto) ===
-        def tem_dado_valido(serie):
-            s = serie.astype(str).str.strip()
-            validos = s[(s != '0') & (s != '0.0') & (s != '00:00:00') & (s != 'nan') & (s != '') & (s != 'None')]
-            return len(validos) > 0
-
-        if not any(tem_dado_valido(df_tela[ind]) for ind in inds_f if ind in df_tela.columns):
+        # Filtro de segurança 100% numérico
+        if not any((df_tela[ind] > 0).any() for ind in inds_f if ind in df_tela.columns):
             st.session_state.passo = (st.session_state.passo + 1) % len(lista_telas)
             st.rerun()
 
@@ -125,18 +127,10 @@ try:
         blocos = []
         for ind in inds_f:
             if ind in df_tela.columns:
-                # O Segredo: Filtramos convertendo temporariamente para string para não dar conflito
-                mascara_validos = (
-                    (df_tela[ind].astype(str).str.strip() != '0') & 
-                    (df_tela[ind].astype(str).str.strip() != '0.0') & 
-                    (df_tela[ind].astype(str).str.strip() != '00:00:00') &
-                    (df_tela[ind].astype(str).str.strip() != 'nan') &
-                    (df_tela[ind].astype(str).str.strip() != '')
-                )
-                df_ind = df_tela[mascara_validos].copy()
+                df_ind = df_tela[df_tela[ind] > 0].copy()
                 
                 if not df_ind.empty:
-                    # Tempo Médio também entra na lista de "Quanto menor, melhor"
+                    # Tempo Médio entra na lista de "Quanto menor, melhor" (Menos tempo = mais rápido = Topo do gráfico)
                     ordem_crescente = True if ind in ['Avaria', 'Corte %', 'Dev. %', 'Tempo Médio'] else False
                     
                     df_ind = df_ind.sort_values(by=ind, ascending=ordem_crescente).drop_duplicates(subset=['NOME'])
@@ -153,15 +147,22 @@ try:
         def formatar_kpi(row, coluna_ind):
             if row['TURNO'] == 'FANTASMA': return ""
             valor = row[coluna_ind]
-            if pd.isna(valor) or valor == '' or valor == 0: return ""
+            if pd.isna(valor) or valor == 0: return ""
             
             if coluna_ind in ['Avaria', 'Corte %', 'Dev. %']: return f"{float(valor):.2f}%"
             elif 'Jornada' in coluna_ind: return f"{float(valor):.0f}%"
-            elif coluna_ind == 'Tempo Médio': return str(valor).split('.')[0] # Limpa os milissegundos
+            elif coluna_ind == 'Tempo Médio': 
+                # Converte os Segundos Matemáticos de volta para o formato de Relógio
+                segundos = int(float(valor))
+                h = segundos // 3600
+                m = (segundos % 3600) // 60
+                s = segundos % 60
+                return f"{h:02d}:{m:02d}:{s:02d}"
             else: return f"{float(valor):.0f}"
 
         num_blocos = len(blocos)
         
+        # O motor de centralização
         if num_blocos == 1:
             colunas_ui = st.columns([1, 1.5, 1]) 
             alvos = [colunas_ui[1]]
