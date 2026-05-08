@@ -60,7 +60,7 @@ mapa_completo = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'CONFERENTE': ['Itens Conf.'],
-        'OPERADOR': ['Mov. Horizontal'], # Busca "OPERADOR" na planilha
+        'OPERADOR': ['Mov. Horizontal'], 
         'RAMPEIRO': ['Itens Rampa'],
         'MANOBRISTA': ['Itens Manob.'],
     },
@@ -78,7 +78,6 @@ mapa_completo = {
     }
 }
 
-# CONFIGURAÇÃO DE APELIDOS PARA O TÍTULO (NOME NA PLANILHA : NOME NA TV)
 apelidos_cargos = {
     "OPERADOR": "OPERADOR DE EMPILHADEIRA"
 }
@@ -104,62 +103,73 @@ try:
     with placeholder.container():
         tela_atual = lista_telas[st.session_state.passo]
         t_atual = tela_atual['turno']
-        f_planilha = tela_atual['funcao'] # Nome usado na busca
+        f_planilha = tela_atual['funcao'] 
         inds_f = tela_atual['indicadores']
         
-        # Define o nome que vai aparecer no título da TV
         f_exibicao = apelidos_cargos.get(f_planilha, f_planilha)
-
         df_tela = df[(df['TURNO'] == t_atual) & (df['FUNCAO_BUSCA'] == f_planilha)].copy()
         
-        if not any(df_tela[ind].sum() > 0 for ind in inds_f if ind in df_tela.columns):
+        # === FILTRO INTELIGENTE ANTI-ERRO (Aceita tanto número quanto texto) ===
+        def tem_dado_valido(serie):
+            s = serie.astype(str).str.strip()
+            validos = s[(s != '0') & (s != '0.0') & (s != '00:00:00') & (s != 'nan') & (s != '') & (s != 'None')]
+            return len(validos) > 0
+
+        if not any(tem_dado_valido(df_tela[ind]) for ind in inds_f if ind in df_tela.columns):
             st.session_state.passo = (st.session_state.passo + 1) % len(lista_telas)
             st.rerun()
 
-        # Cabeçalho
         st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; font-size: 3.5rem;'>{f_exibicao}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; color: gray;'>📅 {dt_inicio.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')}</p>", unsafe_allow_html=True)
 
         blocos = []
         for ind in inds_f:
-            df_ind = df_tela[df_tela[ind] > 0].copy()
-            if not df_ind.empty:
-                df_ind = df_ind.sort_values(by=ind, ascending=False).drop_duplicates(subset=['NOME'])
-                blocos.append({"titulo": ind, "data": df_ind.head(15).sort_values(by=ind, ascending=True), "ind": ind})
-                if len(df_ind) > 15:
-                    blocos.append({"titulo": f"{ind} (Cont.)", "data": df_ind.iloc[15:30].sort_values(by=ind, ascending=True), "ind": ind})
+            if ind in df_tela.columns:
+                # O Segredo: Filtramos convertendo temporariamente para string para não dar conflito
+                mascara_validos = (
+                    (df_tela[ind].astype(str).str.strip() != '0') & 
+                    (df_tela[ind].astype(str).str.strip() != '0.0') & 
+                    (df_tela[ind].astype(str).str.strip() != '00:00:00') &
+                    (df_tela[ind].astype(str).str.strip() != 'nan') &
+                    (df_tela[ind].astype(str).str.strip() != '')
+                )
+                df_ind = df_tela[mascara_validos].copy()
+                
+                if not df_ind.empty:
+                    # Tempo Médio também entra na lista de "Quanto menor, melhor"
+                    ordem_crescente = True if ind in ['Avaria', 'Corte %', 'Dev. %', 'Tempo Médio'] else False
+                    
+                    df_ind = df_ind.sort_values(by=ind, ascending=ordem_crescente).drop_duplicates(subset=['NOME'])
+                    
+                    chunk = df_ind.head(15).sort_values(by=ind, ascending=not ordem_crescente)
+                    blocos.append({"titulo": ind, "data": chunk, "ind": ind})
+                    
+                    if len(df_ind) > 15:
+                        chunk2 = df_ind.iloc[15:30].sort_values(by=ind, ascending=not ordem_crescente)
+                        blocos.append({"titulo": f"{ind} (Cont.)", "data": chunk2, "ind": ind})
 
-        # Cores: T1/T2 Amarelo (#ffcc00), T3 Azul Escuro (#004aad)
         mapa_cores = {'T1': '#ffcc00', 'T2': '#ffcc00', 'T3': '#004aad', 'FANTASMA': 'rgba(0,0,0,0)'}
         
-        # Função para aplicar a máscara de texto perfeita
         def formatar_kpi(row, coluna_ind):
             if row['TURNO'] == 'FANTASMA': return ""
             valor = row[coluna_ind]
             if pd.isna(valor) or valor == '' or valor == 0: return ""
             
-            # Máscaras específicas da sua matriz!
-            if coluna_ind in ['Avaria', 'Corte %', 'Dev. %']:
-                return f"{float(valor):.2f}%"
-            elif 'Jornada' in coluna_ind:
-                return f"{float(valor):.0f}%"
-            elif coluna_ind == 'Tempo Médio':
-                # O SEGREDO AQUI: Corta o texto no ponto e pega só a parte da frente!
-                return str(valor).split('.')[0]
-            else:
-                return f"{float(valor):.0f}"
+            if coluna_ind in ['Avaria', 'Corte %', 'Dev. %']: return f"{float(valor):.2f}%"
+            elif 'Jornada' in coluna_ind: return f"{float(valor):.0f}%"
+            elif coluna_ind == 'Tempo Médio': return str(valor).split('.')[0] # Limpa os milissegundos
+            else: return f"{float(valor):.0f}"
 
         num_blocos = len(blocos)
         
-        # LÓGICA DE CENTRALIZAÇÃO AUTOMÁTICA
         if num_blocos == 1:
-            colunas_ui = st.columns([1, 1.5, 1]) # Cria espaço nas laterais para centralizar 1 bloco
+            colunas_ui = st.columns([1, 1.5, 1]) 
             alvos = [colunas_ui[1]]
         elif num_blocos == 2:
-            colunas_ui = st.columns([0.5, 2, 2, 0.5]) # Centraliza 2 blocos
+            colunas_ui = st.columns([0.5, 2, 2, 0.5]) 
             alvos = [colunas_ui[1], colunas_ui[2]]
         else:
-            colunas_ui = st.columns(3) # Usa a tela toda para 3 ou mais
+            colunas_ui = st.columns(3) 
             alvos = [colunas_ui[0], colunas_ui[1], colunas_ui[2]]
 
         for i in range(min(num_blocos, len(alvos))):
@@ -185,7 +195,7 @@ try:
                     showlegend=False, 
                     margin=dict(l=5, r=40, t=5, b=5), 
                     bargap=0.3, 
-                    yaxis_title=None # REMOVE A PALAVRA "NOME"
+                    yaxis_title=None 
                 )
                 
                 fig.update_xaxes(visible=False)
