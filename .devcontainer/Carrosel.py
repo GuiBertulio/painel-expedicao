@@ -70,7 +70,7 @@ try:
     mapa_funcoes = {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Conf.', 'Ressup. Eq.'], 
+        'CONFERENTE': ['Itens Conf.', 'Ressup.'], 
         'OPERADOR': ['Mov. Horizontal', 'Mov. Vert.'],
         'RAMPA': ['Itens Rampa']
     }
@@ -105,7 +105,8 @@ try:
                     blocos.append({"titulo": f"{ind} (Cont.)", "data": df_ind.iloc[15:30].sort_values(by=ind, ascending=True), "ind": ind})
 
         # Desenha exatamente nos 3 slots
-        mapa_cores = {'T1': '#004aad', 'T2': '#ffcc00', 'T3': '#ff4b4b', 'FANTASMA': 'rgba(0,0,0,0)'}
+        # Ajuste de Cores: T1 e T2 Amarelo, T3 Azul Escuro
+        mapa_cores = {'T1': '#ffcc00', 'T2': '#ffcc00', 'T3': '#004aad', 'FANTASMA': 'rgba(0,0,0,0)'}
         for i in range(3):
             with colunas_ui[i]:
                 if i < len(blocos):
@@ -121,8 +122,20 @@ try:
 
                     txt = df_graf[b['ind']].apply(lambda x: "" if x == 0 else (f"{x:.0f}%" if 'Jornada' in b['ind'] else f"{x:.0f}"))
                     fig = px.bar(df_graf, x=b['ind'], y="NOME", orientation='h', text=txt)
+                    
                     fig.update_yaxes(type='category', tickfont=dict(size=14))
-                    fig.update_layout(height=600, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", showlegend=False, margin=dict(l=5, r=40, t=5, b=5), bargap=0.3)
+                    
+                    # Ajuste: yaxis_title=None remove a palavra "NOME" do eixo vertical
+                    fig.update_layout(
+                        height=600, 
+                        plot_bgcolor="rgba(0,0,0,0)", 
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        showlegend=False, 
+                        margin=dict(l=5, r=40, t=5, b=5), 
+                        bargap=0.3,
+                        yaxis_title=None 
+                    )
+                    
                     fig.update_xaxes(visible=False)
                     fig.update_traces(marker_color=df_graf['TURNO'].map(mapa_cores).fillna('gray').tolist(), textposition="outside", cliponaxis=False)
                     st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True}, key=f"slot_{i}")
