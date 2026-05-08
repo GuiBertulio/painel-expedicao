@@ -132,13 +132,22 @@ try:
         # Cores: T1/T2 Amarelo (#ffcc00), T3 Azul Escuro (#004aad)
         mapa_cores = {'T1': '#ffcc00', 'T2': '#ffcc00', 'T3': '#004aad', 'FANTASMA': 'rgba(0,0,0,0)'}
         
+        # Função para aplicar a máscara de texto perfeita
         def formatar_kpi(row, coluna_ind):
             if row['TURNO'] == 'FANTASMA': return ""
             valor = row[coluna_ind]
             if pd.isna(valor) or valor == '' or valor == 0: return ""
-            if 'Jornada' in coluna_ind: return f"{float(valor):.0f}%"
-            elif coluna_ind == 'Tempo Médio': return str(valor)
-            else: return f"{float(valor):.0f}"
+            
+            # Máscaras específicas da sua matriz!
+            if coluna_ind in ['Avaria', 'Corte %', 'Dev. %']:
+                return f"{float(valor):.2f}%"
+            elif 'Jornada' in coluna_ind:
+                return f"{float(valor):.0f}%"
+            elif coluna_ind == 'Tempo Médio':
+                # O SEGREDO AQUI: Corta o texto no ponto e pega só a parte da frente!
+                return str(valor).split('.')[0]
+            else:
+                return f"{float(valor):.0f}"
 
         num_blocos = len(blocos)
         
