@@ -23,14 +23,13 @@ st.markdown(
         font-size: 20px !important;
         color: gray;
     }
-    /* Estilo para os cards customizados de metas */
     .card-meta {
         background-color: white; 
         padding: 15px; 
         border-radius: 10px; 
         box-shadow: 1px 1px 5px rgba(0,0,0,0.1); 
         margin-bottom: 15px;
-        border-left: 5px solid #ccc;
+        border-left: 6px solid #ccc;
     }
     </style>
     """,
@@ -38,42 +37,56 @@ st.markdown(
 )
 
 # ==========================================
-# 2. DICIONÁRIO DE METAS
+# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS
 # ==========================================
+# Transcrevi as regras exatas da sua foto para o Python!
+# 'tipo': '>' (maior melhor) ou '<' (menor melhor)
+# 'prop': True (Proporcional SIM) ou False (NÃO)
 metas_100 = {
     'T3': {
-        'SEPARADOR F': {'Jornada Líq.': 80, 'Itens Sep': 9000, 'Itens/Hora': 75},
-        'SEPARADOR G': {'Jornada Líq.': 72, 'Itens Sep': 8100, 'Itens/Hora': 75},
-        'CONFERENTE': {'Itens Conf.': 110000, 'Dev. %': 0.46},
-        'OPERADOR': {'Mov. Horizontal': 1800, 'Avaria': 0.07},
-        'RAMPEIRO': {'Itens Rampa': 45000, 'Dev. %': 0.46, 'Avaria': 0.07},
-        'MESA': {'Jornada Líq. Eq.': 75, 'Dev. %': 0.46, 'Corte %': 0.45},
-        'MANOBRISTA': {'Itens Manob.': 250000, 'Dev. %': 0.46, 'Avaria': 0.07},
-        'LÍDER': {'Jornada Líq. Eq.': 75, 'Dev. %': 0.46, 'Itens/Hora Eq.': 75}
-    },
-    'T2': {
-        'AVARIA': {'Avaria': 0.07},
-        'CONFERENTE': {'Itens Conf.': 120000, 'Dev. %': 0.46},
-        'DEVOLUÇÃO': {'Dev. %': 0.46},
-        'INVENTARIO': {'Corte %': 0.45},
-        'LÍDER': {'Ressup. Eq.': 11000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
-        'MESA': {'Ressup. Eq.': 11000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
-        'OPERADOR': {'Mov. Horizontal': 1800, 'Avaria': 0.07},
-        'RAMPEIRO': {'Itens Rampa': 45000, 'Dev. %': 0.46, 'Avaria': 0.07},
-        'SEPARADOR G': {'Ressup. Ap.': 800, 'Itens/Hora': 65}
-    },
-    'T1': {
-        'CONFERENTE': {'Palets Conf.': 2500},
-        'DESCARGA': {'Carga Palet.': 3700, 'Carga Bat.': 1500},
-        'DEVOLUÇÃO': {'Dev. %': 0.46},
-        'LÍDER': {'Palets Conf.': 2500}, 
-        'OPERADOR': {'Mov. Vert.': 2750},
-        'PUXA': {'Palets Px.': 3000}
+        'SEPARADOR F': {
+            'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 75, 't100': 80, 't120': 85},
+            'Itens Sep':    {'tipo': '>', 'prop': True,  'v100': 150.0, 't50': 7000, 't100': 9000, 't120': 11000},
+            'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
+        },
+        'SEPARADOR G': {
+            'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 68, 't100': 72, 't120': 77},
+            'Itens Sep':    {'tipo': '>', 'prop': True,  'v100': 150.0, 't50': 6300, 't100': 8100, 't120': 9900},
+            'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
+        },
+        'CONFERENTE': {
+            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000},
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'OPERADOR': {
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
+        'RAMPEIRO': {
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
+        'MESA': {
+            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85},
+            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Corte %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
+        },
+        'MANOBRISTA': {
+            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000},
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
+        'LÍDER': {
+            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 65, 't100': 75, 't120': 85},
+            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Itens/Hora Eq.':   {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}
+        }
     }
 }
 
 # ==========================================
-# 3. CARREGAMENTO DOS DADOS DA NUVEM
+# 3. CARREGAMENTO DOS DADOS
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
@@ -96,7 +109,6 @@ def carregar_dados():
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
     df = df[colunas_existentes]
     
-    # TRATAMENTO ANTI-ERRO (MAIÚSCULAS)
     if 'FUNÇÃO' in df.columns:
         df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
     if 'TURNO' in df.columns:
@@ -115,21 +127,17 @@ def carregar_dados():
     return df
 
 # ==========================================
-# 4. CONSTRUÇÃO DA TELA E FILTROS
+# 4. CONSTRUÇÃO DA TELA
 # ==========================================
 try:
     df = carregar_dados()
 
-    # --- BARRA LATERAL (FILTROS EM LISTA) ---
     st.sidebar.title("🔍 Filtros do Painel")
     
     lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
 
-    if turno_selecionado != "Todos":
-        df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
-    else:
-        df_filtrado = df.copy()
+    df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
 
     lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
     cargo_selecionado = st.sidebar.selectbox("2. Cargo/Função:", lista_cargos)
@@ -142,45 +150,29 @@ try:
 
     # --- CÁLCULO DO PERÍODO ---
     hoje = datetime.date.today()
-    if hoje.day >= 26:
-        dt_inicio = datetime.date(hoje.year, hoje.month, 26)
-    else:
-        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
-        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
-        dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+    dt_inicio = datetime.date(hoje.year, hoje.month, 26) if hoje.day >= 26 else datetime.date(hoje.year if hoje.month > 1 else hoje.year - 1, hoje.month - 1 if hoje.month > 1 else 12, 26)
     
-    dt_inicio_str = dt_inicio.strftime('%d/%m/%Y')
-    dt_fim_str = hoje.strftime('%d/%m/%Y')
-
-    # --- LINHA 1: TÍTULO E KPIS GERAIS ---
     col_titulo, col_kpis = st.columns([1, 1.2])
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        st.markdown("Acompanhamento de desempenho da equipe.")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio_str} até {dt_fim_str}")
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {hoje.strftime('%d/%m/%Y')}")
 
     with col_kpis:
         st.markdown("## 🎯 Visão Geral do Período")
         kpi1, kpi2, kpi3 = st.columns(3)
 
         total_itens = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
-        media_velocidade = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean() if 'Itens/Hora' in df_filtrado.columns else 0
-        if pd.isna(media_velocidade): media_velocidade = 0
-        
-        # BLINDAGEM DAS HORAS NEGATIVAS
-        if 'Horas' in df_filtrado.columns:
-            total_horas = df_filtrado.loc[df_filtrado['Horas'] > 0, 'Horas'].sum()
-        else:
-            total_horas = 0
+        media_vel = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean() if 'Itens/Hora' in df_filtrado.columns else 0
+        total_horas = df_filtrado.loc[df_filtrado['Horas'] > 0, 'Horas'].sum() if 'Horas' in df_filtrado.columns else 0
 
         kpi1.metric("📦 Total de Itens", f"{total_itens:,.0f}".replace(',', '.'))
-        kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
+        kpi2.metric("⚡ Média (Itens/H)", f"{media_vel:.0f}" if not pd.isna(media_vel) else "0")
         kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
     st.divider()
 
-    # --- BLOCO DE METAS INDIVIDUAIS E FINANCEIRO ---
+    # --- BLOCO DE METAS (A CALCULADORA FINANCEIRA MESTRA) ---
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         
@@ -189,93 +181,93 @@ try:
         if not dados_pessoa.empty:
             turno_p = dados_pessoa['TURNO'].values[0]
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
+            
+            # Puxa as regras do Turno exato. (Se no futuro colocar T2 e T1 no dicionário, vai funcionar 100%)
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
             bonus_acumulado = 0.0 
             
             if metas_cargo:
                 cols_meta = st.columns(len(metas_cargo))
-                for idx, (ind, valor_meta) in enumerate(metas_cargo.items()):
+                for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
-                        realizado = dados_pessoa[ind].values[0]
+                        realizado = float(dados_pessoa[ind].values[0])
                         
-                        # Inverte a lógica para % de erros (Quanto menor, melhor)
-                        if ind in ['Avaria', 'Dev. %', 'Corte %']:
-                            atingimento = (valor_meta / realizado * 100) if realizado > 0 else 100
-                        else:
-                            atingimento = (realizado / valor_meta * 100) if valor_meta > 0 else 0
-                            
-                        # ==========================================
-                        # LÓGICA DE CORES DA GESTÃO VISUAL
-                        # ==========================================
-                        if atingimento >= 120:
-                            cor_texto = "#198754" # Verde
-                            borda = "#198754"
-                            icone = "🟢"
-                        elif atingimento >= 100:
-                            cor_texto = "#0d6efd" # Azul
-                            borda = "#0d6efd"
-                            icone = "🔵"
-                        else:
-                            cor_texto = "#dc3545" # Vermelho
-                            borda = "#dc3545"
-                            icone = "🔴"
+                        t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
+                        v100, tipo, prop = regra['v100'], regra['tipo'], regra['prop']
                         
-                        # Placeholder para a Lógica Financeira Real
-                        if atingimento >= 100:
-                            bonus_acumulado += 150.00
-                        elif atingimento >= 50:
-                            bonus_acumulado += 75.00
-                            
-                        # Desenhando o Card Customizado com HTML
+                        pagamento_ind = 0.0
+                        
+                        # Lógica para indicadores onde MAIOR é melhor (ex: Itens Sep)
+                        if tipo == '>':
+                            if realizado >= t120:
+                                cor_texto = "#198754"; borda = "#198754"; icone = "🟢"; status_texto = "Meta 120% (Superou!)"
+                                pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 1.2)
+                            elif realizado >= t100:
+                                cor_texto = "#0d6efd"; borda = "#0d6efd"; icone = "🔵"; status_texto = "Meta 100% (Atingiu)"
+                                pagamento_ind = (realizado / t100 * v100) if prop else v100
+                            elif realizado >= t50:
+                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Meta 50% (Parcial)"
+                                pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 0.5)
+                            else:
+                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta (Zerado)"
+                                pagamento_ind = 0.0
+                                
+                        # Lógica para indicadores onde MENOR é melhor (ex: Avaria, Dev. %)
+                        elif tipo == '<':
+                            if realizado <= t120:
+                                cor_texto = "#198754"; borda = "#198754"; icone = "🟢"; status_texto = "Meta 120% (Superou!)"
+                                pagamento_ind = v100 * 1.2
+                            elif realizado <= t100:
+                                cor_texto = "#0d6efd"; borda = "#0d6efd"; icone = "🔵"; status_texto = "Meta 100% (Atingiu)"
+                                pagamento_ind = v100
+                            elif realizado <= t50:
+                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Meta 50% (Parcial)"
+                                pagamento_ind = v100 * 0.5
+                            else:
+                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta (Zerado)"
+                                pagamento_ind = 0.0
+
+                        bonus_acumulado += pagamento_ind
+                        
+                        # Formata o número da tela
+                        valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
+                        if "Líq." in ind: valor_tela = f"{realizado:.0f}%"
+                        
                         with cols_meta[idx]:
                             st.markdown(f"""
                             <div class="card-meta" style="border-left-color: {borda};">
-                                <div style="font-size: 16px; color: gray; margin-bottom: 5px;">{ind} (Meta: {valor_meta})</div>
-                                <div style="font-size: 38px; color: #1f1f1f; font-weight: bold; line-height: 1.1;">{realizado:.2f}</div>
-                                <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
-                                    {icone} {atingimento:.1f}% atingido
+                                <div style="font-size: 15px; color: gray; margin-bottom: 5px;">{ind} (Alvo 100%: {t100})</div>
+                                <div style="font-size: 38px; color: #1f1f1f; font-weight: bold; line-height: 1.1;">{valor_tela}</div>
+                                <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
+                                    {icone} {status_texto}
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
                 
-                # --- PAINEL FINANCEIRO ---
-                st.markdown("<br>", unsafe_allow_html=True)
-                
+                # --- AQUI OCORRE A MÁGICA DE ESCONDER O DINHEIRO SE ELE ZERAR ---
                 if bonus_acumulado > 0:
+                    st.markdown("<br>", unsafe_allow_html=True)
                     st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-                else:
-                    st.info("⏳ **Sem premiação até o momento.** Continue focado para atingir os próximos patamares da meta!")
                 
             else:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
         st.divider()
 
-    # --- TABELA DINÂMICA (FULL WIDTH) ---
+    # --- TABELA DINÂMICA ---
     st.markdown("### 📋 Tabela de Produtividade Consolidada")
     
     df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
     
-    configuracao_colunas = {}
+    config_colunas = {}
     for col in df_tabela.columns:
-        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']:
-            continue 
-        elif col in ['Avaria', 'Corte %', 'Dev. %']:
-            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-        elif "Líq." in col:
-            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-        elif col == "Horas":
-            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
-        else:
-            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+        elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
-    st.dataframe(
-        df_tabela, 
-        hide_index=True, 
-        use_container_width=True,
-        height=650,
-        column_config=configuracao_colunas 
-    )
+    st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
 
 except Exception as e:
     st.error(f"⚠️ Ocorreu um erro ao processar os dados: {e}")
