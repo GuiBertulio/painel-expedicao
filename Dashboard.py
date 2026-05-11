@@ -62,7 +62,7 @@ def carregar_dados():
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
     if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
-        df['Jornada Líq.'] = df['Jornada Líq.'] * 100
+        df['Jornada Líq.'] = df['Jornada Líq.'] * 10
         
     return df
 
