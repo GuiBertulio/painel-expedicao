@@ -171,6 +171,7 @@ try:
     st.divider()
 
     # --- BLOCO DE METAS INDIVIDUAIS ---
+    # --- BLOCO DE METAS INDIVIDUAIS E FINANCEIRO ---
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         
@@ -181,17 +182,30 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
+            # Variável para acumular o dinheiro do colaborador
+            bonus_acumulado = 0.0 
+            
             if metas_cargo:
                 cols_meta = st.columns(len(metas_cargo))
                 for idx, (ind, valor_meta) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = dados_pessoa[ind].values[0]
                         
+                        # Inverte a lógica para % de erros (Quanto menor, melhor)
                         if ind in ['Avaria', 'Dev. %', 'Corte %']:
                             atingimento = (valor_meta / realizado * 100) if realizado > 0 else 100
                         else:
                             atingimento = (realizado / valor_meta * 100) if valor_meta > 0 else 0
                         
+                        # ==========================================
+                        # LÓGICA FINANCEIRA (A SER REFINADA POR VOCÊ)
+                        # ==========================================
+                        # Exemplo genérico: Se atingiu 100%, ganha R$ 150 naquele indicador
+                        if atingimento >= 100:
+                            bonus_acumulado += 150.00
+                        elif atingimento >= 50:
+                            bonus_acumulado += 75.00 # Ganha metade se bateu 50%
+                            
                         with cols_meta[idx]:
                             st.metric(
                                 label=f"{ind} (Meta: {valor_meta})", 
@@ -199,6 +213,11 @@ try:
                                 delta=f"{atingimento:.1f}% da meta",
                                 delta_color="normal" if ind not in ['Avaria', 'Dev. %', 'Corte %'] else "inverse"
                             )
+                
+                # --- PAINEL FINANCEIRO (NOVO) ---
+                st.markdown("<br>", unsafe_allow_html=True) # Espaçamento
+                st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                
             else:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
         st.divider()
