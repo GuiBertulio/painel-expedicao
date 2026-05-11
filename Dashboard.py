@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import datetime
 
 # ==========================================
@@ -39,9 +38,7 @@ st.markdown(
 # ==========================================
 # 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS
 # ==========================================
-# Transcrevi as regras exatas da sua foto para o Python!
-# 'tipo': '>' (maior melhor) ou '<' (menor melhor)
-# 'prop': True (Proporcional SIM) ou False (NÃO)
+# Estrutura: t50, t100, t120 são os gatilhos. v100 é o valor base. prop é se calcula proporcional.
 metas_100 = {
     'T3': {
         'SEPARADOR F': {
@@ -82,6 +79,34 @@ metas_100 = {
             'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Itens/Hora Eq.':   {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}
         }
+    },
+    'T2': {
+        'SEPARADOR G': {
+            'Ressup. Ap.': {'tipo': '>', 'prop': True,  'v100': 200.0, 't50': 600, 't100': 800, 't120': 1000},
+            'Itens/Hora':  {'tipo': '>', 'prop': False, 'v100': 200.0, 't50': 50, 't100': 65, 't120': 80}
+        },
+        'CONFERENTE': {
+            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'OPERADOR': {
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
+        'RAMPEIRO': {
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        }
+    },
+    'T1': {
+        'CONFERENTE': {
+            'Palets Conf.': {'tipo': '>', 'prop': True, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250}
+        },
+        'DESCARGA': {
+            'Carga Palet.': {'tipo': '>', 'prop': True, 'v100': 125.0, 't50': 3000, 't100': 3700, 't120': 4400},
+            'Carga Bat.':   {'tipo': '>', 'prop': True, 'v100': 125.0, 't50': 1000, 't100': 1500, 't120': 2000}
+        }
     }
 }
 
@@ -121,9 +146,6 @@ def carregar_dados():
         df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    if 'Jornada Líq.' in df.columns and df['Jornada Líq.'].mean() < 2: 
-        df['Jornada Líq.'] = df['Jornada Líq.']
-        
     return df
 
 # ==========================================
@@ -172,7 +194,7 @@ try:
 
     st.divider()
 
-    # --- BLOCO DE METAS (A CALCULADORA FINANCEIRA MESTRA) ---
+    # --- BLOCO DE METAS ---
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         
@@ -181,8 +203,6 @@ try:
         if not dados_pessoa.empty:
             turno_p = dados_pessoa['TURNO'].values[0]
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
-            
-            # Puxa as regras do Turno exato. (Se no futuro colocar T2 e T1 no dicionário, vai funcionar 100%)
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
             bonus_acumulado = 0.0 
@@ -192,13 +212,11 @@ try:
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
-                        
                         t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
                         v100, tipo, prop = regra['v100'], regra['tipo'], regra['prop']
                         
                         pagamento_ind = 0.0
                         
-                        # Lógica para indicadores onde MAIOR é melhor (ex: Itens Sep)
                         if tipo == '>':
                             if realizado >= t120:
                                 cor_texto = "#198754"; borda = "#198754"; icone = "🟢"; status_texto = "Meta 120% (Superou!)"
@@ -210,10 +228,9 @@ try:
                                 cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Meta 50% (Parcial)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 0.5)
                             else:
-                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta (Zerado)"
+                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta"
                                 pagamento_ind = 0.0
                                 
-                        # Lógica para indicadores onde MENOR é melhor (ex: Avaria, Dev. %)
                         elif tipo == '<':
                             if realizado <= t120:
                                 cor_texto = "#198754"; borda = "#198754"; icone = "🟢"; status_texto = "Meta 120% (Superou!)"
@@ -225,12 +242,10 @@ try:
                                 cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Meta 50% (Parcial)"
                                 pagamento_ind = v100 * 0.5
                             else:
-                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta (Zerado)"
+                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta"
                                 pagamento_ind = 0.0
 
                         bonus_acumulado += pagamento_ind
-                        
-                        # Formata o número da tela
                         valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
                         if "Líq." in ind: valor_tela = f"{realizado:.0f}%"
                         
@@ -239,26 +254,20 @@ try:
                             <div class="card-meta" style="border-left-color: {borda};">
                                 <div style="font-size: 15px; color: gray; margin-bottom: 5px;">{ind} (Alvo 100%: {t100})</div>
                                 <div style="font-size: 38px; color: #1f1f1f; font-weight: bold; line-height: 1.1;">{valor_tela}</div>
-                                <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
-                                    {icone} {status_texto}
-                                </div>
+                                <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">{icone} {status_texto}</div>
                             </div>
                             """, unsafe_allow_html=True)
                 
-                # --- AQUI OCORRE A MÁGICA DE ESCONDER O DINHEIRO SE ELE ZERAR ---
                 if bonus_acumulado > 0:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-                
             else:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
         st.divider()
 
     # --- TABELA DINÂMICA ---
     st.markdown("### 📋 Tabela de Produtividade Consolidada")
-    
     df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
-    
     config_colunas = {}
     for col in df_tabela.columns:
         if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
