@@ -28,9 +28,8 @@ st.markdown(
 )
 
 # ==========================================
-# 2. DICIONÁRIO DE METAS (EXTRAÍDO DA SUA MATRIZ)
+# 2. DICIONÁRIO DE METAS
 # ==========================================
-# Mapeado 100% dos indicadores baseados na imagem fornecida
 metas_100 = {
     'T3': {
         'SEPARADOR F': {'Jornada Líq.': 80, 'Itens Sep': 9000, 'Itens/Hora': 75},
@@ -87,6 +86,12 @@ def carregar_dados():
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
     df = df[colunas_existentes]
     
+    # TRATAMENTO ANTI-ERRO (MAIÚSCULAS)
+    if 'FUNÇÃO' in df.columns:
+        df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
+    if 'TURNO' in df.columns:
+        df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
+
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
     colunas_numericas = [col for col in df.columns if col not in colunas_texto]
 
@@ -152,7 +157,12 @@ try:
         total_itens = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
         media_velocidade = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean() if 'Itens/Hora' in df_filtrado.columns else 0
         if pd.isna(media_velocidade): media_velocidade = 0
-        total_horas = df_filtrado['Horas'].sum() if 'Horas' in df_filtrado.columns else 0
+        
+        # BLINDAGEM DAS HORAS NEGATIVAS
+        if 'Horas' in df_filtrado.columns:
+            total_horas = df_filtrado.loc[df_filtrado['Horas'] > 0, 'Horas'].sum()
+        else:
+            total_horas = 0
 
         kpi1.metric("📦 Total de Itens", f"{total_itens:,.0f}".replace(',', '.'))
         kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
@@ -177,7 +187,6 @@ try:
                     if ind in dados_pessoa.columns:
                         realizado = dados_pessoa[ind].values[0]
                         
-                        # Inverte a lógica para % de erros (Quanto menor, melhor)
                         if ind in ['Avaria', 'Dev. %', 'Corte %']:
                             atingimento = (valor_meta / realizado * 100) if realizado > 0 else 100
                         else:
