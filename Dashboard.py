@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import datetime
 
 # ==========================================
@@ -17,14 +16,11 @@ st.markdown(
     }
     [data-testid="stMetricValue"] {
         font-size: 50px !important;
+        color: #004aad !important;
     }
     [data-testid="stMetricLabel"] > div {
         font-size: 20px !important;
-    }
-    /* Estilo especial para o painel de metas */
-    .painel-metas [data-testid="stMetricValue"] {
-        color: #004aad !important;
-        font-size: 40px !important;
+        color: gray;
     }
     </style>
     """,
@@ -32,17 +28,38 @@ st.markdown(
 )
 
 # ==========================================
-# 2. DICIONÁRIO DE METAS (PREENCHER AQUI)
+# 2. DICIONÁRIO DE METAS (EXTRAÍDO DA SUA MATRIZ)
 # ==========================================
-# Gui, preencha aqui os valores de 100% para cada cargo!
+# Mapeado 100% dos indicadores baseados na imagem fornecida
 metas_100 = {
     'T3': {
-        'SEPARADOR F': {'Jornada Líq.': 80, 'Itens Sep': 9000},
-        'CONFERENTE': {'Itens Conf.': 110000, 'Dev. %': 0.46}
+        'SEPARADOR F': {'Jornada Líq.': 80, 'Itens Sep': 9000, 'Itens/Hora': 75},
+        'SEPARADOR G': {'Jornada Líq.': 72, 'Itens Sep': 8100, 'Itens/Hora': 75},
+        'CONFERENTE': {'Itens Conf.': 110000, 'Dev. %': 0.46},
+        'OPERADOR': {'Mov. Horizontal': 1800, 'Avaria': 0.07},
+        'RAMPEIRO': {'Itens Rampa': 45000, 'Dev. %': 0.46, 'Avaria': 0.07},
+        'MESA': {'Jornada Líq. Eq.': 75, 'Dev. %': 0.46, 'Corte %': 0.45},
+        'MANOBRISTA': {'Itens Manob.': 250000, 'Dev. %': 0.46, 'Avaria': 0.07},
+        'LÍDER': {'Jornada Líq. Eq.': 75, 'Dev. %': 0.46, 'Itens/Hora Eq.': 75}
+    },
+    'T2': {
+        'AVARIA': {'Avaria': 0.07},
+        'CONFERENTE': {'Itens Conf.': 120000, 'Dev. %': 0.46},
+        'DEVOLUÇÃO': {'Dev. %': 0.46},
+        'INVENTARIO': {'Corte %': 0.45},
+        'LÍDER': {'Ressup. Eq.': 11000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
+        'MESA': {'Ressup. Eq.': 11000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
+        'OPERADOR': {'Mov. Horizontal': 1800, 'Avaria': 0.07},
+        'RAMPEIRO': {'Itens Rampa': 45000, 'Dev. %': 0.46, 'Avaria': 0.07},
+        'SEPARADOR G': {'Ressup. Ap.': 800, 'Itens/Hora': 65}
     },
     'T1': {
         'CONFERENTE': {'Palets Conf.': 2500},
-        'OPERADOR': {'Mov. Vert.': 2750}
+        'DESCARGA': {'Carga Palet.': 3700, 'Carga Bat.': 1500},
+        'DEVOLUÇÃO': {'Dev. %': 0.46},
+        'LÍDER': {'Palets Conf.': 2500}, 
+        'OPERADOR': {'Mov. Vert.': 2750},
+        'PUXA': {'Palets Px.': 3000}
     }
 }
 
@@ -108,7 +125,6 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
-
     # --- CÁLCULO DO PERÍODO ---
     hoje = datetime.date.today()
     if hoje.day >= 26:
@@ -130,7 +146,7 @@ try:
         st.info(f"📅 **Período Apurado:** de {dt_inicio_str} até {dt_fim_str}")
 
     with col_kpis:
-        st.markdown("## 🎯 Visão Geral")
+        st.markdown("## 🎯 Visão Geral do Período")
         kpi1, kpi2, kpi3 = st.columns(3)
 
         total_itens = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
@@ -142,12 +158,11 @@ try:
         kpi2.metric("⚡ Média (Itens/H)", f"{media_velocidade:.0f}")
         kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
+    st.divider()
 
-    # --- BLOCO NOVO: PAINEL DE METAS INDIVIDUAIS ---
+    # --- BLOCO DE METAS INDIVIDUAIS ---
     if pessoa_selecionada != "Nenhum":
-        st.divider()
-        st.markdown(f"<div class='painel-metas'>", unsafe_allow_html=True)
-        st.subheader(f"🎯 Atingimento de Metas: {pessoa_selecionada}")
+        st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
         
@@ -162,7 +177,7 @@ try:
                     if ind in dados_pessoa.columns:
                         realizado = dados_pessoa[ind].values[0]
                         
-                        # Lógica de atingimento (Inverte para avarias/erros)
+                        # Inverte a lógica para % de erros (Quanto menor, melhor)
                         if ind in ['Avaria', 'Dev. %', 'Corte %']:
                             atingimento = (valor_meta / realizado * 100) if realizado > 0 else 100
                         else:
@@ -172,84 +187,38 @@ try:
                             st.metric(
                                 label=f"{ind} (Meta: {valor_meta})", 
                                 value=f"{realizado:.2f}", 
-                                delta=f"{atingimento:.1f}% da meta atingida",
+                                delta=f"{atingimento:.1f}% da meta",
                                 delta_color="normal" if ind not in ['Avaria', 'Dev. %', 'Corte %'] else "inverse"
                             )
             else:
-                st.warning(f"Metas não cadastradas no dicionário para o cargo: {cargo_p} ({turno_p}).")
-        st.markdown("</div>", unsafe_allow_html=True)
+                st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
+        st.divider()
 
-    st.divider()
-
-    # --- LINHA 2: GRÁFICO INTERATIVO E TABELA ---
-    col_graf, col_tab = st.columns([1.2, 1]) 
-
-    with col_graf:
-        st.markdown("### 📈 Análise por Colaborador")
-        
-        colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
-        opcoes_grafico = [col for col in df_filtrado.columns if col not in colunas_texto]
-        
-        opcao_grafico = st.selectbox("Selecione a métrica para o gráfico:", opcoes_grafico)
-        
-        df_grafico = df_filtrado[df_filtrado[opcao_grafico] > 0].copy()
-        df_grafico = df_grafico.sort_values(by=opcao_grafico, ascending=True)
-        
-        if "Líq." in opcao_grafico or "%" in opcao_grafico:
-            textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}%")
-        elif opcao_grafico == "Horas":
-            textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.2f}h")
+    # --- TABELA DINÂMICA (FULL WIDTH) ---
+    st.markdown("### 📋 Tabela de Produtividade Consolidada")
+    
+    df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
+    
+    configuracao_colunas = {}
+    for col in df_tabela.columns:
+        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']:
+            continue 
+        elif col in ['Avaria', 'Corte %', 'Dev. %']:
+            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+        elif "Líq." in col:
+            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+        elif col == "Horas":
+            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
         else:
-            textos_barras = df_grafico[opcao_grafico].apply(lambda x: f"{x:.0f}")
-        
-        fig = px.bar(
-            df_grafico, 
-            x=opcao_grafico, 
-            y="NOME", 
-            color="TURNO", 
-            orientation='h',
-            text=textos_barras
-        )
-        
-        fig.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)", 
-            paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title=None,
-            yaxis_title=None,
-            height=650,
-            showlegend=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
+            configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
-    with col_tab:
-        st.markdown("### 📋 Tabela Dinâmica")
-        
-        df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
-        
-        configuracao_colunas = {}
-        for col in df_tabela.columns:
-            if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']:
-                continue 
-                
-            elif col in ['Avaria', 'Corte %', 'Dev. %']:
-                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                
-            elif "Líq." in col:
-                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                
-            elif col == "Horas":
-                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
-                
-            else:
-                configuracao_colunas[col] = st.column_config.NumberColumn(col, format="%d")
-
-        st.dataframe(
-            df_tabela, 
-            hide_index=True, 
-            use_container_width=True,
-            height=650,
-            column_config=configuracao_colunas 
-        )
+    st.dataframe(
+        df_tabela, 
+        hide_index=True, 
+        use_container_width=True,
+        height=650,
+        column_config=configuracao_colunas 
+    )
 
 except Exception as e:
     st.error(f"⚠️ Ocorreu um erro ao processar os dados: {e}")
