@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import datetime
 
 # ==========================================
@@ -21,6 +22,15 @@ st.markdown(
     [data-testid="stMetricLabel"] > div {
         font-size: 20px !important;
         color: gray;
+    }
+    /* Estilo para os cards customizados de metas */
+    .card-meta {
+        background-color: white; 
+        padding: 15px; 
+        border-radius: 10px; 
+        box-shadow: 1px 1px 5px rgba(0,0,0,0.1); 
+        margin-bottom: 15px;
+        border-left: 5px solid #ccc;
     }
     </style>
     """,
@@ -181,7 +191,6 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
-            # Variável para acumular o dinheiro do colaborador
             bonus_acumulado = 0.0 
             
             if metas_cargo:
@@ -195,25 +204,42 @@ try:
                             atingimento = (valor_meta / realizado * 100) if realizado > 0 else 100
                         else:
                             atingimento = (realizado / valor_meta * 100) if valor_meta > 0 else 0
+                            
+                        # ==========================================
+                        # LÓGICA DE CORES DA GESTÃO VISUAL
+                        # ==========================================
+                        if atingimento >= 120:
+                            cor_texto = "#198754" # Verde
+                            borda = "#198754"
+                            icone = "🟢"
+                        elif atingimento >= 100:
+                            cor_texto = "#0d6efd" # Azul
+                            borda = "#0d6efd"
+                            icone = "🔵"
+                        else:
+                            cor_texto = "#dc3545" # Vermelho
+                            borda = "#dc3545"
+                            icone = "🔴"
                         
-                        # ==========================================
-                        # LÓGICA FINANCEIRA (Aguardando suas regras exatas)
-                        # ==========================================
-                        # Exemplo genérico de cálculo:
+                        # Placeholder para a Lógica Financeira Real
                         if atingimento >= 100:
                             bonus_acumulado += 150.00
                         elif atingimento >= 50:
                             bonus_acumulado += 75.00
                             
+                        # Desenhando o Card Customizado com HTML
                         with cols_meta[idx]:
-                            st.metric(
-                                label=f"{ind} (Meta: {valor_meta})", 
-                                value=f"{realizado:.2f}", 
-                                delta=f"{atingimento:.1f}% da meta",
-                                delta_color="normal" if ind not in ['Avaria', 'Dev. %', 'Corte %'] else "inverse"
-                            )
+                            st.markdown(f"""
+                            <div class="card-meta" style="border-left-color: {borda};">
+                                <div style="font-size: 16px; color: gray; margin-bottom: 5px;">{ind} (Meta: {valor_meta})</div>
+                                <div style="font-size: 38px; color: #1f1f1f; font-weight: bold; line-height: 1.1;">{realizado:.2f}</div>
+                                <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
+                                    {icone} {atingimento:.1f}% atingido
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
                 
-                # --- PAINEL FINANCEIRO (NOVO: REGRA DO ZERADO) ---
+                # --- PAINEL FINANCEIRO ---
                 st.markdown("<br>", unsafe_allow_html=True)
                 
                 if bonus_acumulado > 0:
