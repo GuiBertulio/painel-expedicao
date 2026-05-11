@@ -42,33 +42,33 @@ st.markdown(
 # ==========================================
 metas_100 = {
     'T3': {
-        'SEPARADOR F': {'Jornada Líq.': 80, 'Itens Sep': 9.000, 'Itens/Hora': 75},
-        'SEPARADOR G': {'Jornada Líq.': 72, 'Itens Sep': 8.100, 'Itens/Hora': 75},
-        'CONFERENTE': {'Itens Conf.': 110.000, 'Dev. %': 0.46},
-        'OPERADOR': {'Mov. Horizontal': 1.800, 'Avaria': 0.07},
-        'RAMPEIRO': {'Itens Rampa': 45.000, 'Dev. %': 0.46, 'Avaria': 0.07},
+        'SEPARADOR F': {'Jornada Líq.': 80, 'Itens Sep': 9000, 'Itens/Hora': 75},
+        'SEPARADOR G': {'Jornada Líq.': 72, 'Itens Sep': 8100, 'Itens/Hora': 75},
+        'CONFERENTE': {'Itens Conf.': 110000, 'Dev. %': 0.46},
+        'OPERADOR': {'Mov. Horizontal': 1800, 'Avaria': 0.07},
+        'RAMPEIRO': {'Itens Rampa': 45000, 'Dev. %': 0.46, 'Avaria': 0.07},
         'MESA': {'Jornada Líq. Eq.': 75, 'Dev. %': 0.46, 'Corte %': 0.45},
-        'MANOBRISTA': {'Itens Manob.': 250.000, 'Dev. %': 0.46, 'Avaria': 0.07},
+        'MANOBRISTA': {'Itens Manob.': 250000, 'Dev. %': 0.46, 'Avaria': 0.07},
         'LÍDER': {'Jornada Líq. Eq.': 75, 'Dev. %': 0.46, 'Itens/Hora Eq.': 75}
     },
     'T2': {
         'AVARIA': {'Avaria': 0.07},
-        'CONFERENTE': {'Itens Conf.': 120.000, 'Dev. %': 0.46},
+        'CONFERENTE': {'Itens Conf.': 120000, 'Dev. %': 0.46},
         'DEVOLUÇÃO': {'Dev. %': 0.46},
         'INVENTARIO': {'Corte %': 0.45},
-        'LÍDER': {'Ressup. Eq.': 11.000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
-        'MESA': {'Ressup. Eq.': 11.000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
-        'OPERADOR': {'Mov. Horizontal': 1.800, 'Avaria': 0.07},
-        'RAMPEIRO': {'Itens Rampa': 45.000, 'Dev. %': 0.46, 'Avaria': 0.07},
+        'LÍDER': {'Ressup. Eq.': 11000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
+        'MESA': {'Ressup. Eq.': 11000, 'Dev. %': 0.46, 'Itens/Hora Eq.': 65},
+        'OPERADOR': {'Mov. Horizontal': 1800, 'Avaria': 0.07},
+        'RAMPEIRO': {'Itens Rampa': 45000, 'Dev. %': 0.46, 'Avaria': 0.07},
         'SEPARADOR G': {'Ressup. Ap.': 800, 'Itens/Hora': 65}
     },
     'T1': {
-        'CONFERENTE': {'Palets Conf.': 2.500},
-        'DESCARGA': {'Carga Palet.': 3.700, 'Carga Bat.': 1.500},
+        'CONFERENTE': {'Palets Conf.': 2500},
+        'DESCARGA': {'Carga Palet.': 3700, 'Carga Bat.': 1500},
         'DEVOLUÇÃO': {'Dev. %': 0.46},
-        'LÍDER': {'Palets Conf.': 2.500}, 
-        'OPERADOR': {'Mov. Vert.': 2.750},
-        'PUXA': {'Palets Px.': 3.000}
+        'LÍDER': {'Palets Conf.': 2500}, 
+        'OPERADOR': {'Mov. Vert.': 2750},
+        'PUXA': {'Palets Px.': 3000}
     }
 }
 
