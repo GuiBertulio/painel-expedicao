@@ -170,7 +170,6 @@ try:
 
     st.divider()
 
-    # --- BLOCO DE METAS INDIVIDUAIS ---
     # --- BLOCO DE METAS INDIVIDUAIS E FINANCEIRO ---
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
@@ -198,13 +197,13 @@ try:
                             atingimento = (realizado / valor_meta * 100) if valor_meta > 0 else 0
                         
                         # ==========================================
-                        # LÓGICA FINANCEIRA (A SER REFINADA POR VOCÊ)
+                        # LÓGICA FINANCEIRA (Aguardando suas regras exatas)
                         # ==========================================
-                        # Exemplo genérico: Se atingiu 100%, ganha R$ 150 naquele indicador
+                        # Exemplo genérico de cálculo:
                         if atingimento >= 100:
                             bonus_acumulado += 150.00
                         elif atingimento >= 50:
-                            bonus_acumulado += 75.00 # Ganha metade se bateu 50%
+                            bonus_acumulado += 75.00
                             
                         with cols_meta[idx]:
                             st.metric(
@@ -214,9 +213,13 @@ try:
                                 delta_color="normal" if ind not in ['Avaria', 'Dev. %', 'Corte %'] else "inverse"
                             )
                 
-                # --- PAINEL FINANCEIRO (NOVO) ---
-                st.markdown("<br>", unsafe_allow_html=True) # Espaçamento
-                st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                # --- PAINEL FINANCEIRO (NOVO: REGRA DO ZERADO) ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if bonus_acumulado > 0:
+                    st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                else:
+                    st.info("⏳ **Sem premiação até o momento.** Continue focado para atingir os próximos patamares da meta!")
                 
             else:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
