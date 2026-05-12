@@ -34,7 +34,6 @@ placeholder = st.empty()
 # ==========================================
 # 2. CARREGAMENTO E LIMPEZA DE DADOS
 # ==========================================
-# Mudei o nome da função para FORÇAR o cache a resetar!
 @st.cache_data(ttl=60) 
 def baixar_planilha_tv():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
@@ -48,11 +47,9 @@ def baixar_planilha_tv():
     for col in df.columns:
         if col not in colunas_texto:
             if col == 'Tempo Médio': 
-                # Corta o ".017000" fora primeiro, depois transforma em Segundos Matemáticos
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                # Transforma indicadores normais em números
                 texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False).str.strip()
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
                 if 'Jornada' in col: 
@@ -89,6 +86,9 @@ apelidos_cargos = {
     "OPERADOR": "OPERADOR DE EMPILHADEIRA"
 }
 
+# --- REGRA: CARGOS UNIFICADOS (Sem a Mesa) ---
+cargos_unificados = ['RAMPEIRO', 'DESCARGA', 'PUXA']
+
 try:
     df_base = baixar_planilha_tv()
     hoje = datetime.date.today()
@@ -98,25 +98,49 @@ try:
     turnos_permitidos = ['T3'] if (18 <= agora_brasil.hour or agora_brasil.hour < 6) else ['T1', 'T2']
     df = df_base[df_base['TURNO'].isin(turnos_permitidos)].copy()
 
-    lista_telas = []
+    telas_dict = {}
+    
     for turno_ativo in turnos_permitidos:
         if turno_ativo in mapa_completo:
             for funcao, indicadores in mapa_completo[turno_ativo].items():
-                lista_telas.append({'turno': turno_ativo, 'funcao': funcao, 'indicadores': indicadores})
+                
+                if funcao in cargos_unificados:
+                    nome_tela = apelidos_cargos.get(funcao, funcao)
+                else:
+                    nome_tela = f"{apelidos_cargos.get(funcao, funcao)} - {turno_ativo}"
+
+                if nome_tela not in telas_dict:
+                    telas_dict[nome_tela] = {
+                        'exibicao': nome_tela,
+                        'turnos': [turno_ativo],
+                        'funcao_busca': funcao,
+                        'indicadores': indicadores
+                    }
+                else:
+                    if turno_ativo not in telas_dict[nome_tela]['turnos']:
+                        telas_dict[nome_tela]['turnos'].append(turno_ativo)
+
+    lista_telas = list(telas_dict.values())
 
     if 'passo' not in st.session_state or st.session_state.passo >= len(lista_telas):
         st.session_state.passo = 0
 
+    # ==========================================
+    # 4. RENDERIZAÇÃO DA TELA
+    # ==========================================
     with placeholder.container():
+        if len(lista_telas) == 0:
+            st.warning("Nenhuma tela configurada para este horário.")
+            st.stop()
+
         tela_atual = lista_telas[st.session_state.passo]
-        t_atual = tela_atual['turno']
-        f_planilha = tela_atual['funcao'] 
+        t_list = tela_atual['turnos']
+        f_planilha = tela_atual['funcao_busca'] 
         inds_f = tela_atual['indicadores']
+        f_exibicao = tela_atual['exibicao']
         
-        f_exibicao = apelidos_cargos.get(f_planilha, f_planilha)
-        df_tela = df[(df['TURNO'] == t_atual) & (df['FUNCAO_BUSCA'] == f_planilha)].copy()
+        df_tela = df[(df['TURNO'].isin(t_list)) & (df['FUNCAO_BUSCA'] == f_planilha)].copy()
         
-        # Filtro de segurança 100% numérico
         if not any((df_tela[ind] > 0).any() for ind in inds_f if ind in df_tela.columns):
             st.session_state.passo = (st.session_state.passo + 1) % len(lista_telas)
             st.rerun()
@@ -130,7 +154,6 @@ try:
                 df_ind = df_tela[df_tela[ind] > 0].copy()
                 
                 if not df_ind.empty:
-                    # Tempo Médio entra na lista de "Quanto menor, melhor" (Menos tempo = mais rápido = Topo do gráfico)
                     ordem_crescente = True if ind in ['Avaria', 'Corte %', 'Dev. %', 'Tempo Médio'] else False
                     
                     df_ind = df_ind.sort_values(by=ind, ascending=ordem_crescente).drop_duplicates(subset=['NOME'])
@@ -152,7 +175,6 @@ try:
             if coluna_ind in ['Avaria', 'Corte %', 'Dev. %']: return f"{float(valor):.2f}%"
             elif 'Jornada' in coluna_ind: return f"{float(valor):.0f}%"
             elif coluna_ind == 'Tempo Médio': 
-                # Converte os Segundos Matemáticos de volta para o formato de Relógio
                 segundos = int(float(valor))
                 h = segundos // 3600
                 m = (segundos % 3600) // 60
@@ -162,7 +184,6 @@ try:
 
         num_blocos = len(blocos)
         
-        # O motor de centralização
         if num_blocos == 1:
             colunas_ui = st.columns([1, 1.5, 1]) 
             alvos = [colunas_ui[1]]
