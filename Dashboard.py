@@ -276,7 +276,6 @@ try:
                         bonus_acumulado += pagamento_ind
                         
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        # Dinheiro acompanha a cor Verde Neon para destacar sempre
                         html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
                         
                         valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
@@ -306,27 +305,24 @@ try:
                 with col_grafico:
                     if grafico_dados:
                         df_grafico = pd.DataFrame(grafico_dados)
-                        # Aplica as cores vibrantes também no gráfico
+                        # Aplica as cores vibrantes
                         df_grafico['Cor'] = df_grafico['Real'].apply(
                             lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO))
                         )
                         
-                        # --- PONTO CHAVE: LÓGICA DE COR DO TEXTO DAS BARRAS ---
-                        # Se a cor da barra for amarela (C_AMARELO), usamos texto preto (black) para contraste.
-                        # Caso contrário (Azul, Verde, Vermelho), usamos branco (white).
+                        # Define a cor do texto para dar contraste com o Amarelo
                         df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(
                             lambda color: "black" if color == C_AMARELO else "white"
                         )
                         
+                        # --- PONTO CHAVE: Criação do gráfico sem o 'color' parameter para evitar separação de grupos ---
                         fig = px.bar(
                             df_grafico, 
                             x='Indicador', 
                             y='Atingimento (%)',
-                            # Adiciona tags <b> para negrito no texto das porcentagens
-                            text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"),
-                            color='Cor',
-                            color_discrete_map="identity"
+                            text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>")
                         )
+                        
                         fig.update_layout(
                             showlegend=False, 
                             yaxis_title="<b>% da Meta Atingida</b>",
@@ -335,16 +331,14 @@ try:
                             height=350,
                             margin=dict(t=15, b=0, l=0, r=0)
                         )
-                        # Linha pontilhada e texto mais claros (lightgray) para aparecer no fundo preto
                         fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
                         
-                        # Aplica a cor de texto dinâmica (Texto_Cor) para cada barra individualmente
-                        # Adiciona uma borda fina branca nas barras para dar mais definição no dark mode
+                        # --- A MÁGICA DO PLOTLY ACONTECE AQUI: Aplica as cores físicas nas barras e nos textos ---
                         fig.update_traces(
-                            textfont_size=24, 
-                            textfont_color=df_grafico['Texto_Cor'].tolist(), # Passa a lista de cores de texto
-                            marker=dict(line=dict(color='white', width=1)) # Borda fina nas barras
-                        ) 
+                            textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()),
+                            marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1))
+                        )
+                        
                         fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                         fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                         
