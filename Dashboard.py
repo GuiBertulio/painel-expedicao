@@ -16,7 +16,6 @@ st.markdown(
         padding-bottom: 0rem !important;
     }
     
-    /* Força NEGRITO MÁXIMO nos Títulos e Subtítulos */
     h1, h2, h3 {
         font-weight: 900 !important;
         letter-spacing: 0.5px;
@@ -24,7 +23,7 @@ st.markdown(
 
     [data-testid="stMetricValue"] {
         font-size: 50px !important;
-        color: #3b82f6 !important; /* Azul mais claro e vibrante */
+        color: #3b82f6 !important; 
     }
     [data-testid="stMetricLabel"] > div {
         font-size: 20px !important;
@@ -37,22 +36,28 @@ st.markdown(
         border-radius: 10px; 
         box-shadow: 1px 1px 5px rgba(0,0,0,0.3); 
         margin-bottom: 15px;
-        border-left: 8px solid #ccc; /* Borda mais grossa */
+        border-left: 8px solid #ccc; 
         border-top: 1px solid var(--secondary-background-color);
         border-right: 1px solid var(--secondary-background-color);
         border-bottom: 1px solid var(--secondary-background-color);
     }
     .texto-card-principal {
-        font-size: 42px; /* Número maior */
+        font-size: 42px; 
         color: var(--text-color); 
         font-weight: 900; 
         line-height: 1.1;
     }
     .texto-card-titulo {
-        font-size: 22px; /* Título do indicador maior e mais visível */
+        font-size: 22px; 
         color: var(--text-color); 
         font-weight: 900; 
         margin-bottom: 5px;
+    }
+    .texto-card-secundario {
+        font-size: 16px;
+        color: gray;
+        font-weight: normal;
+        margin-left: 8px;
     }
     </style>
     """,
@@ -60,12 +65,12 @@ st.markdown(
 )
 
 # ==========================================
-# PALETA DE CORES VIBRANTES (Para Dark Mode)
+# PALETA DE CORES GERAIS
 # ==========================================
-C_AZUL = "#3b82f6"     # Azul Claro/Celeste
-C_VERDE = "#2ecc71"    # Verde Esmeralda/Neon
-C_AMARELO = "#ffca28"  # Amarelo Vivo
-C_VERMELHO = "#ef4444" # Vermelho Alerta
+C_AZUL = "#3b82f6"     
+C_VERDE = "#2ecc71"    
+C_AMARELO = "#ffca28"  
+C_VERMELHO = "#ef4444" 
 
 # ==========================================
 # 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS
@@ -146,7 +151,7 @@ def carregar_dados():
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
         'Mov. Horizontal', 'Mov. Vert.', 'Avaria', 'Corte %', 'Dev. %', 'Itens Conf.', 
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
-        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.'
+        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Dias Trabalhados'
     ]
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
@@ -188,14 +193,42 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
+    # ==========================================
+    # LÓGICA DINÂMICA: CICLO E DIAS ÚTEIS BRASIL
+    # ==========================================
     hoje = datetime.date.today()
-    dt_inicio = datetime.date(hoje.year, hoje.month, 26) if hoje.day >= 26 else datetime.date(hoje.year if hoje.month > 1 else hoje.year - 1, hoje.month - 1 if hoje.month > 1 else 12, 26)
+    if hoje.day >= 26:
+        dt_inicio = datetime.date(hoje.year, hoje.month, 26)
+        mes_fim = hoje.month + 1 if hoje.month < 12 else 1
+        ano_fim = hoje.year if hoje.month < 12 else hoje.year + 1
+        dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
+    else:
+        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
+        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
+        dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+        dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
+
+    # Conta os dias úteis (Seg-Sex)
+    dias_uteis_pandas = pd.bdate_range(start=dt_inicio, end=dt_fim_ciclo)
+    
+    # Tenta usar a biblioteca holidays para remover feriados BR do cálculo
+    try:
+        import holidays
+        feriados_br = holidays.Brazil(years=[dt_inicio.year, dt_fim_ciclo.year])
+        dias_uteis_pandas = dias_uteis_pandas.drop([d for d in dias_uteis_pandas if d.date() in feriados_br])
+    except ImportError:
+        pass # Se não instalou, conta só Seg-Sex normal.
+
+    DIAS_UTEIS_MES = float(len(dias_uteis_pandas))
+    if DIAS_UTEIS_MES <= 0: DIAS_UTEIS_MES = 22.0 # Trava final de segurança
+    
+    # ==========================================
     
     col_titulo, col_kpis = st.columns([1, 1.2])
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {hoje.strftime('%d/%m/%Y')}")
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {hoje.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_UTEIS_MES)} Dias Úteis no Ciclo**")
 
     with col_kpis:
         st.markdown("## 🎯 Visão Geral do Período")
@@ -212,7 +245,7 @@ try:
     st.divider()
 
     # ==========================================
-    # 5. BLOCO CONDICIONAL: VISÃO INDIVIDUAL OU GERAL
+    # 5. BLOCO CONDICIONAL: VISÃO INDIVIDUAL OU GERAL/EQUIPE
     # ==========================================
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
@@ -229,12 +262,20 @@ try:
                 cols_meta = st.columns(len(metas_cargo))
                 grafico_dados = []
                 
+                dias_trab = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns else DIAS_UTEIS_MES
+                if dias_trab <= 0: dias_trab = 1.0 
+                fator_proporcional = dias_trab / DIAS_UTEIS_MES
+                
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
-                        t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
-                        v100, tipo, prop = regra['v100'], regra['tipo'], regra['prop']
                         
+                        t50 = regra['t50'] * fator_proporcional if regra['prop'] else regra['t50']
+                        t100 = regra['t100'] * fator_proporcional if regra['prop'] else regra['t100']
+                        t120 = regra['t120'] * fator_proporcional if regra['prop'] else regra['t120']
+                        v100 = regra['v100'] * fator_proporcional if regra['prop'] else regra['v100']
+                        
+                        tipo, prop = regra['tipo'], regra['prop']
                         pagamento_ind = 0.0
                         
                         if tipo == '>':
@@ -278,13 +319,13 @@ try:
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
                         
-                        valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
-                        if "Líq." in ind: valor_tela = f"{realizado:.0f}%"
+                        valor_tela = f"{realizado:.0f}%" if "Líq." in ind else f"{realizado:.0f}"
+                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. {dias_trab:.0f}d)</span>" if prop else ""
                         
                         with cols_meta[idx]:
                             st.markdown(f"""
                             <div class="card-meta" style="border-left-color: {borda};">
-                                <div class="texto-card-titulo">{ind} (Alvo 100%: {t100})</div>
+                                <div class="texto-card-titulo">{ind} (Alvo: {t100:.0f}){aviso_prop}</div>
                                 <div class="texto-card-principal">{valor_tela}</div>
                                 <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
                                     {icone} {status_texto} {html_dinheiro}
@@ -305,56 +346,30 @@ try:
                 with col_grafico:
                     if grafico_dados:
                         df_grafico = pd.DataFrame(grafico_dados)
-                        # Aplica as cores vibrantes
-                        df_grafico['Cor'] = df_grafico['Real'].apply(
-                            lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO))
-                        )
+                        df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
+                        df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(lambda color: "black" if color == C_AMARELO else "white")
                         
-                        # Define a cor do texto para dar contraste com o Amarelo
-                        df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(
-                            lambda color: "black" if color == C_AMARELO else "white"
-                        )
-                        
-                        # --- PONTO CHAVE: Criação do gráfico sem o 'color' parameter para evitar separação de grupos ---
                         fig = px.bar(
-                            df_grafico, 
-                            x='Indicador', 
-                            y='Atingimento (%)',
+                            df_grafico, x='Indicador', y='Atingimento (%)',
                             text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>")
                         )
-                        
-                        fig.update_layout(
-                            showlegend=False, 
-                            yaxis_title="<b>% da Meta Atingida</b>",
-                            xaxis_title=None,
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            height=350,
-                            margin=dict(t=15, b=0, l=0, r=0)
-                        )
+                        fig.update_layout(showlegend=False, yaxis_title="<b>% da Meta Atingida</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
                         fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
-                        
-                        # --- A MÁGICA DO PLOTLY ACONTECE AQUI: Aplica as cores físicas nas barras e nos textos ---
-                        fig.update_traces(
-                            textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()),
-                            marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1))
-                        )
-                        
+                        fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1)))
                         fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                         fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
-                        
                         st.plotly_chart(fig, use_container_width=True)
 
                 with col_tabela:
-                    colunas_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO'] + list(metas_cargo.keys())
+                    colunas_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
                     colunas_existentes = [c for c in colunas_uteis if c in df_filtrado.columns]
                     df_tabela_mini = dados_pessoa[colunas_existentes]
                     
                     config_colunas = {}
                     for col in df_tabela_mini.columns:
                         if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
-                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                         elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                        elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+                        elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
@@ -363,14 +378,78 @@ try:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
 
     else:
+        if cargo_selecionado != "Todos" and not df_filtrado.empty:
+            st.subheader(f"👥 Raio-X da Equipe: {cargo_selecionado}")
+            
+            turno_equipe = df_filtrado['TURNO'].mode()[0] if not df_filtrado.empty else "T3"
+            metas_equipe = metas_100.get(turno_equipe, {}).get(cargo_selecionado, {})
+            
+            if metas_equipe:
+                cols_equipe = st.columns(len(metas_equipe))
+                
+                dias_trab_medio = float(df_filtrado[df_filtrado['Dias Trabalhados'] > 0]['Dias Trabalhados'].mean()) if 'Dias Trabalhados' in df_filtrado.columns else DIAS_UTEIS_MES
+                if pd.isna(dias_trab_medio) or dias_trab_medio <= 0: dias_trab_medio = DIAS_UTEIS_MES
+                fator_equipe = dias_trab_medio / DIAS_UTEIS_MES
+
+                for idx, (ind, regra) in enumerate(metas_equipe.items()):
+                    if ind in df_filtrado.columns:
+                        
+                        valores_validos = df_filtrado[df_filtrado[ind] > 0][ind]
+                        realizado_medio = float(valores_validos.mean()) if not valores_validos.empty else 0.0
+                        soma_total = float(valores_validos.sum()) if not valores_validos.empty else 0.0
+                        
+                        t50 = regra['t50'] * fator_equipe if regra['prop'] else regra['t50']
+                        t100 = regra['t100'] * fator_equipe if regra['prop'] else regra['t100']
+                        t120 = regra['t120'] * fator_equipe if regra['prop'] else regra['t120']
+                        tipo = regra['tipo']
+                        
+                        if tipo == '>':
+                            atingimento_real = (realizado_medio / t100 * 100) if t100 > 0 else 0
+                            if realizado_medio >= t120:
+                                cor_texto, borda, icone, status_texto = C_AZUL, C_AZUL, "🔵", f"Equipe Superando: {atingimento_real:.0f}%"
+                            elif realizado_medio >= t100:
+                                cor_texto, borda, icone, status_texto = C_VERDE, C_VERDE, "🟢", f"Equipe na Meta: {atingimento_real:.0f}%"
+                            elif realizado_medio >= t50:
+                                cor_texto, borda, icone, status_texto = C_AMARELO, C_AMARELO, "🟡", f"Média Parcial: {atingimento_real:.0f}%"
+                            else:
+                                cor_texto, borda, icone, status_texto = C_VERMELHO, C_VERMELHO, "🔴", f"Equipe Abaixo: {atingimento_real:.0f}%"
+                                
+                        elif tipo == '<':
+                            atingimento_real = (t100 / realizado_medio * 100) if realizado_medio > 0 else 120.0
+                            if realizado_medio <= t120:
+                                cor_texto, borda, icone, status_texto = C_AZUL, C_AZUL, "🔵", f"Equipe Superando: {atingimento_real:.0f}%"
+                            elif realizado_medio <= t100:
+                                cor_texto, borda, icone, status_texto = C_VERDE, C_VERDE, "🟢", f"Equipe na Meta: {atingimento_real:.0f}%"
+                            elif realizado_medio <= t50:
+                                cor_texto, borda, icone, status_texto = C_AMARELO, C_AMARELO, "🟡", f"Média Parcial: {atingimento_real:.0f}%"
+                            else:
+                                cor_texto, borda, icone, status_texto = C_VERMELHO, C_VERMELHO, "🔴", f"Equipe Abaixo: {atingimento_real:.0f}%"
+
+                        valor_tela = f"{realizado_medio:.0f}%" if "Líq." in ind else f"{realizado_medio:.0f}"
+                        soma_tela = f"{soma_total:.0f}%" if "Líq." in ind else f"{soma_total:.0f}"
+                        
+                        html_soma = f'<span class="texto-card-secundario">| Soma Total: {soma_tela}</span>' if not "Líq." in ind else ""
+                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Média de {dias_trab_medio:.1f} dias)</span>" if regra['prop'] else ""
+
+                        with cols_equipe[idx]:
+                            st.markdown(f"""
+                            <div class="card-meta" style="border-left-color: {borda};">
+                                <div class="texto-card-titulo">Média: {ind} (Alvo: {t100:.0f}){aviso_prop}</div>
+                                <div class="texto-card-principal">{valor_tela} {html_soma}</div>
+                                <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
+                                    {icone} {status_texto}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                st.divider()
+
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
         config_colunas = {}
         for col in df_tabela.columns:
             if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
-            elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
             elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-            elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+            elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
             else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
