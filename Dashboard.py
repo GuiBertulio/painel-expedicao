@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import plotly.express as px
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -38,7 +39,6 @@ st.markdown(
 # ==========================================
 # 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS
 # ==========================================
-# Estrutura: t50, t100, t120 são os gatilhos. v100 é o valor base. prop é se calcula proporcional.
 metas_100 = {
     'T3': {
         'SEPARADOR F': {
@@ -194,10 +194,11 @@ try:
 
     st.divider()
 
-    # --- BLOCO DE METAS ---
+    # ==========================================
+    # 5. BLOCO CONDICIONAL: VISÃO INDIVIDUAL OU GERAL
+    # ==========================================
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
-        
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
         
         if not dados_pessoa.empty:
@@ -208,7 +209,12 @@ try:
             bonus_acumulado = 0.0 
             
             if metas_cargo:
+                # 1. RENDERIZA OS CARDS DE METAS
                 cols_meta = st.columns(len(metas_cargo))
+                
+                # Lista para alimentar o gráfico depois
+                grafico_dados = []
+                
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
@@ -218,32 +224,41 @@ try:
                         pagamento_ind = 0.0
                         
                         if tipo == '>':
+                            atingimento_real = (realizado / t100 * 100) if t100 > 0 else 0
                             if realizado >= t120:
-                                cor_texto = "#198754"; borda = "#198754"; icone = "🟢"; status_texto = "Meta 120% (Superou!)"
+                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", "Meta 120% (Superou!)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 1.2)
                             elif realizado >= t100:
-                                cor_texto = "#0d6efd"; borda = "#0d6efd"; icone = "🔵"; status_texto = "Meta 100% (Atingiu)"
+                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", "Meta 100% (Atingiu)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else v100
                             elif realizado >= t50:
-                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Meta 50% (Parcial)"
+                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Meta 50% (Parcial)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 0.5)
                             else:
-                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta"
+                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
                                 
                         elif tipo == '<':
+                            atingimento_real = (t100 / realizado * 100) if realizado > 0 else 100
                             if realizado <= t120:
-                                cor_texto = "#198754"; borda = "#198754"; icone = "🟢"; status_texto = "Meta 120% (Superou!)"
+                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", "Meta 120% (Superou!)"
                                 pagamento_ind = v100 * 1.2
                             elif realizado <= t100:
-                                cor_texto = "#0d6efd"; borda = "#0d6efd"; icone = "🔵"; status_texto = "Meta 100% (Atingiu)"
+                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", "Meta 100% (Atingiu)"
                                 pagamento_ind = v100
                             elif realizado <= t50:
-                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Meta 50% (Parcial)"
+                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Meta 50% (Parcial)"
                                 pagamento_ind = v100 * 0.5
                             else:
-                                cor_texto = "#dc3545"; borda = "#dc3545"; icone = "🔴"; status_texto = "Abaixo da Meta"
+                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
+
+                        # Salva para o gráfico limitando a barra a 150% visualmente
+                        grafico_dados.append({
+                            'Indicador': ind,
+                            'Atingimento (%)': min(atingimento_real, 150),
+                            'Real': atingimento_real
+                        })
 
                         bonus_acumulado += pagamento_ind
                         valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
@@ -261,22 +276,75 @@ try:
                 if bonus_acumulado > 0:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+                st.divider()
+
+                # 2. RENDERIZA GRÁFICO E TABELA ENXUTA LADO A LADO
+                st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
+                
+                col_grafico, col_tabela = st.columns([1.2, 1])
+                
+                with col_grafico:
+                    if grafico_dados:
+                        df_grafico = pd.DataFrame(grafico_dados)
+                        # Define a cor da barra baseado no atingimento real
+                        df_grafico['Cor'] = df_grafico['Real'].apply(
+                            lambda x: '#198754' if x >= 120 else ('#0d6efd' if x >= 100 else '#dc3545')
+                        )
+                        
+                        fig = px.bar(
+                            df_grafico, 
+                            x='Indicador', 
+                            y='Atingimento (%)',
+                            text=df_grafico['Real'].apply(lambda x: f"{x:.1f}%"),
+                            color='Cor',
+                            color_discrete_map="identity"
+                        )
+                        fig.update_layout(
+                            showlegend=False, 
+                            yaxis_title="% da Meta Atingida",
+                            xaxis_title=None,
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            height=350,
+                            margin=dict(t=10, b=0, l=0, r=0)
+                        )
+                        fig.add_hline(y=100, line_dash="dash", line_color="gray", annotation_text="Meta 100%")
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with col_tabela:
+                    # Tabela enxuta: Filtra só as colunas que a pessoa tem meta
+                    colunas_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO'] + list(metas_cargo.keys())
+                    colunas_existentes = [c for c in colunas_uteis if c in df_filtrado.columns]
+                    df_tabela_mini = dados_pessoa[colunas_existentes]
+                    
+                    config_colunas = {}
+                    for col in df_tabela_mini.columns:
+                        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+                        elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+                        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+                        
+                    st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
+
             else:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
-        st.divider()
 
-    # --- TABELA DINÂMICA ---
-    st.markdown("### 📋 Tabela de Produtividade Consolidada")
-    df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
-    config_colunas = {}
-    for col in df_tabela.columns:
-        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
-        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-        elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
-        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+    else:
+        # ==========================================
+        # SE "NENHUM" FOR SELECIONADO: VISÃO GERAL GIGANTE
+        # ==========================================
+        st.markdown("### 📋 Tabela de Produtividade Consolidada")
+        df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
+        config_colunas = {}
+        for col in df_tabela.columns:
+            if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+            elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+            elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+            elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+            else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
-    st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
+        st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
 
 except Exception as e:
     st.error(f"⚠️ Ocorreu um erro ao processar os dados: {e}")
