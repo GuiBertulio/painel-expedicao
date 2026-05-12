@@ -73,7 +73,8 @@ C_AMARELO = "#ffca28"
 C_VERMELHO = "#ef4444" 
 
 # ==========================================
-# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS
+# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS (BÍBLIA DA OPERAÇÃO)
+# Tempo Médio: 01:05:00 = 3900s | 00:55:00 = 3300s | 00:45:00 = 2700s
 # ==========================================
 metas_100 = {
     'T3': {
@@ -88,47 +89,96 @@ metas_100 = {
             'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
         },
         'CONFERENTE': {
-            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000}
+            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000},
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
         },
         'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'MESA': {
-            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85}
+            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85},
+            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Corte %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
         },
         'MANOBRISTA': {
-            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000}
+            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000},
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'LÍDER': {
             'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 65, 't100': 75, 't120': 85},
+            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Itens/Hora Eq.':   {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}
         }
     },
     'T2': {
+        'AVARIA': {
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
+        'CONFERENTE': {
+            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'DEVOLUÇÃO': {
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'INVENTÁRIO': {
+            'Corte %':     {'tipo': '<', 'prop': False, 'v100': 200.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
+        },
+        'LÍDER': {
+            'Ressup. Eq.':     {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 8000, 't100': 11000, 't120': 14000},
+            'Dev. %':          {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Itens/Hora Eq.':  {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 50, 't100': 65, 't120': 80}
+        },
+        'MESA': {
+            'Ressup. Eq.':     {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 8000, 't100': 11000, 't120': 14000},
+            'Dev. %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Itens/Hora Eq.':  {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 50, 't100': 65, 't120': 80}
+        },
+        'OPERADOR': {
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
+        'RAMPEIRO': {
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
         'SEPARADOR G': {
             'Ressup. Ap.': {'tipo': '>', 'prop': True,  'v100': 200.0, 't50': 600, 't100': 800, 't120': 1000},
             'Itens/Hora':  {'tipo': '>', 'prop': False, 'v100': 200.0, 't50': 50, 't100': 65, 't120': 80}
-        },
-        'CONFERENTE': {
-            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000}
-        },
-        'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}
-        },
-        'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}
         }
     },
     'T1': {
         'CONFERENTE': {
-            'Palets Conf.': {'tipo': '>', 'prop': True, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250}
+            'Palets Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250},
+            'Tempo Médio':  {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}
         },
         'DESCARGA': {
-            'Carga Palet.': {'tipo': '>', 'prop': True, 'v100': 125.0, 't50': 3000, 't100': 3700, 't120': 4400},
-            'Carga Bat.':   {'tipo': '>', 'prop': True, 'v100': 125.0, 't50': 1000, 't100': 1500, 't120': 2000}
+            'Carga Palet.': {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 3000, 't100': 3700, 't120': 4400},
+            'Tempo Médio':  {'tipo': '<', 'prop': False, 'v100': 125.0, 't50': 3900, 't100': 3300, 't120': 2700},
+            'Carga Bat.':   {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 1000, 't100': 1500, 't120': 2000}
+        },
+        'DEVOLUÇÃO': {
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'LÍDER': {
+            'Méd. Palets Conf.': {'tipo': '>', 'prop': False, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250},
+            'Tempo Médio':       {'tipo': '<', 'prop': False, 'v100': 300.0, 't50': 3900, 't100': 3300, 't120': 2700}
+        },
+        'OPERADOR': {
+            'Mov. Vert.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 2000, 't100': 2750, 't120': 3500},
+            'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}
+        },
+        'PUXA': {
+            'Palets Px.':  {'tipo': '>', 'prop': True,  'v100': 200.0, 't50': 1800, 't100': 3000, 't120': 4200},
+            'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}
         }
     }
 }
@@ -151,7 +201,7 @@ def carregar_dados():
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
         'Mov. Horizontal', 'Mov. Vert.', 'Avaria', 'Corte %', 'Dev. %', 'Itens Conf.', 
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
-        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Dias Trabalhados'
+        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.'
     ]
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
@@ -163,16 +213,58 @@ def carregar_dados():
         df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
 
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
-    colunas_numericas = [col for col in df.columns if col not in colunas_texto]
-
-    for col in colunas_numericas:
-        df[col] = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    for col in df.columns:
+        if col not in colunas_texto:
+            # Transformação robusta para captar HH:MM:SS do Google Sheets e transformar em Segundos
+            if col == 'Tempo Médio': 
+                texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
+                df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
+            else:
+                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+                df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
     return df
 
 # ==========================================
-# 4. CONSTRUÇÃO DA TELA
+# 4. LÓGICA DE TEMPO: DIAS DECORRIDOS EM TEMPO REAL
+# ==========================================
+hoje = datetime.date.today()
+if hoje.day >= 26:
+    dt_inicio = datetime.date(hoje.year, hoje.month, 26)
+    mes_fim = hoje.month + 1 if hoje.month < 12 else 1
+    ano_fim = hoje.year if hoje.month < 12 else hoje.year + 1
+    dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
+else:
+    mes_ant = hoje.month - 1 if hoje.month > 1 else 12
+    ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
+    dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+    dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
+
+# Conta os dias úteis na marra com a inteligência do Pandas (Seg a Sex)
+dias_uteis_totais = pd.bdate_range(start=dt_inicio, end=dt_fim_ciclo)
+dias_decorridos = pd.bdate_range(start=dt_inicio, end=hoje)
+
+try:
+    import holidays
+    feriados_br = holidays.Brazil(years=[dt_inicio.year, dt_fim_ciclo.year])
+    dias_uteis_totais = dias_uteis_totais.drop([d for d in dias_uteis_totais if d.date() in feriados_br])
+    dias_decorridos = dias_decorridos.drop([d for d in dias_decorridos if d.date() in feriados_br])
+except ImportError:
+    pass # Caso não tenha a biblioteca holidays, conta só seg-sex bruto
+
+DIAS_UTEIS_MES = float(len(dias_uteis_totais))
+DIAS_DECORRIDOS = float(len(dias_decorridos))
+
+# Travas anti-bug
+if DIAS_UTEIS_MES <= 0: DIAS_UTEIS_MES = 22.0 
+if DIAS_DECORRIDOS > DIAS_UTEIS_MES: DIAS_DECORRIDOS = DIAS_UTEIS_MES
+if DIAS_DECORRIDOS <= 0: DIAS_DECORRIDOS = 1.0
+
+# O verdadeiro "Motor" do Proporcional
+FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
+
+# ==========================================
+# 5. CONSTRUÇÃO DA TELA
 # ==========================================
 try:
     df = carregar_dados()
@@ -193,42 +285,11 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
-    # ==========================================
-    # LÓGICA DINÂMICA: CICLO E DIAS ÚTEIS BRASIL
-    # ==========================================
-    hoje = datetime.date.today()
-    if hoje.day >= 26:
-        dt_inicio = datetime.date(hoje.year, hoje.month, 26)
-        mes_fim = hoje.month + 1 if hoje.month < 12 else 1
-        ano_fim = hoje.year if hoje.month < 12 else hoje.year + 1
-        dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
-    else:
-        mes_ant = hoje.month - 1 if hoje.month > 1 else 12
-        ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
-        dt_inicio = datetime.date(ano_ant, mes_ant, 26)
-        dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
-
-    # Conta os dias úteis (Seg-Sex)
-    dias_uteis_pandas = pd.bdate_range(start=dt_inicio, end=dt_fim_ciclo)
-    
-    # Tenta usar a biblioteca holidays para remover feriados BR do cálculo
-    try:
-        import holidays
-        feriados_br = holidays.Brazil(years=[dt_inicio.year, dt_fim_ciclo.year])
-        dias_uteis_pandas = dias_uteis_pandas.drop([d for d in dias_uteis_pandas if d.date() in feriados_br])
-    except ImportError:
-        pass # Se não instalou, conta só Seg-Sex normal.
-
-    DIAS_UTEIS_MES = float(len(dias_uteis_pandas))
-    if DIAS_UTEIS_MES <= 0: DIAS_UTEIS_MES = 22.0 # Trava final de segurança
-    
-    # ==========================================
-    
     col_titulo, col_kpis = st.columns([1, 1.2])
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {hoje.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_UTEIS_MES)} Dias Úteis no Ciclo**")
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {hoje.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_DECORRIDOS)} Dias Corridos de {int(DIAS_UTEIS_MES)}**")
 
     with col_kpis:
         st.markdown("## 🎯 Visão Geral do Período")
@@ -245,7 +306,7 @@ try:
     st.divider()
 
     # ==========================================
-    # 5. BLOCO CONDICIONAL: VISÃO INDIVIDUAL OU GERAL/EQUIPE
+    # VISÃO INDIVIDUAL DO COLABORADOR
     # ==========================================
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
@@ -262,20 +323,17 @@ try:
                 cols_meta = st.columns(len(metas_cargo))
                 grafico_dados = []
                 
-                dias_trab = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns else DIAS_UTEIS_MES
-                if dias_trab <= 0: dias_trab = 1.0 
-                fator_proporcional = dias_trab / DIAS_UTEIS_MES
-                
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
-                        
-                        t50 = regra['t50'] * fator_proporcional if regra['prop'] else regra['t50']
-                        t100 = regra['t100'] * fator_proporcional if regra['prop'] else regra['t100']
-                        t120 = regra['t120'] * fator_proporcional if regra['prop'] else regra['t120']
-                        v100 = regra['v100'] * fator_proporcional if regra['prop'] else regra['v100']
-                        
                         tipo, prop = regra['tipo'], regra['prop']
+                        
+                        # --- FATOR DE ESCALA PROPORCIONAL APLICADO AO ALVO ---
+                        t50 = regra['t50'] * FATOR_PROPORCIONAL if prop else regra['t50']
+                        t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
+                        t120 = regra['t120'] * FATOR_PROPORCIONAL if prop else regra['t120']
+                        v100 = regra['v100'] * FATOR_PROPORCIONAL if prop else regra['v100']
+                        
                         pagamento_ind = 0.0
                         
                         if tipo == '>':
@@ -308,24 +366,33 @@ try:
                                 cor_texto, borda, icone, status_texto = C_VERMELHO, C_VERMELHO, "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
 
-                        grafico_dados.append({
-                            'Indicador': f"<b>{ind}</b>", 
-                            'Atingimento (%)': min(atingimento_real, 150),
-                            'Real': atingimento_real
-                        })
-
+                        grafico_dados.append({'Indicador': f"<b>{ind}</b>", 'Atingimento (%)': min(atingimento_real, 150), 'Real': atingimento_real})
                         bonus_acumulado += pagamento_ind
                         
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
+                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(DIAS_DECORRIDOS)}d)</span>" if prop else ""
                         
-                        valor_tela = f"{realizado:.0f}%" if "Líq." in ind else f"{realizado:.0f}"
-                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. {dias_trab:.0f}d)</span>" if prop else ""
+                        # --- FORMATAÇÃO INTELIGENTE DO VALOR NA TELA ---
+                        if "Tempo Médio" in ind:
+                            segundos = int(realizado)
+                            valor_tela = f"{segundos // 3600:02d}:{(segundos % 3600) // 60:02d}:{segundos % 60:02d}"
+                            s_t100 = int(t100)
+                            t100_tela = f"{s_t100 // 3600:02d}:{(s_t100 % 3600) // 60:02d}:{s_t100 % 60:02d}"
+                        elif ind in ['Avaria', 'Dev. %', 'Corte %']:
+                            valor_tela = f"{realizado:.2f}%"
+                            t100_tela = f"{t100:.2f}%"
+                        elif "Líq." in ind: 
+                            valor_tela = f"{realizado:.0f}%"
+                            t100_tela = f"{t100:.0f}%"
+                        else:
+                            valor_tela = f"{realizado:.0f}"
+                            t100_tela = f"{t100:.0f}"
                         
                         with cols_meta[idx]:
                             st.markdown(f"""
                             <div class="card-meta" style="border-left-color: {borda};">
-                                <div class="texto-card-titulo">{ind} (Alvo: {t100:.0f}){aviso_prop}</div>
+                                <div class="texto-card-titulo">{ind} (Alvo: {t100_tela}){aviso_prop}</div>
                                 <div class="texto-card-principal">{valor_tela}</div>
                                 <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
                                     {icone} {status_texto} {html_dinheiro}
@@ -340,7 +407,6 @@ try:
                 st.divider()
 
                 st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
-                
                 col_grafico, col_tabela = st.columns([1.2, 1])
                 
                 with col_grafico:
@@ -349,10 +415,7 @@ try:
                         df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
                         df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(lambda color: "black" if color == C_AMARELO else "white")
                         
-                        fig = px.bar(
-                            df_grafico, x='Indicador', y='Atingimento (%)',
-                            text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>")
-                        )
+                        fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
                         fig.update_layout(showlegend=False, yaxis_title="<b>% da Meta Atingida</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
                         fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
                         fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1)))
@@ -361,23 +424,26 @@ try:
                         st.plotly_chart(fig, use_container_width=True)
 
                 with col_tabela:
-                    colunas_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
-                    colunas_existentes = [c for c in colunas_uteis if c in df_filtrado.columns]
-                    df_tabela_mini = dados_pessoa[colunas_existentes]
+                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO'] + list(metas_cargo.keys())
+                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]]
                     
                     config_colunas = {}
                     for col in df_tabela_mini.columns:
                         if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                         elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                        elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+                        elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+                        elif col == "Tempo Médio": config_colunas[col] = st.column_config.NumberColumn(col, format="%d segs")
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
-
             else:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
 
     else:
+        # ==========================================
+        # VISÃO GERAL OU MÉDIA DA EQUIPE
+        # ==========================================
         if cargo_selecionado != "Todos" and not df_filtrado.empty:
             st.subheader(f"👥 Raio-X da Equipe: {cargo_selecionado}")
             
@@ -387,10 +453,6 @@ try:
             if metas_equipe:
                 cols_equipe = st.columns(len(metas_equipe))
                 
-                dias_trab_medio = float(df_filtrado[df_filtrado['Dias Trabalhados'] > 0]['Dias Trabalhados'].mean()) if 'Dias Trabalhados' in df_filtrado.columns else DIAS_UTEIS_MES
-                if pd.isna(dias_trab_medio) or dias_trab_medio <= 0: dias_trab_medio = DIAS_UTEIS_MES
-                fator_equipe = dias_trab_medio / DIAS_UTEIS_MES
-
                 for idx, (ind, regra) in enumerate(metas_equipe.items()):
                     if ind in df_filtrado.columns:
                         
@@ -398,10 +460,11 @@ try:
                         realizado_medio = float(valores_validos.mean()) if not valores_validos.empty else 0.0
                         soma_total = float(valores_validos.sum()) if not valores_validos.empty else 0.0
                         
-                        t50 = regra['t50'] * fator_equipe if regra['prop'] else regra['t50']
-                        t100 = regra['t100'] * fator_equipe if regra['prop'] else regra['t100']
-                        t120 = regra['t120'] * fator_equipe if regra['prop'] else regra['t120']
-                        tipo = regra['tipo']
+                        tipo, prop = regra['tipo'], regra['prop']
+                        
+                        t50 = regra['t50'] * FATOR_PROPORCIONAL if prop else regra['t50']
+                        t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
+                        t120 = regra['t120'] * FATOR_PROPORCIONAL if prop else regra['t120']
                         
                         if tipo == '>':
                             atingimento_real = (realizado_medio / t100 * 100) if t100 > 0 else 0
@@ -425,16 +488,31 @@ try:
                             else:
                                 cor_texto, borda, icone, status_texto = C_VERMELHO, C_VERMELHO, "🔴", f"Equipe Abaixo: {atingimento_real:.0f}%"
 
-                        valor_tela = f"{realizado_medio:.0f}%" if "Líq." in ind else f"{realizado_medio:.0f}"
-                        soma_tela = f"{soma_total:.0f}%" if "Líq." in ind else f"{soma_total:.0f}"
+                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(DIAS_DECORRIDOS)}d)</span>" if prop else ""
                         
-                        html_soma = f'<span class="texto-card-secundario">| Soma Total: {soma_tela}</span>' if not "Líq." in ind else ""
-                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Média de {dias_trab_medio:.1f} dias)</span>" if regra['prop'] else ""
-
+                        if "Tempo Médio" in ind:
+                            seg = int(realizado_medio)
+                            valor_tela = f"{seg // 3600:02d}:{(seg % 3600) // 60:02d}:{seg % 60:02d}"
+                            s_t100 = int(t100)
+                            t100_tela = f"{s_t100 // 3600:02d}:{(s_t100 % 3600) // 60:02d}:{s_t100 % 60:02d}"
+                            html_soma = ""
+                        elif ind in ['Avaria', 'Dev. %', 'Corte %']:
+                            valor_tela = f"{realizado_medio:.2f}%"
+                            t100_tela = f"{t100:.2f}%"
+                            html_soma = ""
+                        elif "Líq." in ind: 
+                            valor_tela = f"{realizado_medio:.0f}%"
+                            t100_tela = f"{t100:.0f}%"
+                            html_soma = ""
+                        else:
+                            valor_tela = f"{realizado_medio:.0f}"
+                            t100_tela = f"{t100:.0f}"
+                            html_soma = f'<span class="texto-card-secundario">| Soma Equipe: {soma_total:.0f}</span>'
+                            
                         with cols_equipe[idx]:
                             st.markdown(f"""
                             <div class="card-meta" style="border-left-color: {borda};">
-                                <div class="texto-card-titulo">Média: {ind} (Alvo: {t100:.0f}){aviso_prop}</div>
+                                <div class="texto-card-titulo">Média: {ind} (Alvo: {t100_tela}){aviso_prop}</div>
                                 <div class="texto-card-principal">{valor_tela} {html_soma}</div>
                                 <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
                                     {icone} {status_texto}
@@ -448,8 +526,10 @@ try:
         config_colunas = {}
         for col in df_tabela.columns:
             if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+            elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
             elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-            elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+            elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+            elif col == "Tempo Médio": config_colunas[col] = st.column_config.NumberColumn(col, format="%d segs")
             else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
