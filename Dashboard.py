@@ -4,7 +4,7 @@ import datetime
 import plotly.express as px
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA E CSS (VISUAL)
 # ==========================================
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
@@ -15,39 +15,57 @@ st.markdown(
         padding-top: 2rem !important;
         padding-bottom: 0rem !important;
     }
+    
+    /* Força NEGRITO MÁXIMO nos Títulos e Subtítulos */
+    h1, h2, h3 {
+        font-weight: 900 !important;
+        letter-spacing: 0.5px;
+    }
+
     [data-testid="stMetricValue"] {
         font-size: 50px !important;
-        color: #004aad !important;
+        color: #3b82f6 !important; /* Azul mais claro e vibrante */
     }
     [data-testid="stMetricLabel"] > div {
         font-size: 20px !important;
-        color: gray;
+        font-weight: bold !important;
+        color: lightgray;
     }
     .card-meta {
         background-color: var(--background-color); 
         padding: 15px; 
         border-radius: 10px; 
-        box-shadow: 1px 1px 5px rgba(0,0,0,0.1); 
+        box-shadow: 1px 1px 5px rgba(0,0,0,0.3); 
         margin-bottom: 15px;
-        border-left: 6px solid #ccc;
-        border: 1px solid var(--secondary-background-color);
+        border-left: 8px solid #ccc; /* Borda mais grossa */
+        border-top: 1px solid var(--secondary-background-color);
+        border-right: 1px solid var(--secondary-background-color);
+        border-bottom: 1px solid var(--secondary-background-color);
     }
     .texto-card-principal {
-        font-size: 38px; 
+        font-size: 42px; /* Número maior */
         color: var(--text-color); 
-        font-weight: bold; 
+        font-weight: 900; 
         line-height: 1.1;
     }
     .texto-card-titulo {
-        font-size: 20px; 
+        font-size: 22px; /* Título do indicador maior e mais visível */
         color: var(--text-color); 
-        font-weight: bold; 
+        font-weight: 900; 
         margin-bottom: 5px;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
+
+# ==========================================
+# PALETA DE CORES VIBRANTES (Para Dark Mode)
+# ==========================================
+C_AZUL = "#3b82f6"     # Azul Claro/Celeste
+C_VERDE = "#2ecc71"    # Verde Esmeralda/Neon
+C_AMARELO = "#ffca28"  # Amarelo Vivo
+C_VERMELHO = "#ef4444" # Vermelho Alerta
 
 # ==========================================
 # 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS
@@ -219,36 +237,34 @@ try:
                         
                         pagamento_ind = 0.0
                         
-                        # --- PONTO CHAVE: AS NOVAS 4 CORES ---
                         if tipo == '>':
                             atingimento_real = (realizado / t100 * 100) if t100 > 0 else 0
                             if realizado >= t120:
-                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", f"Meta 120% (Superou: {atingimento_real:.0f}%)"
+                                cor_texto, borda, icone, status_texto = C_AZUL, C_AZUL, "🔵", f"Meta 120% (Superou: {atingimento_real:.0f}%)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 1.2)
                             elif realizado >= t100:
-                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", f"Meta 100% (Atingiu: {atingimento_real:.0f}%)"
+                                cor_texto, borda, icone, status_texto = C_VERDE, C_VERDE, "🟢", f"Meta 100% (Atingiu: {atingimento_real:.0f}%)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else v100
                             elif realizado >= t50:
-                                cor_texto, borda, icone, status_texto = "#f39c12", "#f39c12", "🟡", f"Meta 50% (Parcial: {atingimento_real:.0f}%)"
+                                cor_texto, borda, icone, status_texto = C_AMARELO, C_AMARELO, "🟡", f"Meta 50% (Parcial: {atingimento_real:.0f}%)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 0.5)
                             else:
-                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Abaixo da Meta"
+                                cor_texto, borda, icone, status_texto = C_VERMELHO, C_VERMELHO, "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
                                 
                         elif tipo == '<':
-                            # CORREÇÃO ZERADO MANTIDA
                             atingimento_real = (t100 / realizado * 100) if realizado > 0 else 120.0
                             if realizado <= t120:
-                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", f"Meta 120% (Superou: {atingimento_real:.0f}%)"
+                                cor_texto, borda, icone, status_texto = C_AZUL, C_AZUL, "🔵", f"Meta 120% (Superou: {atingimento_real:.0f}%)"
                                 pagamento_ind = v100 * 1.2
                             elif realizado <= t100:
-                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", f"Meta 100% (Atingiu: {atingimento_real:.0f}%)"
+                                cor_texto, borda, icone, status_texto = C_VERDE, C_VERDE, "🟢", f"Meta 100% (Atingiu: {atingimento_real:.0f}%)"
                                 pagamento_ind = v100
                             elif realizado <= t50:
-                                cor_texto, borda, icone, status_texto = "#f39c12", "#f39c12", "🟡", f"Meta 50% (Parcial: {atingimento_real:.0f}%)"
+                                cor_texto, borda, icone, status_texto = C_AMARELO, C_AMARELO, "🟡", f"Meta 50% (Parcial: {atingimento_real:.0f}%)"
                                 pagamento_ind = v100 * 0.5
                             else:
-                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Abaixo da Meta"
+                                cor_texto, borda, icone, status_texto = C_VERMELHO, C_VERMELHO, "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
 
                         grafico_dados.append({
@@ -259,9 +275,9 @@ try:
 
                         bonus_acumulado += pagamento_ind
                         
-                        # Formata o dinheiro (Esconde se for zerado)
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        html_dinheiro = f'<span style="color: #198754; font-size: 19px; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
+                        # Dinheiro acompanha a cor Verde Neon para destacar sempre
+                        html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
                         
                         valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
                         if "Líq." in ind: valor_tela = f"{realizado:.0f}%"
@@ -271,7 +287,7 @@ try:
                             <div class="card-meta" style="border-left-color: {borda};">
                                 <div class="texto-card-titulo">{ind} (Alvo 100%: {t100})</div>
                                 <div class="texto-card-principal">{valor_tela}</div>
-                                <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
+                                <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
                                     {icone} {status_texto} {html_dinheiro}
                                 </div>
                             </div>
@@ -290,9 +306,9 @@ try:
                 with col_grafico:
                     if grafico_dados:
                         df_grafico = pd.DataFrame(grafico_dados)
-                        # --- PONTO CHAVE: CORES DO GRÁFICO (Azul, Verde, Amarelo, Vermelho) ---
+                        # Aplica as cores vibrantes também no gráfico
                         df_grafico['Cor'] = df_grafico['Real'].apply(
-                            lambda x: '#0d6efd' if x >= 120 else ('#198754' if x >= 100 else ('#f39c12' if x >= 50 else '#dc3545'))
+                            lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO))
                         )
                         
                         fig = px.bar(
@@ -305,16 +321,19 @@ try:
                         )
                         fig.update_layout(
                             showlegend=False, 
-                            yaxis_title="% da Meta Atingida",
+                            yaxis_title="<b>% da Meta Atingida</b>",
                             xaxis_title=None,
                             plot_bgcolor="rgba(0,0,0,0)",
                             height=350,
-                            margin=dict(t=10, b=0, l=0, r=0)
+                            margin=dict(t=15, b=0, l=0, r=0)
                         )
-                        fig.add_hline(y=100, line_dash="dash", line_color="gray", annotation_text="Meta 100%")
+                        # Linha pontilhada e texto mais claros (lightgray) para aparecer no fundo preto
+                        fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
                         
-                        fig.update_traces(textfont_size=22) 
-                        fig.update_xaxes(tickfont=dict(size=18, color="gray"))
+                        fig.update_traces(textfont_size=24, textfont_color="white") 
+                        # Eixo X agora é cinza claro com letras negritas
+                        fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
+                        fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                         
                         st.plotly_chart(fig, use_container_width=True)
 
