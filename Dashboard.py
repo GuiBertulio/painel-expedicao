@@ -255,7 +255,7 @@ try:
 
                         # Salva para o gráfico limitando a barra a 150% visualmente
                         grafico_dados.append({
-                            'Indicador': ind,
+                            'Indicador': f"<b>{ind}</b>", # <-- PONTO DE AJUSTE 3: Forçando o Eixo X em negrito
                             'Atingimento (%)': min(atingimento_real, 150),
                             'Real': atingimento_real
                         })
@@ -265,9 +265,10 @@ try:
                         if "Líq." in ind: valor_tela = f"{realizado:.0f}%"
                         
                         with cols_meta[idx]:
+                            # <-- PONTO DE AJUSTE 1: Aqui eu mudei o font-size de 15px para 20px, cor para #1f1f1f e adicionei font-weight: bold;
                             st.markdown(f"""
                             <div class="card-meta" style="border-left-color: {borda};">
-                                <div style="font-size: 15px; color: gray; margin-bottom: 5px;">{ind} (Alvo 100%: {t100})</div>
+                                <div style="font-size: 20px; color: #1f1f1f; font-weight: bold; margin-bottom: 5px;">{ind} (Alvo 100%: {t100})</div>
                                 <div style="font-size: 38px; color: #1f1f1f; font-weight: bold; line-height: 1.1;">{valor_tela}</div>
                                 <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">{icone} {status_texto}</div>
                             </div>
@@ -287,7 +288,6 @@ try:
                 with col_grafico:
                     if grafico_dados:
                         df_grafico = pd.DataFrame(grafico_dados)
-                        # Define a cor da barra baseado no atingimento real
                         df_grafico['Cor'] = df_grafico['Real'].apply(
                             lambda x: '#198754' if x >= 120 else ('#0d6efd' if x >= 100 else '#dc3545')
                         )
@@ -296,7 +296,7 @@ try:
                             df_grafico, 
                             x='Indicador', 
                             y='Atingimento (%)',
-                            text=df_grafico['Real'].apply(lambda x: f"{x:.1f}%"),
+                            text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"), # <-- PONTO DE AJUSTE 2: Adicionei a tag <b> no texto das barras
                             color='Cor',
                             color_discrete_map="identity"
                         )
@@ -309,10 +309,14 @@ try:
                             margin=dict(t=10, b=0, l=0, r=0)
                         )
                         fig.add_hline(y=100, line_dash="dash", line_color="gray", annotation_text="Meta 100%")
+                        
+                        # <-- PONTO DE AJUSTE 2 E 3: Aumentando a fonte das barras (textfont_size) e do Eixo X (tickfont)
+                        fig.update_traces(textfont_size=22) 
+                        fig.update_xaxes(tickfont=dict(size=18, color="black"))
+                        
                         st.plotly_chart(fig, use_container_width=True)
 
                 with col_tabela:
-                    # Tabela enxuta: Filtra só as colunas que a pessoa tem meta
                     colunas_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO'] + list(metas_cargo.keys())
                     colunas_existentes = [c for c in colunas_uteis if c in df_filtrado.columns]
                     df_tabela_mini = dados_pessoa[colunas_existentes]
