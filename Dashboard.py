@@ -24,12 +24,25 @@ st.markdown(
         color: gray;
     }
     .card-meta {
-        background-color: white; 
+        background-color: var(--background-color); 
         padding: 15px; 
         border-radius: 10px; 
         box-shadow: 1px 1px 5px rgba(0,0,0,0.1); 
         margin-bottom: 15px;
         border-left: 6px solid #ccc;
+        border: 1px solid var(--secondary-background-color);
+    }
+    .texto-card-principal {
+        font-size: 38px; 
+        color: var(--text-color); 
+        font-weight: bold; 
+        line-height: 1.1;
+    }
+    .texto-card-titulo {
+        font-size: 20px; 
+        color: var(--text-color); 
+        font-weight: bold; 
+        margin-bottom: 5px;
     }
     </style>
     """,
@@ -52,31 +65,22 @@ metas_100 = {
             'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
         },
         'CONFERENTE': {
-            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000},
-            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000}
         },
         'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
-            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}
         },
         'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}
         },
         'MESA': {
-            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85},
-            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Corte %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
+            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85}
         },
         'MANOBRISTA': {
-            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000},
-            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000}
         },
         'LÍDER': {
             'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 65, 't100': 75, 't120': 85},
-            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Itens/Hora Eq.':   {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}
         }
     },
@@ -86,17 +90,13 @@ metas_100 = {
             'Itens/Hora':  {'tipo': '>', 'prop': False, 'v100': 200.0, 't50': 50, 't100': 65, 't120': 80}
         },
         'CONFERENTE': {
-            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000}
         },
         'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
-            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}
         },
         'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}
         }
     },
     'T1': {
@@ -170,7 +170,6 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
-    # --- CÁLCULO DO PERÍODO ---
     hoje = datetime.date.today()
     dt_inicio = datetime.date(hoje.year, hoje.month, 26) if hoje.day >= 26 else datetime.date(hoje.year if hoje.month > 1 else hoje.year - 1, hoje.month - 1 if hoje.month > 1 else 12, 26)
     
@@ -209,10 +208,7 @@ try:
             bonus_acumulado = 0.0 
             
             if metas_cargo:
-                # 1. RENDERIZA OS CARDS DE METAS
                 cols_meta = st.columns(len(metas_cargo))
-                
-                # Lista para alimentar o gráfico depois
                 grafico_dados = []
                 
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
@@ -223,64 +219,70 @@ try:
                         
                         pagamento_ind = 0.0
                         
+                        # --- PONTO CHAVE: AS NOVAS 4 CORES ---
                         if tipo == '>':
                             atingimento_real = (realizado / t100 * 100) if t100 > 0 else 0
                             if realizado >= t120:
-                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", "Meta 120% (Superou!)"
+                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", f"Meta 120% (Superou: {atingimento_real:.0f}%)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 1.2)
                             elif realizado >= t100:
-                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", "Meta 100% (Atingiu)"
+                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", f"Meta 100% (Atingiu: {atingimento_real:.0f}%)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else v100
                             elif realizado >= t50:
-                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Meta 50% (Parcial)"
+                                cor_texto, borda, icone, status_texto = "#f39c12", "#f39c12", "🟡", f"Meta 50% (Parcial: {atingimento_real:.0f}%)"
                                 pagamento_ind = (realizado / t100 * v100) if prop else (v100 * 0.5)
                             else:
                                 cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
                                 
                         elif tipo == '<':
-                            atingimento_real = (t100 / realizado * 100) if realizado > 0 else 100
+                            # CORREÇÃO ZERADO MANTIDA
+                            atingimento_real = (t100 / realizado * 100) if realizado > 0 else 120.0
                             if realizado <= t120:
-                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", "Meta 120% (Superou!)"
+                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", f"Meta 120% (Superou: {atingimento_real:.0f}%)"
                                 pagamento_ind = v100 * 1.2
                             elif realizado <= t100:
-                                cor_texto, borda, icone, status_texto = "#0d6efd", "#0d6efd", "🔵", "Meta 100% (Atingiu)"
+                                cor_texto, borda, icone, status_texto = "#198754", "#198754", "🟢", f"Meta 100% (Atingiu: {atingimento_real:.0f}%)"
                                 pagamento_ind = v100
                             elif realizado <= t50:
-                                cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Meta 50% (Parcial)"
+                                cor_texto, borda, icone, status_texto = "#f39c12", "#f39c12", "🟡", f"Meta 50% (Parcial: {atingimento_real:.0f}%)"
                                 pagamento_ind = v100 * 0.5
                             else:
                                 cor_texto, borda, icone, status_texto = "#dc3545", "#dc3545", "🔴", "Abaixo da Meta"
                                 pagamento_ind = 0.0
 
-                        # Salva para o gráfico limitando a barra a 150% visualmente
                         grafico_dados.append({
-                            'Indicador': f"<b>{ind}</b>", # <-- PONTO DE AJUSTE 3: Forçando o Eixo X em negrito
+                            'Indicador': f"<b>{ind}</b>", 
                             'Atingimento (%)': min(atingimento_real, 150),
                             'Real': atingimento_real
                         })
 
                         bonus_acumulado += pagamento_ind
+                        
+                        # Formata o dinheiro (Esconde se for zerado)
+                        texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        html_dinheiro = f'<span style="color: #198754; font-size: 19px; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
+                        
                         valor_tela = f"{realizado:.2f}%" if ind in ['Avaria', 'Dev. %', 'Corte %'] else f"{realizado:.0f}"
                         if "Líq." in ind: valor_tela = f"{realizado:.0f}%"
                         
                         with cols_meta[idx]:
-                            # <-- PONTO DE AJUSTE 1: Aqui eu mudei o font-size de 15px para 20px, cor para #1f1f1f e adicionei font-weight: bold;
                             st.markdown(f"""
                             <div class="card-meta" style="border-left-color: {borda};">
-                                <div style="font-size: 20px; color: #1f1f1f; font-weight: bold; margin-bottom: 5px;">{ind} (Alvo 100%: {t100})</div>
-                                <div style="font-size: 38px; color: #1f1f1f; font-weight: bold; line-height: 1.1;">{valor_tela}</div>
-                                <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">{icone} {status_texto}</div>
+                                <div class="texto-card-titulo">{ind} (Alvo 100%: {t100})</div>
+                                <div class="texto-card-principal">{valor_tela}</div>
+                                <div style="font-size: 16px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
+                                    {icone} {status_texto} {html_dinheiro}
+                                </div>
                             </div>
                             """, unsafe_allow_html=True)
                 
                 if bonus_acumulado > 0:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    st.success(f"💰 **Premiação Variável Acumulada Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                    st.success(f"💰 **Premiação Variável Acumulada TOTAL Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
                 st.divider()
 
-                # 2. RENDERIZA GRÁFICO E TABELA ENXUTA LADO A LADO
                 st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
                 
                 col_grafico, col_tabela = st.columns([1.2, 1])
@@ -288,15 +290,16 @@ try:
                 with col_grafico:
                     if grafico_dados:
                         df_grafico = pd.DataFrame(grafico_dados)
+                        # --- PONTO CHAVE: CORES DO GRÁFICO (Azul, Verde, Amarelo, Vermelho) ---
                         df_grafico['Cor'] = df_grafico['Real'].apply(
-                            lambda x: '#198754' if x >= 120 else ('#0d6efd' if x >= 100 else '#dc3545')
+                            lambda x: '#0d6efd' if x >= 120 else ('#198754' if x >= 100 else ('#f39c12' if x >= 50 else '#dc3545'))
                         )
                         
                         fig = px.bar(
                             df_grafico, 
                             x='Indicador', 
                             y='Atingimento (%)',
-                            text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"), # <-- PONTO DE AJUSTE 2: Adicionei a tag <b> no texto das barras
+                            text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"),
                             color='Cor',
                             color_discrete_map="identity"
                         )
@@ -310,9 +313,8 @@ try:
                         )
                         fig.add_hline(y=100, line_dash="dash", line_color="gray", annotation_text="Meta 100%")
                         
-                        # <-- PONTO DE AJUSTE 2 E 3: Aumentando a fonte das barras (textfont_size) e do Eixo X (tickfont)
                         fig.update_traces(textfont_size=22) 
-                        fig.update_xaxes(tickfont=dict(size=18, color="black"))
+                        fig.update_xaxes(tickfont=dict(size=18, color="gray"))
                         
                         st.plotly_chart(fig, use_container_width=True)
 
@@ -335,9 +337,6 @@ try:
                 st.warning(f"Metas não cadastradas para o cargo: {cargo_p} ({turno_p}).")
 
     else:
-        # ==========================================
-        # SE "NENHUM" FOR SELECIONADO: VISÃO GERAL GIGANTE
-        # ==========================================
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
         config_colunas = {}
