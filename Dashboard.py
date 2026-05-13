@@ -73,7 +73,7 @@ C_AMARELO = "#ffca28"
 C_VERMELHO = "#ef4444" 
 
 # ==========================================
-# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS (BÍBLIA DA OPERAÇÃO)
+# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS 
 # Tempo Médio: 01:05:00 = 3900s | 00:55:00 = 3300s | 00:45:00 = 2700s
 # ==========================================
 metas_100 = {
@@ -201,7 +201,7 @@ def carregar_dados():
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
         'Mov. Horizontal', 'Mov. Vert.', 'Avaria', 'Corte %', 'Dev. %', 'Itens Conf.', 
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
-        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.'
+        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 'Dias Trabalhados'
     ]
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
@@ -215,7 +215,6 @@ def carregar_dados():
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
     for col in df.columns:
         if col not in colunas_texto:
-            # Transformação robusta para captar HH:MM:SS do Google Sheets e transformar em Segundos
             if col == 'Tempo Médio': 
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
@@ -226,23 +225,24 @@ def carregar_dados():
     return df
 
 # ==========================================
-# 4. LÓGICA DE TEMPO: DIAS DECORRIDOS EM TEMPO REAL
+# 4. LÓGICA DE TEMPO: D-1 (Apurando até "Ontem")
 # ==========================================
-hoje = datetime.date.today()
-if hoje.day >= 26:
-    dt_inicio = datetime.date(hoje.year, hoje.month, 26)
-    mes_fim = hoje.month + 1 if hoje.month < 12 else 1
-    ano_fim = hoje.year if hoje.month < 12 else hoje.year + 1
+# A regra oficial de dashboards: os dados mostram a operação finalizada de ontem.
+data_apuracao = datetime.date.today() - datetime.timedelta(days=1)
+
+if data_apuracao.day >= 26:
+    dt_inicio = datetime.date(data_apuracao.year, data_apuracao.month, 26)
+    mes_fim = data_apuracao.month + 1 if data_apuracao.month < 12 else 1
+    ano_fim = data_apuracao.year if data_apuracao.month < 12 else data_apuracao.year + 1
     dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
 else:
-    mes_ant = hoje.month - 1 if hoje.month > 1 else 12
-    ano_ant = hoje.year if hoje.month > 1 else hoje.year - 1
+    mes_ant = data_apuracao.month - 1 if data_apuracao.month > 1 else 12
+    ano_ant = data_apuracao.year if data_apuracao.month > 1 else data_apuracao.year - 1
     dt_inicio = datetime.date(ano_ant, mes_ant, 26)
-    dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
+    dt_fim_ciclo = datetime.date(data_apuracao.year, data_apuracao.month, 25)
 
-# Conta os dias úteis na marra com a inteligência do Pandas (Seg a Sex)
 dias_uteis_totais = pd.bdate_range(start=dt_inicio, end=dt_fim_ciclo)
-dias_decorridos = pd.bdate_range(start=dt_inicio, end=hoje)
+dias_decorridos = pd.bdate_range(start=dt_inicio, end=data_apuracao)
 
 try:
     import holidays
@@ -250,17 +250,15 @@ try:
     dias_uteis_totais = dias_uteis_totais.drop([d for d in dias_uteis_totais if d.date() in feriados_br])
     dias_decorridos = dias_decorridos.drop([d for d in dias_decorridos if d.date() in feriados_br])
 except ImportError:
-    pass # Caso não tenha a biblioteca holidays, conta só seg-sex bruto
+    pass 
 
 DIAS_UTEIS_MES = float(len(dias_uteis_totais))
 DIAS_DECORRIDOS = float(len(dias_decorridos))
 
-# Travas anti-bug
 if DIAS_UTEIS_MES <= 0: DIAS_UTEIS_MES = 22.0 
 if DIAS_DECORRIDOS > DIAS_UTEIS_MES: DIAS_DECORRIDOS = DIAS_UTEIS_MES
 if DIAS_DECORRIDOS <= 0: DIAS_DECORRIDOS = 1.0
 
-# O verdadeiro "Motor" do Proporcional
 FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
 
 # ==========================================
@@ -289,7 +287,8 @@ try:
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {hoje.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_DECORRIDOS)} Dias Corridos de {int(DIAS_UTEIS_MES)}**")
+        # --- ATUALIZADO: Mostrando "data_apuracao" ao invés de "hoje" ---
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_DECORRIDOS)} Dias Corridos de {int(DIAS_UTEIS_MES)}**")
 
     with col_kpis:
         st.markdown("## 🎯 Visão Geral do Período")
@@ -323,16 +322,19 @@ try:
                 cols_meta = st.columns(len(metas_cargo))
                 grafico_dados = []
                 
+                dias_trab = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns else DIAS_UTEIS_MES
+                if dias_trab <= 0: dias_trab = 1.0 
+                fator_colaborador = dias_trab / DIAS_UTEIS_MES
+                
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
                         tipo, prop = regra['tipo'], regra['prop']
                         
-                        # --- FATOR DE ESCALA PROPORCIONAL APLICADO AO ALVO ---
-                        t50 = regra['t50'] * FATOR_PROPORCIONAL if prop else regra['t50']
-                        t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
-                        t120 = regra['t120'] * FATOR_PROPORCIONAL if prop else regra['t120']
-                        v100 = regra['v100'] * FATOR_PROPORCIONAL if prop else regra['v100']
+                        t50 = regra['t50'] * fator_colaborador if prop else regra['t50']
+                        t100 = regra['t100'] * fator_colaborador if prop else regra['t100']
+                        t120 = regra['t120'] * fator_colaborador if prop else regra['t120']
+                        v100 = regra['v100'] * fator_colaborador if prop else regra['v100']
                         
                         pagamento_ind = 0.0
                         
@@ -373,7 +375,6 @@ try:
                         html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
                         aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(DIAS_DECORRIDOS)}d)</span>" if prop else ""
                         
-                        # --- FORMATAÇÃO INTELIGENTE DO VALOR NA TELA ---
                         if "Tempo Médio" in ind:
                             segundos = int(realizado)
                             valor_tela = f"{segundos // 3600:02d}:{(segundos % 3600) // 60:02d}:{segundos % 60:02d}"
@@ -424,7 +425,7 @@ try:
                         st.plotly_chart(fig, use_container_width=True)
 
                 with col_tabela:
-                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO'] + list(metas_cargo.keys())
+                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]]
                     
                     config_colunas = {}
@@ -453,6 +454,10 @@ try:
             if metas_equipe:
                 cols_equipe = st.columns(len(metas_equipe))
                 
+                dias_trab_medio = float(df_filtrado[df_filtrado['Dias Trabalhados'] > 0]['Dias Trabalhados'].mean()) if 'Dias Trabalhados' in df_filtrado.columns else DIAS_UTEIS_MES
+                if pd.isna(dias_trab_medio) or dias_trab_medio <= 0: dias_trab_medio = DIAS_UTEIS_MES
+                fator_equipe = dias_trab_medio / DIAS_UTEIS_MES
+
                 for idx, (ind, regra) in enumerate(metas_equipe.items()):
                     if ind in df_filtrado.columns:
                         
@@ -528,7 +533,7 @@ try:
             if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
             elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
             elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-            elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+            elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
             elif col == "Tempo Médio": config_colunas[col] = st.column_config.NumberColumn(col, format="%d segs")
             else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
