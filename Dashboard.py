@@ -227,7 +227,6 @@ def carregar_dados():
 # ==========================================
 # 4. LÓGICA DE TEMPO: D-1 (Apurando até "Ontem")
 # ==========================================
-# A regra oficial de dashboards: os dados mostram a operação finalizada de ontem.
 data_apuracao = datetime.date.today() - datetime.timedelta(days=1)
 
 if data_apuracao.day >= 26:
@@ -287,7 +286,6 @@ try:
 
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        # --- ATUALIZADO: Mostrando "data_apuracao" ao invés de "hoje" ---
         st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_DECORRIDOS)} Dias Corridos de {int(DIAS_UTEIS_MES)}**")
 
     with col_kpis:
@@ -426,15 +424,20 @@ try:
 
                 with col_tabela:
                     col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
-                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]]
+                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
+                    
+                    # --- MÁSCARA VISUAL PARA HORAS NA TABELA INDIVIDUAL ---
+                    if 'Tempo Médio' in df_tabela_mini.columns:
+                        df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(
+                            lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00"
+                        )
                     
                     config_colunas = {}
                     for col in df_tabela_mini.columns:
-                        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+                        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
                         elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                         elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
                         elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
-                        elif col == "Tempo Médio": config_colunas[col] = st.column_config.NumberColumn(col, format="%d segs")
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
@@ -527,14 +530,20 @@ try:
                 st.divider()
 
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
-        df_tabela = df_filtrado.sort_values(by='NOME', ascending=True)
+        df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
+        
+        # --- MÁSCARA VISUAL PARA HORAS NA TABELA CONSOLIDADA ---
+        if 'Tempo Médio' in df_tabela.columns:
+            df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(
+                lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00"
+            )
+
         config_colunas = {}
         for col in df_tabela.columns:
-            if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']: continue 
+            if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
             elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
             elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
             elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
-            elif col == "Tempo Médio": config_colunas[col] = st.column_config.NumberColumn(col, format="%d segs")
             else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
