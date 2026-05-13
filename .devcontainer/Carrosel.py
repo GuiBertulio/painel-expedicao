@@ -146,7 +146,7 @@ try:
             st.rerun()
 
         st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; font-size: 3.5rem;'>{f_exibicao}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; color: gray;'>📅 {dt_inicio.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: gray;'>📅 {dt_inicio.strftime('%d/%m/%Y')} a {(hoje - datetime.timedelta(days=1)).strftime('%d/%m/%Y')}</p>", unsafe_allow_html=True)
 
         blocos = []
         for ind in inds_f:
