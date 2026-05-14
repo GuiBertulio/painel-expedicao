@@ -128,7 +128,7 @@ metas_100 = {
         'DEVOLUÇÃO': {
             'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
         },
-        'INVENTARIO': {  # Ajustado para remover o acento e parear com a planilha
+        'INVENTARIO': {
             'Corte %':     {'tipo': '<', 'prop': False, 'v100': 200.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
         },
         'LÍDER': {
@@ -530,6 +530,17 @@ try:
 
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
+
+        # --- NOVO: FILTRO DINÂMICO DE COLUNAS POR CARGO ---
+        if cargo_selecionado != "Todos":
+            turno_tabela = df_tabela['TURNO'].mode()[0] if not df_tabela.empty else "T3"
+            metas_tabela = metas_100.get(turno_tabela, {}).get(cargo_selecionado, {})
+            if metas_tabela:
+                # Mantém dados básicos + Horas + Métricas do Cargo selecionado
+                cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Horas']
+                cols_metricas = list(metas_tabela.keys())
+                cols_finais = [c for c in (cols_basicas + cols_metricas) if c in df_tabela.columns]
+                df_tabela = df_tabela[cols_finais]
         
         # --- MÁSCARA VISUAL PARA HORAS NA TABELA CONSOLIDADA ---
         if 'Tempo Médio' in df_tabela.columns:
@@ -542,7 +553,8 @@ try:
             if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
             elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
             elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-            elif col in ["Horas", "Dias Trabalhados"]: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
+            # --- NOVO: APENAS HORAS FICA COM DECIMAL. DIAS TRABALHADOS VAI PARA O "ELSE" E FICA INTEIRO (%d) ---
+            elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
             else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=650, column_config=config_colunas)
