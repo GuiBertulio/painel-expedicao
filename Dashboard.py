@@ -128,7 +128,7 @@ metas_100 = {
         'DEVOLUÇÃO': {
             'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
         },
-        'INVENTÁRIO': {
+        'INVENTARIO': {  # Ajustado para remover o acento e parear com a planilha
             'Corte %':     {'tipo': '<', 'prop': False, 'v100': 200.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
         },
         'LÍDER': {
@@ -426,7 +426,6 @@ try:
                     col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                     
-                    # --- MÁSCARA VISUAL PARA HORAS NA TABELA INDIVIDUAL ---
                     if 'Tempo Médio' in df_tabela_mini.columns:
                         df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(
                             lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00"
