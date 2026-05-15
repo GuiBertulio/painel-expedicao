@@ -219,7 +219,8 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+                # CORREÇÃO AQUI: Adicionado a remoção do PONTO de milhar antes de tratar a vírgula!
+                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
     return df
