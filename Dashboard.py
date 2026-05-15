@@ -157,19 +157,26 @@ metas_100 = {
 }
 
 # ==========================================
-# 3. CARREGAMENTO DOS DADOS (LIMPEZA BR)
+# 3. CARREGAMENTO DOS DADOS (COM AUTO-CORRETOR)
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
+    # ⚠️ COLE SEU NOVO LINK AQUI EMBAIXO (Certifique-se de que a aba certa está publicada)
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
+    # 🛡️ AUTO-CORRETOR: Arruma a falta de pontos nos cabeçalhos vindos do Excel
+    df = df.rename(columns={
+        'Jornada Líq. Eq': 'Jornada Líq. Eq.',
+        'Ressup. Eq': 'Ressup. Eq.',
+        'Méd. Palets Conf': 'Méd. Palets Conf.'
+    })
+    
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
     
-    # Removido da busca: Avaria, Corte %, Dev. %
     colunas_desejadas = [
         'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
@@ -193,8 +200,7 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                # Limpeza de ponto de milhar e vírgula decimal
-                texto_limpo = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
     return df
