@@ -445,25 +445,37 @@ try:
 
     else:
         # ==========================================
-        # VISÃO GERAL OU MÉDIA DA EQUIPE
+        # VISÃO GERAL OU MÉDIA DA EQUIPE / TURNO
         # ==========================================
-        if cargo_selecionado != "Todos" and not df_filtrado.empty:
+        cargos_render = []
+        if cargo_selecionado != "Todos":
+            cargos_render = [cargo_selecionado]
             st.subheader(f"👥 Raio-X da Equipe: {cargo_selecionado}")
+        elif turno_selecionado != "Todos":
+            cargos_render = sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
+            st.subheader(f"🏢 Raio-X Consolidado do Turno: {turno_selecionado}")
             
-            turno_equipe = df_filtrado['TURNO'].mode()[0] if not df_filtrado.empty else "T3"
-            metas_equipe = metas_100.get(turno_equipe, {}).get(cargo_selecionado, {})
+        for cargo_atual in cargos_render:
+            df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
+            if df_cargo.empty: continue
+            
+            turno_equipe = df_cargo['TURNO'].mode()[0]
+            metas_equipe = metas_100.get(turno_equipe, {}).get(cargo_atual, {})
             
             if metas_equipe:
+                # Se for a visão consolidada de Turno, adiciona um subtítulo para cada cargo
+                if len(cargos_render) > 1:
+                    st.markdown(f"<h4 style='color: lightgray; margin-top: 15px; border-bottom: 1px solid #333; padding-bottom: 5px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
+                
                 cols_equipe = st.columns(len(metas_equipe))
                 
-                dias_trab_medio = float(df_filtrado[df_filtrado['Dias Trabalhados'] > 0]['Dias Trabalhados'].mean()) if 'Dias Trabalhados' in df_filtrado.columns else DIAS_UTEIS_MES
+                dias_trab_medio = float(df_cargo[df_cargo['Dias Trabalhados'] > 0]['Dias Trabalhados'].mean()) if 'Dias Trabalhados' in df_cargo.columns else DIAS_UTEIS_MES
                 if pd.isna(dias_trab_medio) or dias_trab_medio <= 0: dias_trab_medio = DIAS_UTEIS_MES
-                fator_equipe = dias_trab_medio / DIAS_UTEIS_MES
-
+                
                 for idx, (ind, regra) in enumerate(metas_equipe.items()):
-                    if ind in df_filtrado.columns:
+                    if ind in df_cargo.columns:
                         
-                        valores_validos = df_filtrado[df_filtrado[ind] > 0][ind]
+                        valores_validos = df_cargo[df_cargo[ind] > 0][ind]
                         realizado_medio = float(valores_validos.mean()) if not valores_validos.empty else 0.0
                         soma_total = float(valores_validos.sum()) if not valores_validos.empty else 0.0
                         
@@ -526,23 +538,22 @@ try:
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-                st.divider()
+        
+        if len(cargos_render) > 0:
+            st.divider()
 
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
 
-        # --- NOVO: FILTRO DINÂMICO DE COLUNAS POR CARGO ---
         if cargo_selecionado != "Todos":
             turno_tabela = df_tabela['TURNO'].mode()[0] if not df_tabela.empty else "T3"
             metas_tabela = metas_100.get(turno_tabela, {}).get(cargo_selecionado, {})
             if metas_tabela:
-                # Mantém dados básicos + Horas + Métricas do Cargo selecionado
                 cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Horas']
                 cols_metricas = list(metas_tabela.keys())
                 cols_finais = [c for c in (cols_basicas + cols_metricas) if c in df_tabela.columns]
                 df_tabela = df_tabela[cols_finais]
         
-        # --- MÁSCARA VISUAL PARA HORAS NA TABELA CONSOLIDADA ---
         if 'Tempo Médio' in df_tabela.columns:
             df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(
                 lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00"
@@ -553,7 +564,6 @@ try:
             if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
             elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
             elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-            # --- NOVO: APENAS HORAS FICA COM DECIMAL. DIAS TRABALHADOS VAI PARA O "ELSE" E FICA INTEIRO (%d) ---
             elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
             else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
 
