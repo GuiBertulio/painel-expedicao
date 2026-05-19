@@ -170,7 +170,7 @@ def carregar_dados():
         df = df.dropna(subset=['NOME'])
     
     colunas_desejadas = [
-        'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 
+        'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
         'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
@@ -408,7 +408,7 @@ try:
         # TABELA DINÂMICA
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Horas']
+        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados']
         todas_metricas = set()
         if cargo_selecionado != "Todos":
             todas_metricas.update(metas_100.get(df_tabela['TURNO'].mode()[0], {}).get(cargo_selecionado, {}).keys())
