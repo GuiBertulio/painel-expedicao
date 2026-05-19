@@ -706,25 +706,17 @@ try:
 
 
 
-                        with cols_meta[idx]:
-
-                            st.markdown(f"""
-
-                            <div class="card-meta" style="border-left-color: {cor_texto};">
-
-                                <div class="texto-card-titulo">{ind} (Alvo: {t100_tela}){aviso_prop}</div>
-
-                                <div class="texto-card-principal">{valor_tela}</div>
-
-                                <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
-
-                                    {icone} {status_texto} {html_dinheiro}
-
-                                </div>
-
-                            </div>
-
-                            """, unsafe_allow_html=True)
+                        # Use este bloco exato para as cartas de metas
+with cols_meta[idx]:
+    st.markdown(f"""
+    <div class="card-meta" style="border-left-color: {cor_texto};">
+        <div class="texto-card-titulo">{ind} (Alvo: {t100_tela}){aviso_prop}</div>
+        <div class="texto-card-principal">{valor_tela}</div>
+        <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
+            {icone} {status_texto} {html_dinheiro}
+        </div>
+    </div>
+    """, unsafe_allow_html=True) # <--- ESTE PARÂMETRO É O QUE FAZ A MÁGICA
 
                 
 
