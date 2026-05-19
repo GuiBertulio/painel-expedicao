@@ -401,7 +401,6 @@ try:
                         if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
                         elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                         elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                        elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
@@ -465,7 +464,9 @@ try:
         # TABELA DINÂMICA
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Horas']
+        
+        # REMOVIDO 'Horas' DA VISÃO DINÂMICA
+        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados']
         todas_metricas = set()
         
         if cargo_selecionado != "Todos":
@@ -486,7 +487,6 @@ try:
             elif "Líq." in c: config[c] = st.column_config.NumberColumn(c, format="%d%%")
             else: config[c] = st.column_config.NumberColumn(c, format="%d")
             
-        config['Horas'] = st.column_config.NumberColumn('Horas', format="%.2f")
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
 except Exception as e:
