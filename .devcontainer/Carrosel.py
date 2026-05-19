@@ -63,15 +63,15 @@ mapa_completo = {
     'T3': {
         'SEPARADOR F': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
         'SEPARADOR G': ['Jornada Líq.', 'Itens Sep', 'Itens/Hora'],
-        'CONFERENTE': ['Itens Conf.'],
-        'OPERADOR': ['Mov. Horizontal'], 
-        'RAMPEIRO': ['Itens Rampa'],
-        'MANOBRISTA': ['Itens Manob.'],
+        'CONFERENTE': ['Itens Conf.', 'Dev. %'],
+        'OPERADOR': ['Mov. Horizontal', 'Avaria'], 
+        'CARREGAMENTO BOX': ['Itens Rampa', 'Dev. %', 'Avaria'],
+        'MANOBRISTA': ['Itens Manob.', 'Dev. %', 'Avaria'],
     },
     'T2': {
-        'CONFERENTE': ['Itens Conf.'],
-        'OPERADOR': ['Mov. Horizontal'],
-        'RAMPEIRO': ['Itens Rampa'],
+        'CONFERENTE': ['Itens Conf.', 'Dev. %'],
+        'OPERADOR': ['Mov. Horizontal', 'Avaria'],
+        'RAMPEIRO': ['Itens Rampa', 'Dev. %', 'Avaria'],
         'SEPARADOR G': ['Ressup. Ap.', 'Itens/Hora']
     },
     'T1': {
@@ -87,7 +87,7 @@ apelidos_cargos = {
 }
 
 # --- REGRA: CARGOS UNIFICADOS (Sem a Mesa) ---
-cargos_unificados = ['RAMPEIRO', 'DESCARGA', 'PUXA']
+cargos_unificados = ['RAMPEIRO', 'DESCARGA', 'PUXA', 'CARREGAMENTO BOX']
 
 try:
     df_base = baixar_planilha_tv()
