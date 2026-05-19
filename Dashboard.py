@@ -74,7 +74,6 @@ C_VERMELHO = "#ef4444"
 
 # ==========================================
 # 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS 
-# (Sem Avaria, Corte e Dev // Sem Proporcional Líder/Mesa/Rampeiro)
 # ==========================================
 metas_100 = {
     'T3': {
@@ -89,42 +88,66 @@ metas_100 = {
             'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
         },
         'CONFERENTE': {
-            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000}
+            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000},
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
         },
         'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'MESA': {
-            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85}
+            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85},
+            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Corte %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
         },
         'MANOBRISTA': {
-            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000}
+            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000},
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'LÍDER': {
             'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 65, 't100': 75, 't120': 85},
+            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Itens/Hora Eq.':   {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}
         }
     },
     'T2': {
+        'AVARIA': {
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
+        },
         'CONFERENTE': {
-            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000}
+            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'DEVOLUÇÃO': {
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
+        },
+        'INVENTARIO': {
+            'Corte %':     {'tipo': '<', 'prop': False, 'v100': 200.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
         },
         'LÍDER': {
             'Ressup. Eq.':     {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 8000, 't100': 11000, 't120': 14000},
+            'Dev. %':          {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Itens/Hora Eq.':  {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 50, 't100': 65, 't120': 80}
         },
         'MESA': {
             'Ressup. Eq.':     {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 8000, 't100': 11000, 't120': 14000},
+            'Dev. %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Itens/Hora Eq.':  {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 50, 't100': 65, 't120': 80}
         },
         'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}
+            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
+            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}
+            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
+            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
+            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
         'SEPARADOR G': {
             'Ressup. Ap.': {'tipo': '>', 'prop': True,  'v100': 200.0, 't50': 600, 't100': 800, 't120': 1000},
@@ -140,6 +163,9 @@ metas_100 = {
             'Carga Palet.': {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 3000, 't100': 3700, 't120': 4400},
             'Tempo Médio':  {'tipo': '<', 'prop': False, 'v100': 125.0, 't50': 3900, 't100': 3300, 't120': 2700},
             'Carga Bat.':   {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 1000, 't100': 1500, 't120': 2000}
+        },
+        'DEVOLUÇÃO': {
+            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
         },
         'LÍDER': {
             'Méd. Palets Conf.': {'tipo': '>', 'prop': False, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250},
@@ -166,13 +192,20 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
+    # AUTO-CORRETOR
+    df = df.rename(columns={
+        'Jornada Líq. Eq': 'Jornada Líq. Eq.',
+        'Ressup. Eq': 'Ressup. Eq.',
+        'Méd. Palets Conf': 'Méd. Palets Conf.'
+    })
+    
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
     
     colunas_desejadas = [
-        'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 
+        'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
-        'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 
+        'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 'Avaria', 'Corte %', 'Dev. %',
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
         'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 'Dias Trabalhados'
     ]
@@ -192,7 +225,6 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                # Limpeza de ponto de milhar e vírgula decimal
                 texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
@@ -261,7 +293,7 @@ try:
 
     st.divider()
 
-    # VISÃO INDIVIDUAL (AGORA COM GRÁFICO E TABELA RESTAURADOS)
+    # VISÃO INDIVIDUAL
     if pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
@@ -281,26 +313,29 @@ try:
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
                         tipo, prop = regra['tipo'], regra['prop']
+                        
                         t100 = regra['t100'] * fator_colaborador if prop else regra['t100']
                         t120 = regra['t120'] * fator_colaborador if prop else regra['t120']
                         t50 = regra['t50'] * fator_colaborador if prop else regra['t50']
                         v100 = regra['v100'] * fator_colaborador if prop else regra['v100']
+                        
                         pagamento_ind = 0.0
                         
+                        # --- TRAVA DE 120% NO PAGAMENTO APLICADA AQUI ---
                         if tipo == '>':
                             atingimento_real = (realizado / t100 * 100) if t100 > 0 else 0
-                            if realizado >= t120: cor_texto, icone, status_texto, pagamento_ind = C_AZUL, "🔵", "Superou", (realizado / t100 * v100) if prop else v100 * 1.2
-                            elif realizado >= t100: cor_texto, icone, status_texto, pagamento_ind = C_VERDE, "🟢", "Atingiu", (realizado / t100 * v100) if prop else v100
-                            elif realizado >= t50: cor_texto, icone, status_texto, pagamento_ind = C_AMARELO, "🟡", "Parcial", (realizado / t100 * v100) if prop else v100 * 0.5
+                            if realizado >= t120: cor_texto, icone, status_texto, pagamento_ind = C_AZUL, "🔵", "Superou", v100 * 1.2
+                            elif realizado >= t100: cor_texto, icone, status_texto, pagamento_ind = C_VERDE, "🟢", "Atingiu", v100
+                            elif realizado >= t50: cor_texto, icone, status_texto, pagamento_ind = C_AMARELO, "🟡", "Parcial", v100 * 0.5
                             else: cor_texto, icone, status_texto, pagamento_ind = C_VERMELHO, "🔴", "Abaixo", 0.0
-                        else: # Tipo '<'
+                        else: 
                             atingimento_real = (t100 / realizado * 100) if realizado > 0 else 120.0
                             if realizado <= t120: cor_texto, icone, status_texto, pagamento_ind = C_AZUL, "🔵", "Superou", v100 * 1.2
                             elif realizado <= t100: cor_texto, icone, status_texto, pagamento_ind = C_VERDE, "🟢", "Atingiu", v100
                             elif realizado <= t50: cor_texto, icone, status_texto, pagamento_ind = C_AMARELO, "🟡", "Parcial", v100 * 0.5
                             else: cor_texto, icone, status_texto, pagamento_ind = C_VERMELHO, "🔴", "Abaixo", 0.0
                         
-                        grafico_dados.append({'Indicador': f"<b>{ind}</b>", 'Atingimento (%)': min(atingimento_real, 150), 'Real': atingimento_real})
+                        grafico_dados.append({'Indicador': f"<b>{ind}</b>", 'Atingimento (%)': min(atingimento_real, 120), 'Real': atingimento_real})
                         bonus_acumulado += pagamento_ind
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
@@ -309,6 +344,9 @@ try:
                         if "Tempo Médio" in ind:
                             valor_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                             t100_tela = f"{int(t100)//3600:02d}:{(int(t100)%3600)//60:02d}:{int(t100)%60:02d}"
+                        elif ind in ['Avaria', 'Dev. %', 'Corte %']:
+                            valor_tela = f"{realizado:.2f}%"
+                            t100_tela = f"{t100:.2f}%"
                         elif "Líq" in ind:
                             valor_tela, t100_tela = f"{realizado:.0f}%", f"{t100:.0f}%"
                         else:
@@ -361,6 +399,7 @@ try:
                     config_colunas = {}
                     for col in df_tabela_mini.columns:
                         if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
+                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                         elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
                         elif col == "Horas": config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f")
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
@@ -384,10 +423,14 @@ try:
                     if ind in df_cargo.columns:
                         val = df_cargo[df_cargo[ind] > 0][ind]
                         real_med = float(val.mean()) if not val.empty else 0.0
-                        t100 = regra['t100'] * FATOR_PROPORCIONAL if regra['prop'] else regra['t100']
-                        t50 = regra['t50'] * FATOR_PROPORCIONAL if regra['prop'] else regra['t50']
-                        t120 = regra['t120'] * FATOR_PROPORCIONAL if regra['prop'] else regra['t120']
-                        if regra['tipo'] == '>':
+                        soma_total = float(val.sum()) if not val.empty else 0.0
+                        tipo, prop = regra['tipo'], regra['prop']
+                        
+                        t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
+                        t50 = regra['t50'] * FATOR_PROPORCIONAL if prop else regra['t50']
+                        t120 = regra['t120'] * FATOR_PROPORCIONAL if prop else regra['t120']
+                        
+                        if tipo == '>':
                             if real_med >= t120: cor, icone, status = C_AZUL, "🔵", "Superando"
                             elif real_med >= t100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
                             elif real_med >= t50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
@@ -398,18 +441,33 @@ try:
                             elif real_med <= t50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                             else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
-                        v_tela = f"{real_med:,.0f}".replace(',','.') if "Tempo" not in ind and "Líq" not in ind else (f"{real_med:.0f}%" if "Líq" in ind else f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}")
-                        t_tela = f"{t100:,.0f}".replace(',','.') if "Tempo" not in ind and "Líq" not in ind else (f"{t100:.0f}%" if "Líq" in ind else f"{int(t100)//3600:02d}:{(int(t100)%3600)//60:02d}")
+                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(DIAS_DECORRIDOS)}d)</span>" if prop else ""
                         
+                        if "Tempo Médio" in ind:
+                            v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                            t_tela = f"{int(t100)//3600:02d}:{(int(t100)%3600)//60:02d}:{(int(t100)%60):02d}"
+                            html_soma = ""
+                        elif ind in ['Avaria', 'Dev. %', 'Corte %']:
+                            v_tela, t_tela = f"{real_med:.2f}%", f"{t100:.2f}%"
+                            html_soma = ""
+                        elif "Líq." in ind: 
+                            v_tela, t_tela = f"{real_med:.0f}%", f"{t100:.0f}%"
+                            html_soma = ""
+                        else:
+                            v_tela, t_tela = f"{real_med:,.0f}".replace(',','.'), f"{t100:,.0f}".replace(',','.')
+                            html_soma = f'<span class="texto-card-secundario">| Soma Equipe: {soma_total:,.0f}</span>'.replace(',', '.')
+                            
                         with cols_eq[idx]:
-                            st.markdown(f"""<div class="card-meta" style="border-left-color: {cor};"><div class="texto-card-titulo">{ind} (Alvo: {t_tela})</div><div class="texto-card-principal">{v_tela}</div><div style="font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;">{icone} {status}</div></div>""", unsafe_allow_html=True)
+                            st.markdown(f"""<div class="card-meta" style="border-left-color: {cor};"><div class="texto-card-titulo">Média: {ind} (Alvo: {t_tela}){aviso_prop}</div><div class="texto-card-principal">{v_tela} {html_soma}</div><div style="font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;">{icone} {status}</div></div>""", unsafe_allow_html=True)
+        
         if len(cargos_render) > 0: st.divider()
 
         # TABELA DINÂMICA
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados']
+        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Horas']
         todas_metricas = set()
+        
         if cargo_selecionado != "Todos":
             todas_metricas.update(metas_100.get(df_tabela['TURNO'].mode()[0], {}).get(cargo_selecionado, {}).keys())
         elif turno_selecionado != "Todos":
@@ -421,7 +479,13 @@ try:
         if 'Tempo Médio' in df_tabela.columns:
             df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(lambda s: f"{int(s)//3600:02d}:{(int(s)%3600)//60:02d}:{(int(s)%60):02d}")
 
-        config = {c: st.column_config.NumberColumn(c, format="%d") for c in df_tabela.columns if c not in (cols_basicas + ['Tempo Médio'])}
+        config = {}
+        for c in df_tabela.columns:
+            if c in cols_basicas or c == 'Tempo Médio': continue
+            elif c in ['Avaria', 'Corte %', 'Dev. %']: config[c] = st.column_config.NumberColumn(c, format="%.2f%%")
+            elif "Líq." in c: config[c] = st.column_config.NumberColumn(c, format="%d%%")
+            else: config[c] = st.column_config.NumberColumn(c, format="%d")
+            
         config['Horas'] = st.column_config.NumberColumn('Horas', format="%.2f")
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
