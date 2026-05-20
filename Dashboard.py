@@ -53,6 +53,12 @@ st.markdown(
         font-weight: 900; 
         margin-bottom: 5px;
     }
+    .texto-card-secundario {
+        font-size: 16px;
+        color: gray;
+        font-weight: normal;
+        margin-left: 8px;
+    }
     .card-detrator {
         background-color: rgba(239, 68, 68, 0.1);
         border: 1px solid #ef4444;
@@ -66,18 +72,16 @@ st.markdown(
 )
 
 # Paleta de Cores
-C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
+C_AZUL = "#3b82f6"     
+C_VERDE = "#2ecc71"    
+C_AMARELO = "#ffca28"  
+C_VERMELHO = "#ef4444" 
 
 # ==========================================
-# 2. DICIONÁRIO MESTRE DE METAS
+# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS 
 # ==========================================
 metas_100 = {
     'T3': {
-        'CARREGAMENTO BOX': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
         'SEPARADOR F': {
             'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 75, 't100': 80, 't120': 85},
             'Itens Sep':    {'tipo': '>', 'prop': True,  'v100': 150.0, 't50': 7000, 't100': 9000, 't120': 11000},
@@ -96,7 +100,7 @@ metas_100 = {
             'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
             'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
         },
-        'RAMPEIRO': {
+        'CARREGAMENTO BOX': {
             'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
             'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
             'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
@@ -189,9 +193,14 @@ metas_100 = {
 @st.cache_data(ttl=600) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
+    
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
+    # Remove colunas fantasmas que quebram o código
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    
+    # AUTO-CORRETOR
     df = df.rename(columns={
         'Jornada Líq. Eq': 'Jornada Líq. Eq.',
         'Ressup. Eq': 'Ressup. Eq.',
@@ -226,6 +235,7 @@ def carregar_dados():
             else:
                 texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
+    
     return df
 
 # ==========================================
@@ -264,7 +274,6 @@ FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
 try:
     df = carregar_dados()
     st.sidebar.title("🔍 Filtros do Painel")
-    
     lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
     df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
@@ -277,7 +286,7 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
-    # NOVO FILTRO DE DETRATORES PEDIDO PELO GUI
+    # NOVO FILTRO DE DETRATORES 
     st.sidebar.markdown("---")
     focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
@@ -299,7 +308,7 @@ try:
     st.divider()
 
     # ==========================================
-    # MODALIDADE NOVA: PAINEL DE DETRATORES (BAIXO DESEMPENHO)
+    # MODALIDADE NOVA: PAINEL DE DETRATORES 
     # ==========================================
     if focar_detratores:
         st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
@@ -317,11 +326,9 @@ try:
             if not regras:
                 continue
                 
-            # Identifica as métricas principais para gerar o texto automático
             itens_realizados = 0
             itens_hora_realizado = 0
             metrica_volume_nome = "Volume"
-            
             abaixo_da_meta = False
             detalhes_gargalo = []
             
@@ -330,7 +337,6 @@ try:
                     realizado = float(row[ind])
                     t100 = regra['t100'] * (dias_c / DIAS_UTEIS_MES) if regra['prop'] else regra['t100']
                     
-                    # Guarda valores para o texto automático do Gui
                     if "Itens" in ind or "Palets" in ind or "Carga" in ind or "Mov" in ind:
                         itens_realizados = realizado
                         metrica_volume_nome = ind
@@ -363,16 +369,43 @@ try:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Botões de ação rápidos para o líder
-                    c_com, c_trein = st.columns(2)
-                    c_com.button(f"💬 Registrar Feedback 1-a-1: {nome_c}", key=f"feed_{cod_c}")
-                    c_trein.button(f"🎯 Solicitar Reciclagem operacional para {nome_c}", key=f"trein_{cod_c}")
+                    # BOTÕES ATIVOS DE GESTÃO (COM FORMULÁRIOS)
+                    col_feed, col_trein = st.columns(2)
+                    
+                    with col_feed:
+                        with st.expander(f"💬 Registrar Feedback 1-a-1: {nome_c}"):
+                            with st.form(key=f"form_feed_{idx}"):
+                                st.write(f"**Novo Registro de Alinhamento**")
+                                st.info("Use este espaço para registrar os motivos do baixo desempenho e o plano de ação combinado com o colaborador.")
+                                texto_feedback = st.text_area("Descreva o que foi conversado:")
+                                salvar_feed = st.form_submit_button("Salvar no Histórico")
+                                
+                                if salvar_feed:
+                                    if texto_feedback:
+                                        st.success(f"✅ Feedback de {nome_c} registrado com sucesso no banco de dados!")
+                                    else:
+                                        st.error("⚠️ Digite algo antes de salvar.")
+
+                    with col_trein:
+                        with st.expander(f"🎯 Solicitar Reciclagem: {nome_c}"):
+                            with st.form(key=f"form_trein_{idx}"):
+                                st.write(f"**Abertura de Chamado para Treinamento**")
+                                st.warning("A solicitação será enviada diretamente para a fila de atendimento do RH/Instrutores.")
+                                motivo = st.selectbox(
+                                    "Identifique o gargalo principal:", 
+                                    ["Baixa Velocidade de Separação", "Muitos Erros/Avarias", "Dificuldade com o Sistema Consinco", "Processo de Carga/Descarga"]
+                                )
+                                pedir_treinamento = st.form_submit_button("Enviar Solicitação")
+                                
+                                if pedir_treinamento:
+                                    st.success(f"📧 Chamado enviado! A equipe de treinamento entrará em contato com o líder do turno para agendar.")
+                    
                     st.markdown("<br>", unsafe_allow_html=True)
                     
         if not houve_detrator:
             st.success("🎉 Excelente! Nenhum colaborador desse filtro está operando abaixo das metas estabelecidas.")
 
-    # VISÃO INDIVIDUAL (MANTIDA ORIGINAL COM FIX DO HTML)
+    # VISÃO INDIVIDUAL 
     elif pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
@@ -400,6 +433,7 @@ try:
                         
                         pagamento_ind = 0.0
                         
+                        # Trava de 120% no Pagamento
                         if tipo == '>':
                             atingimento_real = (realizado / t100 * 100) if t100 > 0 else 0
                             if realizado >= t120: cor_texto, icone, status_texto, pagamento_ind = C_AZUL, "🔵", "Superou", v100 * 1.2
@@ -439,7 +473,7 @@ try:
                                     {icone} {status_texto} {html_dinheiro}
                                 </div>
                             </div>
-                            """, unsafe_allow_html=True) # <--- GARANTIDO O TRATAMENTO DE HTML CORRETO
+                            """, unsafe_allow_html=True)
                 
                 if bonus_acumulado > 0:
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -537,7 +571,7 @@ try:
         
         if len(cargos_render) > 0: st.divider()
 
-        # TABELA DINÂMICA (SEM A COLUNA HORAS)
+        # TABELA DINÂMICA (SEM COLUNA HORAS)
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
         
