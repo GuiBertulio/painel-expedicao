@@ -154,7 +154,7 @@ metas_100 = {
 }
 
 # ==========================================
-# 3. CARREGAMENTO DOS DADOS (LIMPEZA COMPLETA)
+# 3. CARREGAMENTO DOS DADOS (CÁLCULOS LOGÍSTICOS)
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
@@ -162,15 +162,36 @@ def carregar_dados():
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
-    
-    # 🛡️ Remove colunas vazias
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 🛡️ AUTO-CORRETOR DE NOMES (O que fez a métrica do Lider T1 sumir)
+    # Padronização de chaves de texto básicas antes dos cálculos
+    if 'FUNÇÃO' in df.columns:
+        df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
+    if 'TURNO' in df.columns:
+        df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
+
+    # Tratamento padrão das colunas numéricas que vêm da planilha
+    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
+    for col in df.columns:
+        if col not in colunas_texto:
+            if col == 'Tempo Médio': 
+                texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
+                df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
+            else:
+                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
+
+    # 🧠 NOVO CÁLCULO INTELIGENTE DA MÉDIA DE PALETS CONFERIDOS PARA O LÍDER T1
+    if 'Palets Conf.' in df.columns:
+        # Pega o volume real gerado pelos conferentes de cada turno
+        medias_turno = df[df['FUNÇÃO'] == 'CONFERENTE'].groupby('TURNO')['Palets Conf.'].mean().to_dict()
+        # Cria e injeta a coluna calculada dinamicamente para o Líder usar
+        df['Méd. Palets Conf.'] = df['TURNO'].map(medias_turno).fillna(0)
+
+    # Padronização de nomes adicionais de segurança
     df = df.rename(columns={
         'Jornada Líq. Eq': 'Jornada Líq. Eq.',
-        'Ressup. Eq': 'Ressup. Eq.',
-        'Méd. Palets Conf': 'Méd. Palets Conf.'
+        'Ressup. Eq': 'Ressup. Eq.'
     })
     
     if 'NOME' in df.columns:
@@ -186,21 +207,6 @@ def carregar_dados():
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
     df = df[colunas_existentes]
-    
-    if 'FUNÇÃO' in df.columns:
-        df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
-    if 'TURNO' in df.columns:
-        df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
-
-    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
-    for col in df.columns:
-        if col not in colunas_texto:
-            if col == 'Tempo Médio': 
-                texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
-                df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
-            else:
-                texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
     return df
 
@@ -263,17 +269,37 @@ try:
     with col_kpis:
         st.markdown("## 🎯 Visão Geral do Período")
         kpi1, kpi2, kpi3 = st.columns(3)
-        total_itens = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
-        media_vel = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean() if 'Itens/Hora' in df_filtrado.columns else 0
+        
+        col_volumes = [
+            'Itens Sep', 'Itens Conf.', 'Itens Rampa', 'Itens Manob.', 
+            'Palets Conf.', 'Carga Palet.', 'Carga Bat.', 'Mov. Horizontal', 
+            'Mov. Vert.', 'Palets Px.', 'Ressup. Ap.', 'Ressup. Eq.'
+        ]
+        total_volume = sum(df_filtrado[c].sum() for c in col_volumes if c in df_filtrado.columns)
+        
+        if turno_selecionado == 'T1' or (cargo_selecionado != "Todos" and cargo_selecionado in ['OPERADOR', 'DESCARGA', 'PUXA']):
+            if 'Tempo Médio' in df_filtrado.columns:
+                med_vel = df_filtrado[df_filtrado['Tempo Médio'] > 0]['Tempo Médio'].mean()
+                kpi2_label = "⚡ Tempo Médio"
+                kpi2_val = f"{int(med_vel)//3600:02d}:{(int(med_vel)%3600)//60:02d}:{(int(med_vel)%60):02d}" if pd.notna(med_vel) else "00:00:00"
+            else:
+                kpi2_label = "⚡ Tempo Médio"
+                kpi2_val = "-"
+        else:
+            media_vel = df_filtrado[df_filtrado['Itens/Hora'] > 0]['Itens/Hora'].mean() if 'Itens/Hora' in df_filtrado.columns else 0
+            kpi2_label = "⚡ Média (Itens/H)"
+            kpi2_val = f"{media_vel:.0f}" if pd.notna(media_vel) else "0"
+            
         total_horas = df_filtrado.loc[df_filtrado['Horas'] > 0, 'Horas'].sum() if 'Horas' in df_filtrado.columns else 0
-        kpi1.metric("📦 Total de Itens", f"{total_itens:,.0f}".replace(',', '.'))
-        kpi2.metric("⚡ Média (Itens/H)", f"{media_vel:.0f}" if not pd.isna(media_vel) else "0")
+        
+        kpi1.metric("📦 Volume Produtivo Total", f"{total_volume:,.0f}".replace(',', '.'))
+        kpi2.metric(kpi2_label, kpi2_val)
         kpi3.metric("⏱️ Horas Totais", f"{total_horas:.1f} h")
 
     st.divider()
 
     # ==========================================
-    # MODALIDADE NOVA: PAINEL DE DETRATORES 
+    # MODALIDADE: PAINEL DE DETRATORES 
     # ==========================================
     if focar_detratores:
         st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
@@ -474,7 +500,7 @@ try:
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
 
     # ==========================================
-    # VISÃO GERAL EQUIPE / TURNO (MÉDIA PONDERADA APLICADA AQUI)
+    # VISÃO GERAL EQUIPE / TURNO
     # ==========================================
     else:
         cargos_render = []
@@ -502,7 +528,6 @@ try:
                         else:
                             real_med = 0.0
                             soma_total = 0.0
-                        # ----------------------------------
                         
                         tipo, prop = regra['tipo'], regra['prop']
                         t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
