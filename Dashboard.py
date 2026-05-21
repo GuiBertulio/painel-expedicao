@@ -4,32 +4,17 @@ import datetime
 import plotly.express as px
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA E CSS (VISUAL)
+# 1. CONFIGURAÇÃO DA PÁGINA E CSS
 # ==========================================
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
 st.markdown(
     """
     <style>
-    .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 0rem !important;
-    }
-    
-    h1, h2, h3 {
-        font-weight: 900 !important;
-        letter-spacing: 0.5px;
-    }
-
-    [data-testid="stMetricValue"] {
-        font-size: 50px !important;
-        color: #3b82f6 !important; 
-    }
-    [data-testid="stMetricLabel"] > div {
-        font-size: 20px !important;
-        font-weight: bold !important;
-        color: lightgray;
-    }
+    .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
+    h1, h2, h3 { font-weight: 900 !important; letter-spacing: 0.5px; }
+    [data-testid="stMetricValue"] { font-size: 50px !important; color: #3b82f6 !important; }
+    [data-testid="stMetricLabel"] > div { font-size: 20px !important; font-weight: bold !important; color: lightgray; }
     .card-meta {
         background-color: var(--background-color); 
         padding: 15px; 
@@ -41,24 +26,9 @@ st.markdown(
         border-right: 1px solid var(--secondary-background-color);
         border-bottom: 1px solid var(--secondary-background-color);
     }
-    .texto-card-principal {
-        font-size: 42px; 
-        color: var(--text-color); 
-        font-weight: 900; 
-        line-height: 1.1;
-    }
-    .texto-card-titulo {
-        font-size: 22px; 
-        color: var(--text-color); 
-        font-weight: 900; 
-        margin-bottom: 5px;
-    }
-    .texto-card-secundario {
-        font-size: 16px;
-        color: gray;
-        font-weight: normal;
-        margin-left: 8px;
-    }
+    .texto-card-principal { font-size: 42px; color: var(--text-color); font-weight: 900; line-height: 1.1; }
+    .texto-card-titulo { font-size: 22px; color: var(--text-color); font-weight: 900; margin-bottom: 5px; }
+    .texto-card-secundario { font-size: 16px; color: gray; font-weight: normal; margin-left: 8px; }
     .card-detrator {
         background-color: rgba(239, 68, 68, 0.1);
         border: 1px solid #ef4444;
@@ -71,14 +41,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Paleta de Cores
-C_AZUL = "#3b82f6"     
-C_VERDE = "#2ecc71"    
-C_AMARELO = "#ffca28"  
-C_VERMELHO = "#ef4444" 
+C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
 
 # ==========================================
-# 2. DICIONÁRIO MESTRE FINANCEIRO E DE METAS 
+# 2. DICIONÁRIO DE METAS
 # ==========================================
 metas_100 = {
     'T3': {
@@ -188,7 +154,7 @@ metas_100 = {
 }
 
 # ==========================================
-# 3. CARREGAMENTO DOS DADOS (LIMPEZA BR)
+# 3. CARREGAMENTO DOS DADOS (LIMPEZA COMPLETA)
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
@@ -197,10 +163,10 @@ def carregar_dados():
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # Remove colunas fantasmas que quebram o código
+    # 🛡️ Remove colunas vazias
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # AUTO-CORRETOR
+    # 🛡️ AUTO-CORRETOR DE NOMES (O que fez a métrica do Lider T1 sumir)
     df = df.rename(columns={
         'Jornada Líq. Eq': 'Jornada Líq. Eq.',
         'Ressup. Eq': 'Ressup. Eq.',
@@ -286,7 +252,6 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
-    # NOVO FILTRO DE DETRATORES 
     st.sidebar.markdown("---")
     focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
@@ -369,20 +334,17 @@ try:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # BOTÕES ATIVOS DE GESTÃO (COM FORMULÁRIOS)
                     col_feed, col_trein = st.columns(2)
                     
                     with col_feed:
                         with st.expander(f"💬 Registrar Feedback 1-a-1: {nome_c}"):
                             with st.form(key=f"form_feed_{idx}"):
                                 st.write(f"**Novo Registro de Alinhamento**")
-                                st.info("Use este espaço para registrar os motivos do baixo desempenho e o plano de ação combinado com o colaborador.")
                                 texto_feedback = st.text_area("Descreva o que foi conversado:")
                                 salvar_feed = st.form_submit_button("Salvar no Histórico")
-                                
                                 if salvar_feed:
                                     if texto_feedback:
-                                        st.success(f"✅ Feedback de {nome_c} registrado com sucesso no banco de dados!")
+                                        st.success(f"✅ Feedback de {nome_c} registrado com sucesso!")
                                     else:
                                         st.error("⚠️ Digite algo antes de salvar.")
 
@@ -390,22 +352,19 @@ try:
                         with st.expander(f"🎯 Solicitar Reciclagem: {nome_c}"):
                             with st.form(key=f"form_trein_{idx}"):
                                 st.write(f"**Abertura de Chamado para Treinamento**")
-                                st.warning("A solicitação será enviada diretamente para a fila de atendimento do RH/Instrutores.")
-                                motivo = st.selectbox(
-                                    "Identifique o gargalo principal:", 
-                                    ["Baixa Velocidade de Separação", "Muitos Erros/Avarias", "Dificuldade com o Sistema Consinco", "Processo de Carga/Descarga"]
-                                )
+                                motivo = st.selectbox("Identifique o gargalo principal:", ["Baixa Velocidade de Separação", "Muitos Erros/Avarias", "Dificuldade com o Sistema Consinco", "Processo de Carga/Descarga"])
                                 pedir_treinamento = st.form_submit_button("Enviar Solicitação")
-                                
                                 if pedir_treinamento:
-                                    st.success(f"📧 Chamado enviado! A equipe de treinamento entrará em contato com o líder do turno para agendar.")
+                                    st.success(f"📧 Chamado enviado! A equipe de treinamento entrará em contato.")
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
         if not houve_detrator:
             st.success("🎉 Excelente! Nenhum colaborador desse filtro está operando abaixo das metas estabelecidas.")
 
-    # VISÃO INDIVIDUAL 
+    # ==========================================
+    # VISÃO INDIVIDUAL
+    # ==========================================
     elif pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
@@ -433,7 +392,6 @@ try:
                         
                         pagamento_ind = 0.0
                         
-                        # Trava de 120% no Pagamento
                         if tipo == '>':
                             atingimento_real = (realizado / t100 * 100) if t100 > 0 else 0
                             if realizado >= t120: cor_texto, icone, status_texto, pagamento_ind = C_AZUL, "🔵", "Superou", v100 * 1.2
@@ -515,8 +473,10 @@ try:
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
 
+    # ==========================================
+    # VISÃO GERAL EQUIPE / TURNO (MÉDIA PONDERADA APLICADA AQUI)
+    # ==========================================
     else:
-        # VISÃO GERAL EQUIPE / TURNO
         cargos_render = []
         if cargo_selecionado != "Todos": cargos_render = [cargo_selecionado]
         elif turno_selecionado != "Todos": cargos_render = sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
@@ -525,25 +485,26 @@ try:
             df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
             if df_cargo.empty: continue
             metas_equipe = metas_100.get(df_cargo['TURNO'].mode()[0], {}).get(cargo_atual, {})
+            
             if metas_equipe:
                 if len(cargos_render) > 1: st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
                 cols_eq = st.columns(len(metas_equipe))
+                
                 for idx, (ind, regra) in enumerate(metas_equipe.items()):
                     if ind in df_cargo.columns:
+                        # --- CÁLCULO DA MÉDIA PONDERADA ---
                         df_valido = df_cargo[df_cargo[ind] > 0]
                         if not df_valido.empty:
                             valores = df_valido[ind]
-                            # Usa os 'Dias Trabalhados' como peso. Se estiver vazio, usa 1 para não quebrar a matemática.
                             pesos = df_valido['Dias Trabalhados'].replace(0, 1) if 'Dias Trabalhados' in df_valido.columns else 1
-                            
-                            # Fórmula da Média Ponderada: Soma(Valor * Peso) / Soma(Pesos)
                             real_med = float((valores * pesos).sum() / pesos.sum())
                             soma_total = float(valores.sum())
                         else:
                             real_med = 0.0
                             soma_total = 0.0
-                        tipo, prop = regra['tipo'], regra['prop']
+                        # ----------------------------------
                         
+                        tipo, prop = regra['tipo'], regra['prop']
                         t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
                         t50 = regra['t50'] * FATOR_PROPORCIONAL if prop else regra['t50']
                         t120 = regra['t120'] * FATOR_PROPORCIONAL if prop else regra['t120']
@@ -580,10 +541,8 @@ try:
         
         if len(cargos_render) > 0: st.divider()
 
-        # TABELA DINÂMICA (SEM COLUNA HORAS)
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        
         cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados']
         todas_metricas = set()
         
