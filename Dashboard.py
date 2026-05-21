@@ -530,9 +530,18 @@ try:
                 cols_eq = st.columns(len(metas_equipe))
                 for idx, (ind, regra) in enumerate(metas_equipe.items()):
                     if ind in df_cargo.columns:
-                        val = df_cargo[df_cargo[ind] > 0][ind]
-                        real_med = float(val.mean()) if not val.empty else 0.0
-                        soma_total = float(val.sum()) if not val.empty else 0.0
+                        df_valido = df_cargo[df_cargo[ind] > 0]
+                        if not df_valido.empty:
+                            valores = df_valido[ind]
+                            # Usa os 'Dias Trabalhados' como peso. Se estiver vazio, usa 1 para não quebrar a matemática.
+                            pesos = df_valido['Dias Trabalhados'].replace(0, 1) if 'Dias Trabalhados' in df_valido.columns else 1
+                            
+                            # Fórmula da Média Ponderada: Soma(Valor * Peso) / Soma(Pesos)
+                            real_med = float((valores * pesos).sum() / pesos.sum())
+                            soma_total = float(valores.sum())
+                        else:
+                            real_med = 0.0
+                            soma_total = 0.0
                         tipo, prop = regra['tipo'], regra['prop']
                         
                         t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
