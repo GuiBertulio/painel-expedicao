@@ -43,7 +43,16 @@ def baixar_planilha_tv():
     if 'NOME' in df.columns and 'FUNÇÃO' in df.columns:
         df['FUNCAO_BUSCA'] = df['FUNÇÃO'].str.upper().str.strip()
     
-    colunas_texto = ['NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA']
+    # 🔥 LGPD: Exibe apenas o código do colaborador para a TV
+    if 'CÓD.' in df.columns:
+        # Garante que o código seja lido como texto para o gráfico não quebrar
+        df['CÓD.'] = df['CÓD.'].astype(str).str.replace('.0', '', regex=False)
+        df['EXIBICAO'] = df['CÓD.']
+    elif 'NOME' in df.columns:
+        df['EXIBICAO'] = df['NOME'] # Fallback de segurança caso a coluna de código não exista
+    
+    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'FUNCAO_BUSCA', 'EXIBICAO'] 
+    
     for col in df.columns:
         if col not in colunas_texto:
             if col == 'Tempo Médio': 
@@ -156,7 +165,7 @@ try:
                 if not df_ind.empty:
                     ordem_crescente = True if ind in ['Avaria', 'Corte %', 'Dev. %', 'Tempo Médio'] else False
                     
-                    df_ind = df_ind.sort_values(by=ind, ascending=ordem_crescente).drop_duplicates(subset=['NOME'])
+                    df_ind = df_ind.sort_values(by=ind, ascending=ordem_crescente).drop_duplicates(subset=['EXIBICAO'])
                     
                     chunk = df_ind.head(15).sort_values(by=ind, ascending=not ordem_crescente)
                     blocos.append({"titulo": ind, "data": chunk, "ind": ind})
@@ -202,13 +211,13 @@ try:
                 df_graf = b['data']
                 qtd = 15 - len(df_graf)
                 if qtd > 0:
-                    fantasmas = pd.DataFrame({'NOME': ["\u200B"*(x+1) for x in range(qtd)], b['ind']: [0.0]*qtd, 'TURNO': ['FANTASMA']*qtd})
+                    fantasmas = pd.DataFrame({'EXIBICAO': ["\u200B"*(x+1) for x in range(qtd)], b['ind']: [0.0]*qtd, 'TURNO': ['FANTASMA']*qtd})
                     df_graf = pd.concat([fantasmas, df_graf], ignore_index=True)
 
                 txt = df_graf.apply(lambda row: formatar_kpi(row, b['ind']), axis=1)
                 
-                fig = px.bar(df_graf, x=b['ind'], y="NOME", orientation='h', text=txt)
-                fig.update_yaxes(type='category', tickfont=dict(size=14))
+                fig = px.bar(df_graf, x=b['ind'], y="EXIBICAO", orientation='h', text=txt)
+                fig.update_yaxes(type='category', tickfont=dict(size=18))
                 
                 fig.update_layout(
                     height=600, 
