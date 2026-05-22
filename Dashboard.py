@@ -386,7 +386,7 @@ try:
                                     if texto_feedback:
                                         try:
                                             aba_rh = conectar_planilha()
-                                            agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                                            agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                                             aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback 1-a-1", texto_feedback])
                                             st.success(f"✅ Feedback de {nome_c} registrado com sucesso na base de dados!")
                                         except Exception as erro_sheet:
