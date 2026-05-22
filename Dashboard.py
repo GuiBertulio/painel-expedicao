@@ -2,6 +2,20 @@ import streamlit as st
 import pandas as pd
 import datetime
 import plotly.express as px
+import gspread
+from google.oauth2.service_account import ServiceAccountCredentials
+import json
+
+def conectar_planilha():
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    # Puxa os dados do st.secrets
+    cred_dict = dict(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(cred_dict, scope)
+    client = gspread.authorize(creds)
+    
+    # Coloque aqui o LINK EXATO da sua planilha do Sheets
+    planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
+    return planilha.worksheet("Historico_RH")
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E CSS
@@ -362,15 +376,23 @@ try:
                     
                     col_feed, col_trein = st.columns(2)
                     
+                    # --- INTEGRAÇÃO COM BANCO DE DADOS APLICADA AQUI ---
                     with col_feed:
                         with st.expander(f"💬 Registrar Feedback 1-a-1: {nome_c}"):
                             with st.form(key=f"form_feed_{idx}"):
                                 st.write(f"**Novo Registro de Alinhamento**")
                                 texto_feedback = st.text_area("Descreva o que foi conversado:")
                                 salvar_feed = st.form_submit_button("Salvar no Histórico")
+                                
                                 if salvar_feed:
                                     if texto_feedback:
-                                        st.success(f"✅ Feedback de {nome_c} registrado com sucesso!")
+                                        try:
+                                            aba_rh = conectar_planilha()
+                                            agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                                            aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback 1-a-1", texto_feedback])
+                                            st.success(f"✅ Feedback de {nome_c} registrado com sucesso na base de dados!")
+                                        except Exception as erro_sheet:
+                                            st.error(f"Erro ao salvar na planilha: {erro_sheet}")
                                     else:
                                         st.error("⚠️ Digite algo antes de salvar.")
 
@@ -380,8 +402,16 @@ try:
                                 st.write(f"**Abertura de Chamado para Treinamento**")
                                 motivo = st.selectbox("Identifique o gargalo principal:", ["Baixa Velocidade de Separação", "Muitos Erros/Avarias", "Dificuldade com o Sistema Consinco", "Processo de Carga/Descarga"])
                                 pedir_treinamento = st.form_submit_button("Enviar Solicitação")
+                                
                                 if pedir_treinamento:
-                                    st.success(f"📧 Chamado enviado! A equipe de treinamento entrará em contato.")
+                                    try:
+                                        aba_rh = conectar_planilha()
+                                        agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                                        aba_rh.append_row([agora, str(cod_c), nome_c, "Solicitação de Reciclagem", motivo])
+                                        st.success(f"📧 Chamado enviado para a base de dados do RH!")
+                                    except Exception as erro_sheet:
+                                        st.error(f"Erro ao salvar na planilha: {erro_sheet}")
+                    # --------------------------------------------------
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
