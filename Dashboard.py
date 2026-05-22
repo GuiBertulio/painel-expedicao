@@ -3,17 +3,15 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import gspread
-from google.oauth2.service_account import ServiceAccountCredentials
-import json
 
 def conectar_planilha():
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     # Puxa os dados do st.secrets
     cred_dict = dict(st.secrets["gcp_service_account"])
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(cred_dict, scope)
-    client = gspread.authorize(creds)
     
-    # Coloque aqui o LINK EXATO da sua planilha do Sheets
+    # Autenticação direta e simplificada pelo próprio gspread
+    client = gspread.service_account_from_dict(cred_dict)
+    
+    # Conecta na planilha
     planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
     return planilha.worksheet("Historico_RH")
 
