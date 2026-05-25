@@ -272,6 +272,105 @@ try:
     st.sidebar.markdown("---")
     focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
+    # ==========================================
+    # 🔥 NOVO: MÓDULO DE EXTRAÇÃO PARA O RH
+    # ==========================================
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🗃️ Fechamento RH")
+    st.sidebar.caption("Gere a folha de pagamento do ciclo atual com a soma de todas as premiações e rankings.")
+    
+    # Motor de cálculo em massa
+    dados_rh = []
+    for nome_colab in df_filtrado['NOME'].unique():
+        row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
+        turno_c = row['TURNO']
+        cargo_c = row['FUNÇÃO']
+        cod_c = row['CÓD.']
+        dias_trab = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in row else DIAS_UTEIS_MES
+        if dias_trab <= 0: dias_trab = 1.0 
+        fator = dias_trab / DIAS_UTEIS_MES
+        
+        metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
+        premio_total = 0.0
+        
+        if metas_c:
+            # 1. Soma o Bônus dos Indicadores
+            for ind, regra in metas_c.items():
+                if ind in row:
+                    realizado = float(row[ind])
+                    tipo, prop = regra['tipo'], regra['prop']
+                    
+                    t100 = regra['t100'] * fator if prop else regra['t100']
+                    t120 = regra['t120'] * fator if prop else regra['t120']
+                    t50 = regra['t50'] * fator if prop else regra['t50']
+                    v100 = regra['v100'] * fator if prop else regra['v100']
+                    
+                    if tipo == '>':
+                        if realizado >= t120: premio_total += v100 * 1.2
+                        elif realizado >= t100: premio_total += v100
+                        elif realizado >= t50: premio_total += v100 * 0.5
+                    else:
+                        # CORREÇÃO CRÍTICA: Para indicadores "quanto menor melhor", 0.0 é a nota máxima!
+                        if pd.notna(realizado): 
+                            if realizado <= t120: premio_total += v100 * 1.2
+                            elif realizado <= t100: premio_total += v100
+                            elif realizado <= t50: premio_total += v100 * 0.5
+            
+            # 2. Soma o Bônus do Ranking (Regra TAF)
+            metrica_rank = None
+            for ind, regra in metas_c.items():
+                if regra['prop']: 
+                    metrica_rank = ind
+                    break
+            if not metrica_rank: metrica_rank = list(metas_c.keys())[0]
+            
+            if metrica_rank in df.columns:
+                df_eq = df[(df['TURNO'] == turno_c) & (df['FUNÇÃO'] == cargo_c)].copy()
+                ordem_cresc = False if metas_c[metrica_rank]['tipo'] == '>' else True
+                df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc).reset_index(drop=True)
+                
+                try:
+                    pos = df_eq[df_eq['NOME'] == nome_colab].index[0] + 1
+                    val_rank = 0.0
+                    if pos == 1:
+                        if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 250.0
+                        elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 150.0
+                    elif pos == 2:
+                        if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 200.0
+                        elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 100.0
+                    elif pos == 3:
+                        if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 100.0
+                        elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 50.0
+                    premio_total += val_rank
+                except:
+                    pass
+                    
+        # Entra na lista de processamento
+        dados_rh.append({
+            'Matrícula': cod_c,
+            'Nome do Colaborador': nome_colab,
+            'Cargo': cargo_c,
+            'Turno': turno_c,
+            'Premiação Total (R$)': round(premio_total, 2)
+        })
+
+    # Transforma em Tabela e gera o botão de Download
+    if dados_rh:
+        df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome do Colaborador')
+        # Configurado no padrão Excel Brasil (separador ponto e vírgula, decimal vírgula)
+        csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+        
+        st.sidebar.download_button(
+            label="📥 Baixar Planilha do RH",
+            data=csv_rh,
+            file_name=f"Fechamento_Produtividade_TAF_{dt_inicio.strftime('%d-%m')}a{dt_fim_ciclo.strftime('%d-%m')}.csv",
+            mime="text/csv",
+            type="primary",
+            use_container_width=True
+        )
+    else:
+        st.sidebar.info("Nenhum dado processado.")
+
     col_titulo, col_kpis = st.columns([1, 1.2])
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
@@ -581,10 +680,6 @@ try:
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
-
-    # ==========================================
-    # VISÃO GERAL EQUIPE / TURNO
-    # ==========================================
 
     # ==========================================
     # VISÃO GERAL EQUIPE / TURNO
