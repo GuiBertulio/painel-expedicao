@@ -429,7 +429,9 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
-            # 🔥 NOVO: MOTOR DE RANKING DINÂMICO
+            # 🔥 NOVO: MOTOR DE RANKING COM PREMIAÇÃO FINANCEIRA (REGRA TAF)
+            valor_premio_ranking = 0.0
+            
             if metas_cargo:
                 metrica_ranking = None
                 # Descobre qual é a métrica principal de volume do cargo
@@ -441,9 +443,8 @@ try:
                     metrica_ranking = list(metas_cargo.keys())[0]
                 
                 if metrica_ranking in df.columns:
-                    # Puxa todo mundo da mesma função e turno da base geral
+                    # Puxa todo mundo da mesma função e turno
                     df_equipe = df[(df['TURNO'] == turno_p) & (df['FUNÇÃO'] == cargo_p)].copy()
-                    # Se for indicador de tempo/erros, menor é melhor. Se for volume, maior é melhor.
                     ordem_cresc = False if metas_cargo[metrica_ranking]['tipo'] == '>' else True
                     df_equipe = df_equipe.sort_values(by=metrica_ranking, ascending=ordem_cresc).reset_index(drop=True)
                     
@@ -451,21 +452,36 @@ try:
                         posicao = df_equipe[df_equipe['NOME'] == pessoa_selecionada].index[0] + 1
                         total_eq = len(df_equipe)
                         
-                        # Estética do Ranking
-                        if posicao == 1: medalha, cor_rank = "🥇", "#ffd700" # Ouro
-                        elif posicao == 2: medalha, cor_rank = "🥈", "#c0c0c0" # Prata
-                        elif posicao == 3: medalha, cor_rank = "🥉", "#cd7f32" # Bronze
-                        else: medalha, cor_rank = "🏅", "gray"
+                        # Definição de Valores do Pódio (Conforme imagem oficial da TAF)
+                        if posicao == 1: 
+                            medalha, cor_rank = "🥇", "#ffd700" # Ouro
+                            if turno_p == 'T3' and 'SEPARADOR' in cargo_p: valor_premio_ranking = 250.0
+                            elif turno_p == 'T2' and 'SEPARADOR' in cargo_p: valor_premio_ranking = 150.0
+                        elif posicao == 2: 
+                            medalha, cor_rank = "🥈", "#c0c0c0" # Prata
+                            if turno_p == 'T3' and 'SEPARADOR' in cargo_p: valor_premio_ranking = 200.0
+                            elif turno_p == 'T2' and 'SEPARADOR' in cargo_p: valor_premio_ranking = 100.0
+                        elif posicao == 3: 
+                            medalha, cor_rank = "🥉", "#cd7f32" # Bronze
+                            if turno_p == 'T3' and 'SEPARADOR' in cargo_p: valor_premio_ranking = 100.0
+                            elif turno_p == 'T2' and 'SEPARADOR' in cargo_p: valor_premio_ranking = 50.0
+                        else: 
+                            medalha, cor_rank = "🏅", "gray"
+                            valor_premio_ranking = 0.0
+                            
+                        texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio do Ranking: R$ {valor_premio_ranking:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_premio_ranking > 0 else ""
                         
                         st.markdown(f"""
                         <div style='background-color: rgba(255, 255, 255, 0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>
-                            <b>{medalha} Posição no Ranking:</b> {posicao}º lugar de {total_eq} na equipe de {cargo_p} <i>(Critério: {metrica_ranking})</i>
+                            <b>{medalha} Posição no Ranking:</b> {posicao}º lugar de {total_eq} na equipe de {cargo_p} <i>(Critério: {metrica_ranking})</i>{texto_premio_rank}
                         </div>
                         """, unsafe_allow_html=True)
                     except IndexError:
                         pass
 
-            bonus_acumulado = 0.0 
+            # O acumulado de grana já começa valendo o bônus do ranking
+            bonus_acumulado = valor_premio_ranking 
+            
             if metas_cargo:
                 cols_meta = st.columns(len(metas_cargo))
                 grafico_dados = []
@@ -565,6 +581,10 @@ try:
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                         
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
+
+    # ==========================================
+    # VISÃO GERAL EQUIPE / TURNO
+    # ==========================================
 
     # ==========================================
     # VISÃO GERAL EQUIPE / TURNO
