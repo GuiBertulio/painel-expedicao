@@ -166,7 +166,7 @@ metas_100 = {
 }
 
 # ==========================================
-# 3. CARREGAMENTO DOS DADOS (CÁLCULOS LOGÍSTICOS)
+# 3. CARREGAMENTO DOS DADOS E SUPER AUTO-CORRETOR
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
@@ -176,6 +176,19 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
+    # 🔥 SUPER AUTO-CORRETOR DE COLUNAS (Garante a leitura da sua coluna nova)
+    for c in list(df.columns):
+        nome_limpo = c.strip().upper()
+        if "PALET" in nome_limpo and "CONF" in nome_limpo and ("MED" in nome_limpo or "MÉD" in nome_limpo):
+            df = df.rename(columns={c: 'Méd. Palets Conf.'})
+        elif "JORNADA" in nome_limpo and "EQ" in nome_limpo:
+            df = df.rename(columns={c: 'Jornada Líq. Eq.'})
+        elif "RESSUP" in nome_limpo and "EQ" in nome_limpo:
+            df = df.rename(columns={c: 'Ressup. Eq.'})
+
+    if 'NOME' in df.columns:
+        df = df.dropna(subset=['NOME'])
+        
     # Padronização de chaves de texto básicas antes dos cálculos
     if 'FUNÇÃO' in df.columns:
         df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
@@ -192,22 +205,6 @@ def carregar_dados():
             else:
                 texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
-
-    # 🧠 NOVO CÁLCULO INTELIGENTE DA MÉDIA DE PALETS CONFERIDOS PARA O LÍDER T1
-    if 'Palets Conf.' in df.columns:
-        # Pega o volume real gerado pelos conferentes de cada turno
-        medias_turno = df[df['FUNÇÃO'] == 'CONFERENTE'].groupby('TURNO')['Palets Conf.'].mean().to_dict()
-        # Cria e injeta a coluna calculada dinamicamente para o Líder usar
-        df['Méd. Palets Conf.'] = df['TURNO'].map(medias_turno).fillna(0)
-
-    # Padronização de nomes adicionais de segurança
-    df = df.rename(columns={
-        'Jornada Líq. Eq': 'Jornada Líq. Eq.',
-        'Ressup. Eq': 'Ressup. Eq.'
-    })
-    
-    if 'NOME' in df.columns:
-        df = df.dropna(subset=['NOME'])
     
     colunas_desejadas = [
         'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 
