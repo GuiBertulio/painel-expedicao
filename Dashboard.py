@@ -428,6 +428,43 @@ try:
             turno_p = dados_pessoa['TURNO'].values[0]
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
+            
+            # 🔥 NOVO: MOTOR DE RANKING DINÂMICO
+            if metas_cargo:
+                metrica_ranking = None
+                # Descobre qual é a métrica principal de volume do cargo
+                for ind, regra in metas_cargo.items():
+                    if regra['prop']: 
+                        metrica_ranking = ind
+                        break
+                if not metrica_ranking:
+                    metrica_ranking = list(metas_cargo.keys())[0]
+                
+                if metrica_ranking in df.columns:
+                    # Puxa todo mundo da mesma função e turno da base geral
+                    df_equipe = df[(df['TURNO'] == turno_p) & (df['FUNÇÃO'] == cargo_p)].copy()
+                    # Se for indicador de tempo/erros, menor é melhor. Se for volume, maior é melhor.
+                    ordem_cresc = False if metas_cargo[metrica_ranking]['tipo'] == '>' else True
+                    df_equipe = df_equipe.sort_values(by=metrica_ranking, ascending=ordem_cresc).reset_index(drop=True)
+                    
+                    try:
+                        posicao = df_equipe[df_equipe['NOME'] == pessoa_selecionada].index[0] + 1
+                        total_eq = len(df_equipe)
+                        
+                        # Estética do Ranking
+                        if posicao == 1: medalha, cor_rank = "🥇", "#ffd700" # Ouro
+                        elif posicao == 2: medalha, cor_rank = "🥈", "#c0c0c0" # Prata
+                        elif posicao == 3: medalha, cor_rank = "🥉", "#cd7f32" # Bronze
+                        else: medalha, cor_rank = "🏅", "gray"
+                        
+                        st.markdown(f"""
+                        <div style='background-color: rgba(255, 255, 255, 0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>
+                            <b>{medalha} Posição no Ranking:</b> {posicao}º lugar de {total_eq} na equipe de {cargo_p} <i>(Critério: {metrica_ranking})</i>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    except IndexError:
+                        pass
+
             bonus_acumulado = 0.0 
             if metas_cargo:
                 cols_meta = st.columns(len(metas_cargo))
