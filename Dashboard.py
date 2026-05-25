@@ -176,10 +176,10 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 🔥 SUPER AUTO-CORRETOR DE COLUNAS (Garante a leitura da sua coluna nova)
+    # 🔥 SUPER AUTO-CORRETOR DE COLUNAS
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
-        if "PALET" in nome_limpo and "CONF" in nome_limpo and ("MED" in nome_limpo or "MÉD" in nome_limpo):
+        if ("MED" in nome_limpo or "MÉD" in nome_limpo) and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
             df = df.rename(columns={c: 'Méd. Palets Conf.'})
         elif "JORNADA" in nome_limpo and "EQ" in nome_limpo:
             df = df.rename(columns={c: 'Jornada Líq. Eq.'})
@@ -401,7 +401,7 @@ try:
                                 if pedir_treinamento:
                                     try:
                                         aba_rh = conectar_planilha()
-                                        agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                                        agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                                         aba_rh.append_row([agora, str(cod_c), nome_c, "Solicitação de Reciclagem", motivo])
                                         st.success(f"📧 Chamado enviado para a base de dados do RH!")
                                     except Exception as erro_sheet:
@@ -414,16 +414,18 @@ try:
             st.success("🎉 Excelente! Nenhum colaborador desse filtro está operando abaixo das metas estabelecidas.")
 
     # ==========================================
-    # VISÃO INDIVIDUAL
+    # VISÃO INDIVIDUAL E RANKINGS (MÓDULO NOVO)
     # ==========================================
     elif pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento do Colaborador: {pessoa_selecionada}")
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
+        
         if not dados_pessoa.empty:
             turno_p = dados_pessoa['TURNO'].values[0]
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             bonus_acumulado = 0.0 
+            
             if metas_cargo:
                 cols_meta = st.columns(len(metas_cargo))
                 grafico_dados = []
@@ -458,6 +460,7 @@ try:
                         
                         grafico_dados.append({'Indicador': f"<b>{ind}</b>", 'Atingimento (%)': min(atingimento_real, 120), 'Real': atingimento_real})
                         bonus_acumulado += pagamento_ind
+                        
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_dinheiro = f'<span style="color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;">💰 {texto_grana}</span>' if pagamento_ind > 0 else ""
                         aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(dias_trab)}d)</span>" if prop else ""
@@ -471,150 +474,4 @@ try:
                         elif "Líq" in ind:
                             valor_tela, t100_tela = f"{realizado:.0f}%", f"{t100:.0f}%"
                         else:
-                            valor_tela, t100_tela = f"{realizado:,.0f}".replace(',','.'), f"{t100:,.0f}".replace(',','.')
-
-                        with cols_meta[idx]:
-                            st.markdown(f"""
-                            <div class="card-meta" style="border-left-color: {cor_texto};">
-                                <div class="texto-card-titulo">{ind} (Alvo: {t100_tela}){aviso_prop}</div>
-                                <div class="texto-card-principal">{valor_tela}</div>
-                                <div style="font-size: 18px; color: {cor_texto}; font-weight: bold; margin-top: 8px;">
-                                    {icone} {status_texto} {html_dinheiro}
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                
-                if bonus_acumulado > 0:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.success(f"💰 **Premiação Variável Acumulada TOTAL Estimada:** R$ {bonus_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
-                st.divider()
-                st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
-                col_grafico, col_tabela = st.columns([1.2, 1])
-                
-                with col_grafico:
-                    if grafico_dados:
-                        df_grafico = pd.DataFrame(grafico_dados)
-                        df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
-                        df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(lambda color: "black" if color == C_AMARELO else "white")
-                        
-                        fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
-                        fig.update_layout(showlegend=False, yaxis_title="<b>% da Meta Atingida</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
-                        fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
-                        fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1)))
-                        fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
-                        fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
-                        st.plotly_chart(fig, use_container_width=True)
-
-                with col_tabela:
-                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
-                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
-                    
-                    if 'Tempo Médio' in df_tabela_mini.columns:
-                        df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(
-                            lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00"
-                        )
-                    
-                    config_colunas = {}
-                    for col in df_tabela_mini.columns:
-                        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
-                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
-                        
-                    st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
-
-    # ==========================================
-    # VISÃO GERAL EQUIPE / TURNO
-    # ==========================================
-    else:
-        cargos_render = []
-        if cargo_selecionado != "Todos": cargos_render = [cargo_selecionado]
-        elif turno_selecionado != "Todos": cargos_render = sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
-            
-        for cargo_atual in cargos_render:
-            df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
-            if df_cargo.empty: continue
-            metas_equipe = metas_100.get(df_cargo['TURNO'].mode()[0], {}).get(cargo_atual, {})
-            
-            if metas_equipe:
-                if len(cargos_render) > 1: st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
-                cols_eq = st.columns(len(metas_equipe))
-                
-                for idx, (ind, regra) in enumerate(metas_equipe.items()):
-                    if ind in df_cargo.columns:
-                        # --- CÁLCULO DA MÉDIA PONDERADA ---
-                        df_valido = df_cargo[df_cargo[ind] > 0]
-                        if not df_valido.empty:
-                            valores = df_valido[ind]
-                            pesos = df_valido['Dias Trabalhados'].replace(0, 1) if 'Dias Trabalhados' in df_valido.columns else 1
-                            real_med = float((valores * pesos).sum() / pesos.sum())
-                            soma_total = float(valores.sum())
-                        else:
-                            real_med = 0.0
-                            soma_total = 0.0
-                        
-                        tipo, prop = regra['tipo'], regra['prop']
-                        t100 = regra['t100'] * FATOR_PROPORCIONAL if prop else regra['t100']
-                        t50 = regra['t50'] * FATOR_PROPORCIONAL if prop else regra['t50']
-                        t120 = regra['t120'] * FATOR_PROPORCIONAL if prop else regra['t120']
-                        
-                        if tipo == '>':
-                            if real_med >= t120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                            elif real_med >= t100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                            elif real_med >= t50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                        else:
-                            if real_med <= t120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                            elif real_med <= t100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                            elif real_med <= t50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                        
-                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(DIAS_DECORRIDOS)}d)</span>" if prop else ""
-                        
-                        if "Tempo Médio" in ind:
-                            v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                            t_tela = f"{int(t100)//3600:02d}:{(int(t100)%3600)//60:02d}:{(int(t100)%60):02d}"
-                            html_soma = ""
-                        elif ind in ['Avaria', 'Dev. %', 'Corte %']:
-                            v_tela, t_tela = f"{real_med:.2f}%", f"{t100:.2f}%"
-                            html_soma = ""
-                        elif "Líq." in ind: 
-                            v_tela, t_tela = f"{real_med:.0f}%", f"{t100:.0f}%"
-                            html_soma = ""
-                        else:
-                            v_tela, t_tela = f"{real_med:,.0f}".replace(',','.'), f"{t100:,.0f}".replace(',','.')
-                            html_soma = f'<span class="texto-card-secundario">| Soma Equipe: {soma_total:,.0f}</span>'.replace(',', '.')
-                            
-                        with cols_eq[idx]:
-                            st.markdown(f"""<div class="card-meta" style="border-left-color: {cor};"><div class="texto-card-titulo">Média: {ind} (Alvo: {t_tela}){aviso_prop}</div><div class="texto-card-principal">{v_tela} {html_soma}</div><div style="font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;">{icone} {status}</div></div>""", unsafe_allow_html=True)
-        
-        if len(cargos_render) > 0: st.divider()
-
-        st.markdown("### 📋 Tabela de Produtividade Consolidada")
-        df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        cols_basicas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados']
-        todas_metricas = set()
-        
-        if cargo_selecionado != "Todos":
-            todas_metricas.update(metas_100.get(df_tabela['TURNO'].mode()[0], {}).get(cargo_selecionado, {}).keys())
-        elif turno_selecionado != "Todos":
-            for kpis in metas_100.get(turno_selecionado, {}).values(): todas_metricas.update(kpis.keys())
-        
-        if todas_metricas:
-            df_tabela = df_tabela[[c for c in (cols_basicas + sorted(list(todas_metricas))) if c in df_tabela.columns]]
-        
-        if 'Tempo Médio' in df_tabela.columns:
-            df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(lambda s: f"{int(s)//3600:02d}:{(int(s)%3600)//60:02d}:{(int(s)%60):02d}")
-
-        config = {}
-        for c in df_tabela.columns:
-            if c in cols_basicas or c == 'Tempo Médio': continue
-            elif c in ['Avaria', 'Corte %', 'Dev. %']: config[c] = st.column_config.NumberColumn(c, format="%.2f%%")
-            elif "Líq." in c: config[c] = st.column_config.NumberColumn(c, format="%d%%")
-            else: config[c] = st.column_config.NumberColumn(c, format="%d")
-            
-        st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
-
-except Exception as e:
-    st.error(f"⚠️ Erro: {e}")
+                            valor_tela = f"{realizado:,.0f}".replace
