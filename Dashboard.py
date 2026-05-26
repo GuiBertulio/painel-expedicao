@@ -184,7 +184,7 @@ def carregar_dados():
         'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 'Avaria', 'Corte %', 'Dev. %',
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
         'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 
-        'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'  # <--- INSERIDAS AS NOVAS COLUNAS
+        'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'
     ]
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
@@ -256,10 +256,15 @@ try:
         cargo_c = row['FUNÇÃO']
         cod_c = row['CÓD.']
         
-        # 🔥 NOVA LÓGICA DE FATORES SEPARADOS
-        dias_uteis_excel = float(row['Dias Uteis']) if 'Dias Uteis' in row and row['Dias Uteis'] > 0 else DIAS_UTEIS_MES
-        d_trab = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in row else dias_uteis_excel
-        d_meta = float(row['Dias Meta']) if 'Dias Meta' in row else dias_uteis_excel
+        # 🔥 PROTEÇÃO CONTRA VALORES ZERADOS OU VAZIOS NO EXCEL
+        val_du = float(row['Dias Uteis']) if 'Dias Uteis' in row and pd.notna(row['Dias Uteis']) else 0
+        dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
+        
+        val_dt = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in row and pd.notna(row['Dias Trabalhados']) else 0
+        d_trab = val_dt if val_dt > 0 else dias_uteis_excel
+        
+        val_dm = float(row['Dias Meta']) if 'Dias Meta' in row and pd.notna(row['Dias Meta']) else 0
+        d_meta = val_dm if val_dm > 0 else dias_uteis_excel
         
         fator_meta = d_meta / dias_uteis_excel
         fator_premio = d_trab / dias_uteis_excel
@@ -316,7 +321,6 @@ try:
                         if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 100.0
                         elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 50.0
                     
-                    # Fator de Premiação aplicado ao bônus do ranking também
                     premio_total += (val_rank * fator_premio)
                 except:
                     pass
@@ -386,9 +390,13 @@ try:
             nome_c = row['NOME']
             cod_c = row['CÓD.']
             
-            # 🔥 NOVA LÓGICA AQUI TAMBÉM
-            dias_uteis_excel = float(row['Dias Uteis']) if 'Dias Uteis' in df_filtrado.columns and row['Dias Uteis'] > 0 else DIAS_UTEIS_MES
-            d_meta = float(row['Dias Meta']) if 'Dias Meta' in df_filtrado.columns else dias_uteis_excel
+            # 🔥 PROTEÇÃO CONTRA ZEROS NO DETRATOR
+            val_du = float(row['Dias Uteis']) if 'Dias Uteis' in df_filtrado.columns and pd.notna(row['Dias Uteis']) else 0
+            dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
+            
+            val_dm = float(row['Dias Meta']) if 'Dias Meta' in df_filtrado.columns and pd.notna(row['Dias Meta']) else 0
+            d_meta = val_dm if val_dm > 0 else dias_uteis_excel
+            
             fator_meta = d_meta / dias_uteis_excel
             
             regras = metas_100.get(turno_c, {}).get(cargo_c, {})
@@ -464,10 +472,15 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
-            # 🔥 NOVA LÓGICA DE FATORES SEPARADOS NA VISÃO INDIVIDUAL
-            dias_uteis_excel = float(dados_pessoa['Dias Uteis'].values[0]) if 'Dias Uteis' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Uteis'].values[0]) and dados_pessoa['Dias Uteis'].values[0] > 0 else DIAS_UTEIS_MES
-            d_trab = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Trabalhados'].values[0]) else dias_uteis_excel
-            d_meta = float(dados_pessoa['Dias Meta'].values[0]) if 'Dias Meta' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Meta'].values[0]) else dias_uteis_excel
+            # 🔥 PROTEÇÃO CONTRA ZEROS NA VISÃO INDIVIDUAL
+            val_du = float(dados_pessoa['Dias Uteis'].values[0]) if 'Dias Uteis' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Uteis'].values[0]) else 0
+            dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
+            
+            val_dt = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Trabalhados'].values[0]) else 0
+            d_trab = val_dt if val_dt > 0 else dias_uteis_excel
+            
+            val_dm = float(dados_pessoa['Dias Meta'].values[0]) if 'Dias Meta' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Meta'].values[0]) else 0
+            d_meta = val_dm if val_dm > 0 else dias_uteis_excel
             
             fator_meta = d_meta / dias_uteis_excel
             fator_premio = d_trab / dias_uteis_excel
@@ -616,7 +629,9 @@ try:
                     if ind in df_cargo.columns:
                         df_valido = df_cargo[df_cargo[ind] > 0]
                         if not df_valido.empty:
-                            valores, pesos = df_valido[ind], df_valido['Dias Trabalhados'].replace(0, 1) if 'Dias Trabalhados' in df_valido.columns else 1
+                            valores = df_valido[ind]
+                            # Usa Dias Trabalhados se existir, senão assume mês cheio (DIAS_UTEIS_MES)
+                            pesos = df_valido['Dias Trabalhados'].apply(lambda x: x if pd.notna(x) and x > 0 else DIAS_UTEIS_MES) if 'Dias Trabalhados' in df_valido.columns else 1
                             real_med, soma_total = float((valores * pesos).sum() / pesos.sum()), float(valores.sum())
                         else:
                             real_med, soma_total = 0.0, 0.0
