@@ -151,7 +151,6 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 🔥 SUPER AUTO-CORRETOR
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
         if ("MED" in nome_limpo or "MÉD" in nome_limpo) and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
@@ -184,7 +183,8 @@ def carregar_dados():
         'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
         'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 'Avaria', 'Corte %', 'Dev. %',
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
-        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 'Dias Trabalhados'
+        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 
+        'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'  # <--- INSERIDAS AS NOVAS COLUNAS
     ]
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
@@ -193,7 +193,9 @@ def carregar_dados():
 # ==========================================
 # 4. LÓGICA DE TEMPO: D-1
 # ==========================================
-data_apuracao = datetime.date.today() - datetime.timedelta(days=1)
+hoje_brasil = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).date()
+data_apuracao = hoje_brasil - datetime.timedelta(days=1)
+
 if data_apuracao.day >= 26:
     dt_inicio = datetime.date(data_apuracao.year, data_apuracao.month, 26)
     mes_fim = data_apuracao.month + 1 if data_apuracao.month < 12 else 1
@@ -253,9 +255,14 @@ try:
         turno_c = row['TURNO']
         cargo_c = row['FUNÇÃO']
         cod_c = row['CÓD.']
-        dias_trab = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in row else DIAS_UTEIS_MES
-        if dias_trab <= 0: dias_trab = 1.0 
-        fator = dias_trab / DIAS_UTEIS_MES
+        
+        # 🔥 NOVA LÓGICA DE FATORES SEPARADOS
+        dias_uteis_excel = float(row['Dias Uteis']) if 'Dias Uteis' in row and row['Dias Uteis'] > 0 else DIAS_UTEIS_MES
+        d_trab = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in row else dias_uteis_excel
+        d_meta = float(row['Dias Meta']) if 'Dias Meta' in row else dias_uteis_excel
+        
+        fator_meta = d_meta / dias_uteis_excel
+        fator_premio = d_trab / dias_uteis_excel
         
         metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
         premio_total = 0.0
@@ -266,10 +273,13 @@ try:
                     realizado = float(row[ind])
                     tipo, prop = regra['tipo'], regra['prop']
                     
-                    t100 = regra['t100'] * fator if prop else regra['t100']
-                    t120 = regra['t120'] * fator if prop else regra['t120']
-                    t50 = regra['t50'] * fator if prop else regra['t50']
-                    v100 = regra['v100'] * fator if prop else regra['v100']
+                    # Fator de Meta APENAS se for proporcional
+                    t100 = regra['t100'] * fator_meta if prop else regra['t100']
+                    t120 = regra['t120'] * fator_meta if prop else regra['t120']
+                    t50 = regra['t50'] * fator_meta if prop else regra['t50']
+                    
+                    # Fator de Premiação para TODOS os indicadores
+                    v100 = regra['v100'] * fator_premio
                     
                     if tipo == '>':
                         if realizado >= t120: premio_total += v100 * 1.2
@@ -305,14 +315,16 @@ try:
                     elif pos == 3:
                         if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 100.0
                         elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 50.0
-                    premio_total += val_rank
+                    
+                    # Fator de Premiação aplicado ao bônus do ranking também
+                    premio_total += (val_rank * fator_premio)
                 except:
                     pass
                     
         dados_rh.append({
             'Matrícula': cod_c,
             'Nome': nome_colab,
-            'Premiação (R$)': premio_total
+            'Premiação (R$)': round(premio_total, 2)
         })
 
     if dados_rh:
@@ -373,7 +385,11 @@ try:
             cargo_c = row['FUNÇÃO']
             nome_c = row['NOME']
             cod_c = row['CÓD.']
-            dias_c = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in df_filtrado.columns else DIAS_UTEIS_MES
+            
+            # 🔥 NOVA LÓGICA AQUI TAMBÉM
+            dias_uteis_excel = float(row['Dias Uteis']) if 'Dias Uteis' in df_filtrado.columns and row['Dias Uteis'] > 0 else DIAS_UTEIS_MES
+            d_meta = float(row['Dias Meta']) if 'Dias Meta' in df_filtrado.columns else dias_uteis_excel
+            fator_meta = d_meta / dias_uteis_excel
             
             regras = metas_100.get(turno_c, {}).get(cargo_c, {})
             if not regras: continue
@@ -385,7 +401,7 @@ try:
             for ind, regra in regras.items():
                 if ind in df_filtrado.columns:
                     realizado = float(row[ind])
-                    t100 = regra['t100'] * (dias_c / DIAS_UTEIS_MES) if regra['prop'] else regra['t100']
+                    t100 = regra['t100'] * fator_meta if regra['prop'] else regra['t100']
                     
                     if "Itens" in ind or "Palets" in ind or "Carga" in ind or "Mov" in ind:
                         itens_realizados = realizado
@@ -405,7 +421,7 @@ try:
             if abaixo_da_meta:
                 houve_detrator = True
                 with st.container():
-                    st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Ativos no Ciclo:</b> {int(dias_c)} dias<p style='margin-top: 10px; font-size: 16px; line-height: 1.4; color: lightgray;'><b>📝 Análise Operacional Automática:</b><br>Nos {int(dias_c)} dias computados, o colaborador realizou um volume total de {itens_realizados:,.0f} no indicador <i>{metrica_volume_nome}</i>. Velocidade média de {itens_hora_realizado:.1f} por hora.</p><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Ativos no Ciclo:</b> {int(d_meta)} dias<p style='margin-top: 10px; font-size: 16px; line-height: 1.4; color: lightgray;'><b>📝 Análise Operacional Automática:</b><br>Nos {int(d_meta)} dias computados para meta, o colaborador realizou um volume total de {itens_realizados:,.0f} no indicador <i>{metrica_volume_nome}</i>. Velocidade média de {itens_hora_realizado:.1f} por hora.</p><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
                     
                     col_feed, col_trein = st.columns(2)
                     with col_feed:
@@ -448,6 +464,14 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
+            # 🔥 NOVA LÓGICA DE FATORES SEPARADOS NA VISÃO INDIVIDUAL
+            dias_uteis_excel = float(dados_pessoa['Dias Uteis'].values[0]) if 'Dias Uteis' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Uteis'].values[0]) and dados_pessoa['Dias Uteis'].values[0] > 0 else DIAS_UTEIS_MES
+            d_trab = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Trabalhados'].values[0]) else dias_uteis_excel
+            d_meta = float(dados_pessoa['Dias Meta'].values[0]) if 'Dias Meta' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Meta'].values[0]) else dias_uteis_excel
+            
+            fator_meta = d_meta / dias_uteis_excel
+            fator_premio = d_trab / dias_uteis_excel
+
             valor_premio_ranking = 0.0
             
             if metas_cargo:
@@ -477,6 +501,9 @@ try:
                         else: 
                             medalha, cor_rank, valor_premio_ranking = "🏅", "gray", 0.0
                             
+                        # Aplica o fator de premiação no bônus de ranking
+                        valor_premio_ranking = valor_premio_ranking * fator_premio
+                            
                         texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio: R$ {valor_premio_ranking:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_premio_ranking > 0 else ""
                         st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {posicao}º lugar de {total_eq} na equipe de {cargo_p} <i>(Critério: {metrica_ranking})</i>{texto_premio_rank}</div>", unsafe_allow_html=True)
                     except IndexError: pass
@@ -486,18 +513,19 @@ try:
             if metas_cargo:
                 cols_meta = st.columns(len(metas_cargo))
                 grafico_dados = []
-                dias_trab = float(dados_pessoa['Dias Trabalhados'].values[0]) if 'Dias Trabalhados' in dados_pessoa.columns else DIAS_UTEIS_MES
-                if dias_trab <= 0: dias_trab = 1.0 
-                fator_colaborador = dias_trab / DIAS_UTEIS_MES
                 
                 for idx, (ind, regra) in enumerate(metas_cargo.items()):
                     if ind in dados_pessoa.columns:
                         realizado = float(dados_pessoa[ind].values[0])
                         tipo, prop = regra['tipo'], regra['prop']
-                        t100 = regra['t100'] * fator_colaborador if prop else regra['t100']
-                        t120 = regra['t120'] * fator_colaborador if prop else regra['t120']
-                        t50 = regra['t50'] * fator_colaborador if prop else regra['t50']
-                        v100 = regra['v100'] * fator_colaborador if prop else regra['v100']
+                        
+                        # Alvo proporcional à Meta
+                        t100 = regra['t100'] * fator_meta if prop else regra['t100']
+                        t120 = regra['t120'] * fator_meta if prop else regra['t120']
+                        t50 = regra['t50'] * fator_meta if prop else regra['t50']
+                        
+                        # Valor financeiro proporcional ao Trabalho
+                        v100 = regra['v100'] * fator_premio
                         
                         pagamento_ind = 0.0
                         if tipo == '>':
@@ -517,8 +545,13 @@ try:
                         bonus_acumulado += pagamento_ind
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 {texto_grana}</span>" if pagamento_ind > 0 else ""
-                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Prop. a {int(dias_trab)}d)</span>" if prop else ""
                         
+                        # Texto explicativo dos dias na tela
+                        if prop:
+                            aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Meta a {int(d_meta)}d)</span>"
+                        else:
+                            aviso_prop = ""
+                            
                         if "Tempo Médio" in ind:
                             valor_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                             t100_tela = f"{int(t100)//3600:02d}:{(int(t100)%3600)//60:02d}:{int(t100)%60:02d}"
@@ -554,7 +587,7 @@ try:
                         st.plotly_chart(fig, use_container_width=True)
 
                 with col_tabela:
-                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'] + list(metas_cargo.keys())
+                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'] + list(metas_cargo.keys())
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                     if 'Tempo Médio' in df_tabela_mini.columns:
                         df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
@@ -622,7 +655,7 @@ try:
 
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        cols_basicas, todas_metricas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados'], set()
+        cols_basicas, todas_metricas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'], set()
         
         if cargo_selecionado != "Todos": todas_metricas.update(metas_100.get(df_tabela['TURNO'].mode()[0], {}).get(cargo_selecionado, {}).keys())
         elif turno_selecionado != "Todos":
