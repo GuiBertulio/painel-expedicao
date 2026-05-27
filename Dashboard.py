@@ -35,108 +35,33 @@ C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef44
 # ==========================================
 metas_100 = {
     'T3': {
-        'SEPARADOR F': {
-            'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 75, 't100': 80, 't120': 85},
-            'Itens Sep':    {'tipo': '>', 'prop': True,  'v100': 150.0, 't50': 7000, 't100': 9000, 't120': 11000},
-            'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
-        },
-        'SEPARADOR G': {
-            'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 68, 't100': 72, 't120': 77},
-            'Itens Sep':    {'tipo': '>', 'prop': True,  'v100': 150.0, 't50': 6300, 't100': 8100, 't120': 9900},
-            'Itens/Hora':   {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}
-        },
-        'CONFERENTE': {
-            'Itens Conf.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000},
-            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
-        },
-        'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
-            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
-        'CARREGAMENTO BOX': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
-        'MESA': {
-            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85},
-            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Corte %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
-        },
-        'MANOBRISTA': {
-            'Itens Manob.': {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000},
-            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
-        'LÍDER': {
-            'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 65, 't100': 75, 't120': 85},
-            'Dev. %':           {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Itens/Hora Eq.':   {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}
-        }
+        'SEPARADOR F': {'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 75, 't100': 80, 't120': 85}, 'Itens Sep': {'tipo': '>', 'prop': True, 'v100': 150.0, 't50': 7000, 't100': 9000, 't120': 11000}, 'Itens/Hora': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}},
+        'SEPARADOR G': {'Jornada Líq.': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 68, 't100': 72, 't120': 77}, 'Itens Sep': {'tipo': '>', 'prop': True, 'v100': 150.0, 't50': 6300, 't100': 8100, 't120': 9900}, 'Itens/Hora': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 60, 't100': 75, 't120': 90}},
+        'CONFERENTE': {'Itens Conf.': {'tipo': '>', 'prop': True, 'v100': 350.0, 't50': 80000, 't100': 110000, 't120': 140000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}},
+        'OPERADOR': {'Mov. Horizontal': {'tipo': '>', 'prop': True, 'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}, 'Avaria': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}},
+        'CARREGAMENTO BOX': {'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Avaria': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}},
+        'MESA': {'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 65, 't100': 75, 't120': 85}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Corte %': {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}},
+        'MANOBRISTA': {'Itens Manob.': {'tipo': '>', 'prop': True, 'v100': 350.0, 't50': 200000, 't100': 250000, 't120': 300000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Avaria': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}},
+        'LÍDER': {'Jornada Líq. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 65, 't100': 75, 't120': 85}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Itens/Hora Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 60, 't100': 75, 't120': 90}}
     },
     'T2': {
-        'AVARIA': {
-            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
-        'CONFERENTE': {
-            'Itens Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
-        },
-        'DEVOLUÇÃO': {
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
-        },
-        'INVENTARIO': {
-            'Corte %':     {'tipo': '<', 'prop': False, 'v100': 200.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}
-        },
-        'LÍDER': {
-            'Ressup. Eq.':     {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 8000, 't100': 11000, 't120': 14000},
-            'Dev. %':          {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Itens/Hora Eq.':  {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 50, 't100': 65, 't120': 80}
-        },
-        'MESA': {
-            'Ressup. Eq.':     {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 8000, 't100': 11000, 't120': 14000},
-            'Dev. %':          {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Itens/Hora Eq.':  {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 50, 't100': 65, 't120': 80}
-        },
-        'OPERADOR': {
-            'Mov. Horizontal': {'tipo': '>', 'prop': True,  'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400},
-            'Avaria':          {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
-        'RAMPEIRO': {
-            'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000},
-            'Dev. %':      {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40},
-            'Avaria':      {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}
-        },
-        'SEPARADOR G': {
-            'Ressup. Ap.': {'tipo': '>', 'prop': True,  'v100': 200.0, 't50': 600, 't100': 800, 't120': 1000},
-            'Itens/Hora':  {'tipo': '>', 'prop': False, 'v100': 200.0, 't50': 50, 't100': 65, 't120': 80}
-        }
+        'AVARIA': {'Avaria': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}},
+        'CONFERENTE': {'Itens Conf.': {'tipo': '>', 'prop': True, 'v100': 300.0, 't50': 90000, 't100': 120000, 't120': 150000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}},
+        'DEVOLUÇÃO': {'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}},
+        'INVENTARIO': {'Corte %': {'tipo': '<', 'prop': False, 'v100': 200.0, 't50': 0.65, 't100': 0.45, 't120': 0.25}},
+        'LÍDER': {'Ressup. Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 8000, 't100': 11000, 't120': 14000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 240.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Itens/Hora Eq.': {'tipo': '>', 'prop': False, 'v100': 240.0, 't50': 50, 't100': 65, 't120': 80}},
+        'MESA': {'Ressup. Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 8000, 't100': 11000, 't120': 14000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 220.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Itens/Hora Eq.': {'tipo': '>', 'prop': False, 'v100': 220.0, 't50': 50, 't100': 65, 't120': 80}},
+        'OPERADOR': {'Mov. Horizontal': {'tipo': '>', 'prop': True, 'v100': 450.0, 't50': 1200, 't100': 1800, 't120': 2400}, 'Avaria': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}},
+        'RAMPEIRO': {'Itens Rampa': {'tipo': '>', 'prop': False, 'v100': 150.0, 't50': 30000, 't100': 45000, 't120': 60000}, 'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}, 'Avaria': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 0.07, 't100': 0.07, 't120': 0.00}},
+        'SEPARADOR G': {'Ressup. Ap.': {'tipo': '>', 'prop': True, 'v100': 200.0, 't50': 600, 't100': 800, 't120': 1000}, 'Itens/Hora': {'tipo': '>', 'prop': False, 'v100': 200.0, 't50': 50, 't100': 65, 't120': 80}}
     },
     'T1': {
-        'CONFERENTE': {
-            'Palets Conf.': {'tipo': '>', 'prop': True,  'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250},
-            'Tempo Médio':  {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}
-        },
-        'DESCARGA': {
-            'Carga Palet.': {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 3000, 't100': 3700, 't120': 4400},
-            'Tempo Médio':  {'tipo': '<', 'prop': False, 'v100': 125.0, 't50': 3900, 't100': 3300, 't120': 2700},
-            'Carga Bat.':   {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 1000, 't100': 1500, 't120': 2000}
-        },
-        'DEVOLUÇÃO': {
-            'Dev. %':       {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}
-        },
-        'LÍDER': {
-            'Méd. Palets Conf.': {'tipo': '>', 'prop': False, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250},
-            'Tempo Médio':       {'tipo': '<', 'prop': False, 'v100': 300.0, 't50': 3900, 't100': 3300, 't120': 2700}
-        },
-        'OPERADOR': {
-            'Mov. Vert.':  {'tipo': '>', 'prop': True,  'v100': 350.0, 't50': 2000, 't100': 2750, 't120': 3500},
-            'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}
-        },
-        'PUXA': {
-            'Palets Px.':  {'tipo': '>', 'prop': True,  'v100': 200.0, 't50': 1800, 't100': 3000, 't120': 4200},
-            'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}
-        }
+        'CONFERENTE': {'Palets Conf.': {'tipo': '>', 'prop': True, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250}, 'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}},
+        'DESCARGA': {'Carga Palet.': {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 3000, 't100': 3700, 't120': 4400}, 'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 125.0, 't50': 3900, 't100': 3300, 't120': 2700}, 'Carga Bat.': {'tipo': '>', 'prop': False, 'v100': 125.0, 't50': 1000, 't100': 1500, 't120': 2000}},
+        'DEVOLUÇÃO': {'Dev. %': {'tipo': '<', 'prop': False, 'v100': 150.0, 't50': 0.50, 't100': 0.46, 't120': 0.40}},
+        'LÍDER': {'Méd. Palets Conf.': {'tipo': '>', 'prop': False, 'v100': 300.0, 't50': 1750, 't100': 2500, 't120': 3250}, 'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 300.0, 't50': 3900, 't100': 3300, 't120': 2700}},
+        'OPERADOR': {'Mov. Vert.': {'tipo': '>', 'prop': True, 'v100': 350.0, 't50': 2000, 't100': 2750, 't120': 3500}, 'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}},
+        'PUXA': {'Palets Px.': {'tipo': '>', 'prop': True, 'v100': 200.0, 't50': 1800, 't100': 3000, 't120': 4200}, 'Tempo Médio': {'tipo': '<', 'prop': False, 'v100': 100.0, 't50': 3900, 't100': 3300, 't120': 2700}}
     }
 }
 
@@ -146,38 +71,25 @@ metas_100 = {
 @st.cache_data(ttl=60) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
-    
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 🔥 SUPER AUTO-CORRETOR
+    # Auto-corretor de colunas
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
-        if "MED" in nome_limpo and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
-            df = df.rename(columns={c: 'Méd. Palets Conf.'})
-        elif "JORNADA" in nome_limpo and "EQ" in nome_limpo:
-            df = df.rename(columns={c: 'Jornada Líq. Eq.'})
-        elif "RESSUP" in nome_limpo and "EQ" in nome_limpo:
-            df = df.rename(columns={c: 'Ressup. Eq.'})
-        elif "TRAB" in nome_limpo and "DIAS" in nome_limpo:
-            df = df.rename(columns={c: 'Dias Trabalhados'})
-        elif "META" in nome_limpo and "DIAS" in nome_limpo:
-            df = df.rename(columns={c: 'Dias Meta'})
-        elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo:
-            df = df.rename(columns={c: 'Dias Uteis'})
-        elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo):
-            df = df.rename(columns={c: 'Data Inicio'})
-        elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo):
-            df = df.rename(columns={c: 'Data Fim'})
+        if "MED" in nome_limpo and ("PALET" in nome_limpo or "PALLET" in nome_limpo): df = df.rename(columns={c: 'Méd. Palets Conf.'})
+        elif "JORNADA" in nome_limpo and "EQ" in nome_limpo: df = df.rename(columns={c: 'Jornada Líq. Eq.'})
+        elif "RESSUP" in nome_limpo and "EQ" in nome_limpo: df = df.rename(columns={c: 'Ressup. Eq.'})
+        elif "TRAB" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
+        elif "META" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Meta'})
+        elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Uteis'})
+        elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
+        elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
 
-    if 'NOME' in df.columns:
-        df = df.dropna(subset=['NOME'])
-        
-    if 'FUNÇÃO' in df.columns:
-        df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
-    if 'TURNO' in df.columns:
-        df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
+    if 'NOME' in df.columns: df = df.dropna(subset=['NOME'])
+    if 'FUNÇÃO' in df.columns: df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
+    if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
 
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Data Inicio', 'Data Fim']
     for col in df.columns:
@@ -189,23 +101,16 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
-    colunas_desejadas = [
-        'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 
-        'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 
-        'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 'Avaria', 'Corte %', 'Dev. %',
-        'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
-        'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 
-        'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Data Inicio', 'Data Fim'
-    ]
-    
+    colunas_desejadas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Itens Sep', 'Itens/Hora Eq.', 'Horas', 'Itens/Hora', 'Ressup. Ap.', 'Erros', 'Jornada Líq.', 'Ressup.', 'Ressup. Eq.', 'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 'Avaria', 'Corte %', 'Dev. %', 'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Data Inicio', 'Data Fim']
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
     return df[colunas_existentes]
 
 # ==========================================
-# 4. LÓGICA DE TEMPO: DATA-DRIVEN (A PLANILHA MANDA)
+# 4. LÓGICA DE DADOS (CARREGAMENTO PREVIO)
 # ==========================================
 df = carregar_dados()
 
+# Tentativa de ler datas da planilha
 if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
     dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
     data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0], dayfirst=True).date()
@@ -213,10 +118,9 @@ if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Ini
 else:
     hoje = datetime.date.today()
     dt_inicio = datetime.date(hoje.year, hoje.month, 26)
-    dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
     data_apuracao = hoje - datetime.timedelta(days=1)
+    dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
 
-# Cálculo de dias (6x1: remove apenas domingo = 6)
 dias_totais_range = pd.date_range(start=dt_inicio, end=dt_fim_ciclo)
 dias_uteis_totais = dias_totais_range[dias_totais_range.weekday != 6]
 dias_decorridos_range = pd.date_range(start=dt_inicio, end=data_apuracao)
@@ -236,106 +140,81 @@ df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado !
 
 lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 cargo_selecionado = st.sidebar.selectbox("2. Cargo/Função:", lista_cargos)
-if cargo_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_selecionado]
-    
+if cargo_selecionado != "Todos": df_filtrado = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_selecionado]
+
 lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
 pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
-    st.sidebar.markdown("---")
-    focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
+focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
-    # ==========================================
-    # 🔥 MÓDULO DE EXTRAÇÃO PARA O RH
-    # ==========================================
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🗃️ Fechamento RH")
+# ==========================================
+# 🔥 MÓDULO DE EXTRAÇÃO RH
+# ==========================================
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🗃️ Fechamento RH")
+
+dados_rh = []
+for nome_colab in df_filtrado['NOME'].unique():
+    row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
+    turno_c, cargo_c, cod_c = row['TURNO'], row['FUNÇÃO'], row['CÓD.']
     
-    dados_rh = []
-    for nome_colab in df_filtrado['NOME'].unique():
-        row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
-        turno_c = row['TURNO']
-        cargo_c = row['FUNÇÃO']
-        cod_c = row['CÓD.']
-        
-        # 🔥 PROTEÇÃO CONTRA VALORES ZERADOS OU VAZIOS NO EXCEL
-        val_du = float(row.get('Dias Uteis', 0))
-        dias_uteis_excel = val_du if pd.notna(val_du) and val_du > 0 else DIAS_UTEIS_MES
-        
-        val_dt = float(row.get('Dias Trabalhados', 0))
-        d_trab = val_dt if pd.notna(val_dt) and val_dt > 0 else dias_uteis_excel
-        
-        val_dm = float(row.get('Dias Meta', 0))
-        d_meta = val_dm if pd.notna(val_dm) and val_dm > 0 else dias_uteis_excel
-        
-        fator_meta = d_meta / dias_uteis_excel
-        fator_premio = d_trab / dias_uteis_excel
-        
-        metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
-        premio_total = 0.0
-        
-        if metas_c:
-            for ind, regra in metas_c.items():
-                if ind in row:
-                    realizado = float(row[ind])
-                    tipo, prop = regra['tipo'], regra['prop']
-                    
-                    t100 = regra['t100'] * fator_meta if prop else regra['t100']
-                    t120 = regra['t120'] * fator_meta if prop else regra['t120']
-                    t50 = regra['t50'] * fator_meta if prop else regra['t50']
-                    
-                    v100 = regra['v100'] * fator_premio
-                    
-                    if tipo == '>':
-                        if realizado >= t120: premio_total += v100 * 1.2
-                        elif realizado >= t100: premio_total += v100
-                        elif realizado >= t50: premio_total += v100 * 0.5
-                    else:
-                        if pd.notna(realizado): 
-                            if realizado <= t120: premio_total += v100 * 1.2
-                            elif realizado <= t100: premio_total += v100
-                            elif realizado <= t50: premio_total += v100 * 0.5
-            
-            metrica_rank = None
-            for ind, regra in metas_c.items():
-                if regra['prop']: 
-                    metrica_rank = ind
-                    break
-            if not metrica_rank: metrica_rank = list(metas_c.keys())[0]
-            
-            if metrica_rank in df.columns:
-                df_eq = df[(df['TURNO'] == turno_c) & (df['FUNÇÃO'] == cargo_c)].copy()
-                ordem_cresc = False if metas_c[metrica_rank]['tipo'] == '>' else True
-                df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc).reset_index(drop=True)
+    val_du = float(row.get('Dias Uteis', 0))
+    dias_uteis_excel = val_du if pd.notna(val_du) and val_du > 0 else DIAS_UTEIS_MES
+    
+    val_dt = float(row.get('Dias Trabalhados', 0))
+    d_trab = val_dt if pd.notna(val_dt) and val_dt > 0 else dias_uteis_excel
+    
+    val_dm = float(row.get('Dias Meta', 0))
+    d_meta = val_dm if pd.notna(val_dm) and val_dm > 0 else dias_uteis_excel
+    
+    fator_meta = d_meta / dias_uteis_excel
+    fator_premio = d_trab / dias_uteis_excel
+    
+    metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
+    premio_total = 0.0
+    
+    if metas_c:
+        for ind, regra in metas_c.items():
+            if ind in row:
+                realizado = float(row[ind])
+                tipo, prop = regra['tipo'], regra['prop']
                 
-                try:
-                    pos = df_eq[df_eq['NOME'] == nome_colab].index[0] + 1
-                    val_rank = 0.0
-                    if pos == 1:
-                        if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 250.0
-                        elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 150.0
-                    elif pos == 2:
-                        if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 200.0
-                        elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 100.0
-                    elif pos == 3:
-                        if turno_c == 'T3' and 'SEPARADOR' in cargo_c: val_rank = 100.0
-                        elif turno_c == 'T2' and 'SEPARADOR' in cargo_c: val_rank = 50.0
-                    
-                    premio_total += (val_rank * fator_premio)
-                except:
-                    pass
-                    
-        dados_rh.append({
-            'Matrícula': cod_c,
-            'Nome': nome_colab,
-            'Premiação (R$)': round(premio_total, 2)
-        })
+                t100 = regra['t100'] * fator_meta if prop else regra['t100']
+                t120 = regra['t120'] * fator_meta if prop else regra['t120']
+                t50 = regra['t50'] * fator_meta if prop else regra['t50']
+                v100 = regra['v100'] * fator_premio
+                
+                if tipo == '>':
+                    if realizado >= t120: premio_total += v100 * 1.2
+                    elif realizado >= t100: premio_total += v100
+                    elif realizado >= t50: premio_total += v100 * 0.5
+                else:
+                    if pd.notna(realizado): 
+                        if realizado <= t120: premio_total += v100 * 1.2
+                        elif realizado <= t100: premio_total += v100
+                        elif realizado <= t50: premio_total += v100 * 0.5
+        
+        metrica_rank = next((ind for ind, r in metas_c.items() if r['prop']), list(metas_c.keys())[0])
+        if metrica_rank in df.columns:
+            df_eq = df[(df['TURNO'] == turno_c) & (df['FUNÇÃO'] == cargo_c)].copy()
+            ordem_cresc = False if metas_c[metrica_rank]['tipo'] == '>' else True
+            df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc).reset_index(drop=True)
+            try:
+                pos = df_eq[df_eq['NOME'] == nome_colab].index[0] + 1
+                if pos == 1: val_rank = 250.0 if turno_c == 'T3' and 'SEPARADOR' in cargo_c else (150.0 if turno_c == 'T2' and 'SEPARADOR' in cargo_c else 0.0)
+                elif pos == 2: val_rank = 200.0 if turno_c == 'T3' and 'SEPARADOR' in cargo_c else (100.0 if turno_c == 'T2' and 'SEPARADOR' in cargo_c else 0.0)
+                elif pos == 3: val_rank = 100.0 if turno_c == 'T3' and 'SEPARADOR' in cargo_c else (50.0 if turno_c == 'T2' and 'SEPARADOR' in cargo_c else 0.0)
+                else: val_rank = 0.0
+                premio_total += (val_rank * fator_premio)
+            except: pass
+                
+    dados_rh.append({'Matrícula': cod_c, 'Nome': nome_colab, 'Premiação (R$)': round(premio_total, 2)})
 
-    if dados_rh:
-        df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
-        st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
-        csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
-        st.sidebar.download_button(label="📥 Baixar Planilha do RH", data=csv_rh, file_name=f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv", mime="text/csv", type="primary", use_container_width=True)
+if dados_rh:
+    df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
+    st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
+    csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+    st.sidebar.download_button("📥 Baixar Planilha do RH", csv_rh, f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv", "text/csv", type="primary", use_container_width=True)
     else:
         st.sidebar.info("Nenhum dado processado.")
 
