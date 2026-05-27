@@ -36,7 +36,7 @@ C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef44
 @st.cache_data(ttl=60) 
 def carregar_dados():
     # LINK DA ABA "RELATÓRIO_RH" - SUBSTITUA SE FOR DIFERENTE
-    link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=2040685934&single=true&output=csv"
+    link_csv = https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=1520498693&single=true&output=csv
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
