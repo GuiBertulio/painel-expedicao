@@ -143,7 +143,7 @@ metas_100 = {
 # ==========================================
 # 3. CARREGAMENTO DOS DADOS (BLINDADO)
 # ==========================================
-@st.cache_data(ttl=600) 
+#@st.cache_data(ttl=600) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
