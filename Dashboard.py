@@ -158,27 +158,29 @@ for nome_colab in df_filtrado['NOME'].unique():
     if metas_c:
         for ind, regra in metas_c.items():
             if ind in row:
-                # --- CORREÇÃO DO CÁLCULO DE PROPORÇÃO ---
+                # --- LÓGICA DO ESPECIALISTA ---
                 realizado = float(row[ind])
                 tipo = regra['tipo']
                 
-                # Fator de ajuste: (Dias Úteis do Período / Dias Meta do Cargo)
-                # Se o colaborador trabalhou menos dias que o mês padrão, a meta deve diminuir proporcionalmente.
-                fator_proporcao = dias_uteis_excel / d_meta
-                
-                # Ajusta os limites (targets) baseados na proporção
-                if regra['prop']:
-                    t50 = regra['t50'] * fator_proporcao
-                    t100 = regra['t100'] * fator_proporcao
-                    t120 = regra['t120'] * fator_proporcao
+                # Proporção da Meta: (Dias Úteis / Dias Meta)
+                # Garante que a meta seja ajustada pelo esforço esperado
+                if d_meta > 0:
+                    proporcao_meta = dias_uteis_excel / d_meta
                 else:
-                    # Se não for proporcional (fixo), mantém o valor original
+                    proporcao_meta = 1.0 # Evita divisão por zero
+                
+                # Ajusta os targets se a regra for proporcional
+                if regra['prop']:
+                    t50 = regra['t50'] * proporcao_meta
+                    t100 = regra['t100'] * proporcao_meta
+                    t120 = regra['t120'] * proporcao_meta
+                else:
                     t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
                 
-                # O valor do prêmio (dinheiro) é ajustado pelos dias que ele REALMENTE trabalhou (fator_premio)
+                # Valor do prêmio ajustado pelos dias efetivamente trabalhados (fator_premio)
                 v100 = regra['v100'] * fator_premio
                 
-                # Lógica de cálculo (Mantém igual, mas agora usando os targets proporcionais corretos)
+                # --- CÁLCULO FINAL ---
                 if tipo == '>':
                     if realizado >= t120: premio_total += v100 * 1.2
                     elif realizado >= t100: premio_total += v100
