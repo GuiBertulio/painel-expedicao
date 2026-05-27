@@ -143,12 +143,12 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
     # ==========================================
     # 🔥 MÓDULO DE EXTRAÇÃO RH
     # ==========================================
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🗃️ Fechamento RH")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🗃️ Fechamento RH")
     
-    dados_rh = []
+dados_rh = []
     
-    for nome_colab in df_filtrado['NOME'].unique():
+for nome_colab in df_filtrado['NOME'].unique():
         row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
         turno_c, cargo_c, cod_c = row['TURNO'], row['FUNÇÃO'], row['CÓD.']
         
@@ -208,23 +208,23 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
                 except: pass
         dados_rh.append({'Matrícula': cod_c, 'Nome': nome_colab, 'Premiação (R$)': round(premio_total, 2)})
 
-    if dados_rh:
-        df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
+        if dados_rh:
+            df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
         st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
         csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
         st.sidebar.download_button("📥 Baixar Planilha do RH", csv_rh, "Fechamento_RH.csv", "text/csv", type="primary", use_container_width=True)
-    else:
+else:
         st.sidebar.info("Nenhum dado processado.")
 
     # ==========================================
     # 6. RENDERIZAÇÃO PRINCIPAL
     # ==========================================
-    col_titulo, col_kpis = st.columns([1, 1.2])
-    with col_titulo:
+        col_titulo, col_kpis = st.columns([1, 1.2])
+with col_titulo:
         st.title("📊 Monitor de Produtividade")
         st.info(f"📅 *Período:* {dt_inicio.strftime('%d/%m')} a {data_apuracao.strftime('%d/%m')}")
 
-    with col_kpis:
+with col_kpis:
         st.markdown("## 🎯 Visão Geral")
         kpi1, kpi2, kpi3 = st.columns(3)
         total_vol = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
@@ -232,12 +232,12 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
         kpi2.metric("👥 Colaboradores", len(df_filtrado))
         kpi3.metric("⏱️ Horas", f"{df_filtrado['Horas'].sum():.1f}h")
 
-    st.divider()
+st.divider()
 
     # ==========================================
     # 🚨 MÓDULO DETRATORES
     # ==========================================
-    if focar_detratores:
+if focar_detratores:
         st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
         houve_detrator = False
         
@@ -299,7 +299,7 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
     # ==========================================
     # 👁️ VISÃO INDIVIDUAL DO COLABORADOR
     # ==========================================
-    elif pessoa_selecionada != "Nenhum":
+elif pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento: {pessoa_selecionada}")
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
         
@@ -366,7 +366,7 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
     # ==========================================
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
     # ==========================================
-    else:
+else:
         cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
         
         for cargo_atual in cargos_render:
@@ -433,8 +433,7 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
                 
         df_tabela = df_tabela.rename(columns={'Ind_1_Perc': 'Ating. Ind 1', 'Ind_2_Perc': 'Ating. Ind 2', 'Ind_3_Perc': 'Ating. Ind 3', 'Ind_4_Perc': 'Ating. Ind 4'})
         config = {'Valor Final': st.column_config.NumberColumn("Valor R$", format="R$ %.2f")}
-        
-        st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
-
-except Exception as e:
-    st.error(f"⚠️ Erro ao renderizar painel: {e}")
+        try:
+            st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
+        except Exception as e:
+            st.error(f"⚠️ Erro ao renderizar painel: {e}")
