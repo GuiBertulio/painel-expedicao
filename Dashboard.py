@@ -158,21 +158,27 @@ for nome_colab in df_filtrado['NOME'].unique():
     if metas_c:
         for ind, regra in metas_c.items():
             if ind in row:
+                # --- CORREÇÃO DO CÁLCULO DE PROPORÇÃO ---
                 realizado = float(row[ind])
                 tipo = regra['tipo']
                 
-                # Aplica a proporção solicitada: (Dias Uteis / Dias Meta)
+                # Fator de ajuste: (Dias Úteis do Período / Dias Meta do Cargo)
+                # Se o colaborador trabalhou menos dias que o mês padrão, a meta deve diminuir proporcionalmente.
+                fator_proporcao = dias_uteis_excel / d_meta
+                
+                # Ajusta os limites (targets) baseados na proporção
                 if regra['prop']:
-                    proporcao = dias_uteis_excel / d_meta
-                    t50 = regra['t50'] * proporcao
-                    t100 = regra['t100'] * proporcao
-                    t120 = regra['t120'] * proporcao
+                    t50 = regra['t50'] * fator_proporcao
+                    t100 = regra['t100'] * fator_proporcao
+                    t120 = regra['t120'] * fator_proporcao
                 else:
+                    # Se não for proporcional (fixo), mantém o valor original
                     t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
                 
-                # Valor do prêmio ajustado pelos dias trabalhados
+                # O valor do prêmio (dinheiro) é ajustado pelos dias que ele REALMENTE trabalhou (fator_premio)
                 v100 = regra['v100'] * fator_premio
                 
+                # Lógica de cálculo (Mantém igual, mas agora usando os targets proporcionais corretos)
                 if tipo == '>':
                     if realizado >= t120: premio_total += v100 * 1.2
                     elif realizado >= t100: premio_total += v100
@@ -182,7 +188,7 @@ for nome_colab in df_filtrado['NOME'].unique():
                         if realizado <= t120: premio_total += v100 * 1.2
                         elif realizado <= t100: premio_total += v100
                         elif realizado <= t50: premio_total += v100 * 0.5
-        
+                            
         metrica_rank = next((ind for ind, r in metas_c.items() if r['prop']), list(metas_c.keys())[0])
         if metrica_rank in df.columns:
             df_eq = df[(df['TURNO'] == turno_c) & (df['FUNÇÃO'] == cargo_c)].copy()
