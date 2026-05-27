@@ -159,11 +159,18 @@ for nome_colab in df_filtrado['NOME'].unique():
         for ind, regra in metas_c.items():
             if ind in row:
                 realizado = float(row[ind])
-                tipo, prop = regra['tipo'], regra['prop']
+                tipo = regra['tipo']
                 
-                t100 = regra['t100'] * fator_meta if prop else regra['t100']
-                t120 = regra['t120'] * fator_meta if prop else regra['t120']
-                t50 = regra['t50'] * fator_meta if prop else regra['t50']
+                # Aplica a proporção solicitada: (Dias Uteis / Dias Meta)
+                if regra['prop']:
+                    proporcao = dias_uteis_excel / d_meta
+                    t50 = regra['t50'] * proporcao
+                    t100 = regra['t100'] * proporcao
+                    t120 = regra['t120'] * proporcao
+                else:
+                    t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
+                
+                # Valor do prêmio ajustado pelos dias trabalhados
                 v100 = regra['v100'] * fator_premio
                 
                 if tipo == '>':
