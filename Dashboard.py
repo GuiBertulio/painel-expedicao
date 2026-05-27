@@ -140,15 +140,15 @@ st.sidebar.markdown("### 🗃️ Fechamento RH")
 # ==========================================
     # 🔥 MÓDULO DE EXTRAÇÃO RH (VERSÃO SEGURA)
     # ==========================================
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🗃️ Fechamento RH")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🗃️ Fechamento RH")
 
     # DEBUG: ISSO VAI MOSTRAR NA TELA OS NOMES REAIS DAS COLUNAS
     # Se os dados não aparecerem, olhe o que está escrito no site e ajuste o 'metas_100'
     # st.write("Colunas disponíveis no CSV:", df_filtrado.columns.tolist()) 
 
-    dados_rh = []
-    for nome_colab in df_filtrado['NOME'].unique():
+dados_rh = []
+for nome_colab in df_filtrado['NOME'].unique():
         row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
         turno_c, cargo_c, cod_c = row['TURNO'], row['FUNÇÃO'], row['CÓD.']
 
@@ -181,8 +181,8 @@ st.sidebar.markdown("### 🗃️ Fechamento RH")
         dados_rh.append({'Matrícula': cod_c, 'Nome': nome_colab, 'Premiação (R$)': round(premio_total, 2)})
 
     # O botão de download fica aqui, FORA do loop 'for'
-    if dados_rh:
-        df_rh = pd.DataFrame(dados_rh)
+        if dados_rh:
+            df_rh = pd.DataFrame(dados_rh)
         csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
         st.sidebar.download_button(
             "📥 Baixar Planilha do RH", 
@@ -191,30 +191,30 @@ st.sidebar.markdown("### 🗃️ Fechamento RH")
             key="btn_rh_unica" # Chave única para evitar DuplicateElementKey
         )
 else:
-    st.sidebar.info("Nenhum dado processado.")
+        st.sidebar.info("Nenhum dado processado.")
 # ==========================================
 # 6. RENDERIZAÇÃO PRINCIPAL
 # ==========================================
 col_titulo, col_kpis = st.columns([1, 1.2])
 with col_titulo:
-    st.title("📊 Monitor de Produtividade")
-    st.info(f"📅 **Período:** {dt_inicio.strftime('%d/%m')} a {data_apuracao.strftime('%d/%m')}")
+        st.title("📊 Monitor de Produtividade")
+        st.info(f"📅 **Período:** {dt_inicio.strftime('%d/%m')} a {data_apuracao.strftime('%d/%m')}")
 with col_kpis:
-    st.markdown("## 🎯 Visão Geral")
-    kpi1, kpi2, kpi3 = st.columns(3)
-    total_vol = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
-    kpi1.metric("📦 Volume", f"{total_vol:,.0f}")
-    kpi2.metric("👥 Colaboradores", len(df_filtrado))
-    kpi3.metric("⏱️ Horas", f"{df_filtrado['Horas'].sum():.1f}h" if 'Horas' in df_filtrado.columns else "—")
+        st.markdown("## 🎯 Visão Geral")
+kpi1, kpi2, kpi3 = st.columns(3)
+total_vol = df_filtrado['Itens Sep'].sum() if 'Itens Sep' in df_filtrado.columns else 0
+kpi1.metric("📦 Volume", f"{total_vol:,.0f}")
+kpi2.metric("👥 Colaboradores", len(df_filtrado))
+kpi3.metric("⏱️ Horas", f"{df_filtrado['Horas'].sum():.1f}h" if 'Horas' in df_filtrado.columns else "—")
 st.divider()
 # ==========================================
 # 🚨 MÓDULO DETRATORES
 # ==========================================
 if focar_detratores:
-    st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
-    houve_detrator = False
+        st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
+houve_detrator = False
 
-    for idx, row in df_filtrado.iterrows():
+for idx, row in df_filtrado.iterrows():
         detalhes_gargalo = []
 
         for n in range(1, 5):
@@ -264,7 +264,7 @@ if focar_detratores:
                                 except Exception as e: st.error(f"Erro: {e}")
                 st.markdown("<br>", unsafe_allow_html=True)
 
-    if not houve_detrator:
+if not houve_detrator:
         st.success("🎉 Nenhum detrator encontrado!")
 # ==========================================
 # 👁️ VISÃO INDIVIDUAL DO COLABORADOR
