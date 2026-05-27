@@ -140,14 +140,14 @@ lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist
 pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
-# ==========================================
-    # 🔥 MÓDULO DE EXTRAÇÃO RH (CORRIGIDO)
+    # ==========================================
+    # 🔥 MÓDULO DE EXTRAÇÃO RH
     # ==========================================
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🗃️ Fechamento RH")
     
     dados_rh = []
-    # Loop RH - Processa a premiação
+    
     for nome_colab in df_filtrado['NOME'].unique():
         row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
         turno_c, cargo_c, cod_c = row['TURNO'], row['FUNÇÃO'], row['CÓD.']
@@ -162,7 +162,6 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
         d_meta = val_dm if pd.notna(val_dm) and val_dm > 0 else dias_uteis_excel
         
         fator_premio = d_trab / dias_uteis_excel
-        
         metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
         premio_total = 0.0
         
@@ -171,11 +170,8 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
                 if ind in row.index:
                     realizado = float(row[ind])
                     tipo = regra['tipo']
-                    
-                    if d_meta > 0:
-                        proporcao_meta = dias_uteis_excel / d_meta
-                    else:
-                        proporcao_meta = 1.0
+                    if d_meta > 0: proporcao_meta = dias_uteis_excel / d_meta
+                    else: proporcao_meta = 1.0
                     
                     if regra['prop']:
                         t50 = regra['t50'] * proporcao_meta
@@ -210,20 +206,18 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
                     else: val_rank = 0.0
                     premio_total += (val_rank * fator_premio)
                 except: pass
-                
         dados_rh.append({'Matrícula': cod_c, 'Nome': nome_colab, 'Premiação (R$)': round(premio_total, 2)})
 
-    # Exibe o fechamento RH na barra lateral
     if dados_rh:
         df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
         st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
         csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
-        st.sidebar.download_button("📥 Baixar Planilha do RH", csv_rh, f"Fechamento_RH.csv", "text/csv", type="primary", use_container_width=True)
+        st.sidebar.download_button("📥 Baixar Planilha do RH", csv_rh, "Fechamento_RH.csv", "text/csv", type="primary", use_container_width=True)
     else:
         st.sidebar.info("Nenhum dado processado.")
 
     # ==========================================
-    # 6. RENDERIZAÇÃO DA TELA PRINCIPAL (TRY/EXCEPT CORRETO)
+    # 6. RENDERIZAÇÃO PRINCIPAL
     # ==========================================
     col_titulo, col_kpis = st.columns([1, 1.2])
     with col_titulo:
