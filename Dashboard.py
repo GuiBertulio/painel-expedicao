@@ -151,7 +151,7 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 🔥 SUPER AUTO-CORRETOR (Pega qualquer nome que você digitou no Excel)
+    # 🔥 SUPER AUTO-CORRETOR PARA AS COLUNAS NOVAS
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
         if "MED" in nome_limpo and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
@@ -166,6 +166,11 @@ def carregar_dados():
             df = df.rename(columns={c: 'Dias Meta'})
         elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo:
             df = df.rename(columns={c: 'Dias Uteis'})
+        # Auto-corretor das Novas Colunas de Data (Planilha dita as regras)
+        elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo):
+            df = df.rename(columns={c: 'Data Inicio'})
+        elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo):
+            df = df.rename(columns={c: 'Data Fim'})
 
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
@@ -175,7 +180,7 @@ def carregar_dados():
     if 'TURNO' in df.columns:
         df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
 
-    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO']
+    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Data Inicio', 'Data Fim']
     for col in df.columns:
         if col not in colunas_texto:
             if col == 'Tempo Médio': 
@@ -191,45 +196,67 @@ def carregar_dados():
         'Mov. Horizontal', 'Mov. Vert.', 'Itens Conf.', 'Avaria', 'Corte %', 'Dev. %',
         'Conf Base', 'Itens Manob.', 'Itens Rampa', 'Carga Bat.', 'Carga Palet.', 
         'Palets Px.', 'Palets Conf.', 'Jornada Líq. Eq.', 'Tempo Médio', 'Méd. Palets Conf.', 
-        'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'
+        'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Data Inicio', 'Data Fim'
     ]
     
     colunas_existentes = [col for col in colunas_desejadas if col in df.columns]
     return df[colunas_existentes]
 
 # ==========================================
-# 4. LÓGICA DE TEMPO: ESCALA 6x1 (APENAS DOMINGO É FOLGA)
+# 4. LÓGICA DE TEMPO: DATA-DRIVEN (A PLANILHA MANDA)
 # ==========================================
-hoje_brasil = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).date()
-data_apuracao = hoje_brasil - datetime.timedelta(days=1)
+try:
+    df = carregar_dados()
+    
+    # Verifica se as colunas existem e possuem dados válidos (formato DD/MM/AAAA)
+    if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
+        # Pega a data da primeira linha do arquivo
+        dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
+        data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0], dayfirst=True).date()
+        
+        # O Fim do ciclo (teto) ainda usa a regra do dia 25 baseada na data de início extraída
+        if dt_inicio.day >= 26:
+            mes_fim = dt_inicio.month + 1 if dt_inicio.month < 12 else 1
+            ano_fim = dt_inicio.year if dt_inicio.month < 12 else dt_inicio.year + 1
+            dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
+        else:
+            dt_fim_ciclo = datetime.date(dt_inicio.year, dt_inicio.month, 25)
+            
+    else:
+        # PLANO B (Fallback): Caso a planilha venha sem as colunas novas, usa o relógio
+        hoje_brasil = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).date()
+        data_apuracao = hoje_brasil - datetime.timedelta(days=1)
 
-if data_apuracao.day >= 26:
-    dt_inicio = datetime.date(data_apuracao.year, data_apuracao.month, 26)
-    mes_fim = data_apuracao.month + 1 if data_apuracao.month < 12 else 1
-    ano_fim = data_apuracao.year if data_apuracao.month < 12 else data_apuracao.year + 1
-    dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
-else:
-    mes_ant = data_apuracao.month - 1 if data_apuracao.month > 1 else 12
-    ano_ant = data_apuracao.year if data_apuracao.month > 1 else data_apuracao.year - 1
-    dt_inicio = datetime.date(ano_ant, mes_ant, 26)
-    dt_fim_ciclo = datetime.date(data_apuracao.year, data_apuracao.month, 25)
+        if data_apuracao.day >= 26:
+            dt_inicio = datetime.date(data_apuracao.year, data_apuracao.month, 26)
+            mes_fim = data_apuracao.month + 1 if data_apuracao.month < 12 else 1
+            ano_fim = data_apuracao.year if data_apuracao.month < 12 else data_apuracao.year + 1
+            dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
+        else:
+            mes_ant = data_apuracao.month - 1 if data_apuracao.month > 1 else 12
+            ano_ant = data_apuracao.year if data_apuracao.month > 1 else data_apuracao.year - 1
+            dt_inicio = datetime.date(ano_ant, mes_ant, 26)
+            dt_fim_ciclo = datetime.date(data_apuracao.year, data_apuracao.month, 25)
 
-# 🔥 MÁGICA DO 6x1: Pega todos os dias do período e remove APENAS os domingos (dia 6)
-dias_totais_calendario = pd.date_range(start=dt_inicio, end=dt_fim_ciclo)
-dias_uteis_totais = dias_totais_calendario[dias_totais_calendario.weekday != 6]
+    # 🔥 MÁGICA DO 6x1: Pega todos os dias do período e remove APENAS os domingos (dia 6)
+    dias_totais_calendario = pd.date_range(start=dt_inicio, end=dt_fim_ciclo)
+    dias_uteis_totais = dias_totais_calendario[dias_totais_calendario.weekday != 6]
 
-dias_decorridos_calendario = pd.date_range(start=dt_inicio, end=data_apuracao)
-dias_decorridos = dias_decorridos_calendario[dias_decorridos_calendario.weekday != 6]
+    dias_decorridos_calendario = pd.date_range(start=dt_inicio, end=data_apuracao)
+    dias_decorridos = dias_decorridos_calendario[dias_decorridos_calendario.weekday != 6]
 
-DIAS_UTEIS_MES = float(len(dias_uteis_totais)) # ISSO AGORA VAI CRAVAR 26 DIAS NO SEU MÊS!
-DIAS_DECORRIDOS = float(len(dias_decorridos))
-FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
+    DIAS_UTEIS_MES = float(len(dias_uteis_totais))
+    DIAS_DECORRIDOS = float(len(dias_decorridos))
+    FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
+
+except Exception as e:
+    st.error(f"⚠️ Erro crítico na leitura de datas: {e}")
+    st.stop()
 
 # ==========================================
 # 5. CONSTRUÇÃO DA TELA
 # ==========================================
 try:
-    df = carregar_dados()
     st.sidebar.title("🔍 Filtros do Painel")
     lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
@@ -259,7 +286,7 @@ try:
         cargo_c = row['FUNÇÃO']
         cod_c = row['CÓD.']
         
-        # Leitura blindada contra 0's acidentais do Excel
+        # 🔥 PROTEÇÃO CONTRA VALORES ZERADOS OU VAZIOS NO EXCEL
         val_du = float(row.get('Dias Uteis', 0))
         dias_uteis_excel = val_du if pd.notna(val_du) and val_du > 0 else DIAS_UTEIS_MES
         
@@ -336,7 +363,7 @@ try:
         df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
         st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
         csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
-        st.sidebar.download_button(label="📥 Baixar Planilha do RH", data=csv_rh, file_name=f"Fechamento_RH.csv", mime="text/csv", type="primary", use_container_width=True)
+        st.sidebar.download_button(label="📥 Baixar Planilha do RH", data=csv_rh, file_name=f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv", mime="text/csv", type="primary", use_container_width=True)
     else:
         st.sidebar.info("Nenhum dado processado.")
 
@@ -472,7 +499,6 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
-            # 🔥 LEITURA BLINDADA PARA AS DATAS DO EXCEL
             val_du = float(dados_pessoa['Dias Uteis'].values[0]) if 'Dias Uteis' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Uteis'].values[0]) else 0
             dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
             
@@ -593,13 +619,13 @@ try:
                         st.plotly_chart(fig, use_container_width=True)
 
                 with col_tabela:
-                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'] + list(metas_cargo.keys())
+                    col_uteis = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Data Inicio', 'Data Fim'] + list(metas_cargo.keys())
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                     if 'Tempo Médio' in df_tabela_mini.columns:
                         df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
                     config_colunas = {}
                     for col in df_tabela_mini.columns:
-                        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio']: continue 
+                        if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim']: continue 
                         elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                         elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
@@ -662,7 +688,7 @@ try:
 
         st.markdown("### 📋 Tabela de Produtividade Consolidada")
         df_tabela = df_filtrado.sort_values(by='NOME', ascending=True).copy()
-        cols_basicas, todas_metricas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis'], set()
+        cols_basicas, todas_metricas = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Data Inicio', 'Data Fim'], set()
         
         if cargo_selecionado != "Todos": todas_metricas.update(metas_100.get(df_tabela['TURNO'].mode()[0], {}).get(cargo_selecionado, {}).keys())
         elif turno_selecionado != "Todos":
@@ -675,7 +701,7 @@ try:
         for c in df_tabela.columns:
             if c in cols_basicas or c == 'Tempo Médio': continue
             elif c in ['Avaria', 'Corte %', 'Dev. %']: config[c] = st.column_config.NumberColumn(c, format="%.2f%%")
-            elif "Líq." in c: config[c] = config[c] = st.column_config.NumberColumn(c, format="%d%%")
+            elif "Líq." in c: config[c] = st.column_config.NumberColumn(c, format="%d%%")
             else: config[c] = st.column_config.NumberColumn(c, format="%d")
             
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
