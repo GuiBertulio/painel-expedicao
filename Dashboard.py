@@ -143,7 +143,7 @@ metas_100 = {
 # ==========================================
 # 3. CARREGAMENTO DOS DADOS (BLINDADO)
 # ==========================================
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?output=csv"
     
@@ -151,7 +151,7 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 🔥 SUPER AUTO-CORRETOR PARA AS COLUNAS NOVAS
+    # 🔥 SUPER AUTO-CORRETOR
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
         if "MED" in nome_limpo and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
@@ -166,7 +166,6 @@ def carregar_dados():
             df = df.rename(columns={c: 'Dias Meta'})
         elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo:
             df = df.rename(columns={c: 'Dias Uteis'})
-        # Auto-corretor das Novas Colunas de Data (Planilha dita as regras)
         elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo):
             df = df.rename(columns={c: 'Data Inicio'})
         elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo):
@@ -205,70 +204,43 @@ def carregar_dados():
 # ==========================================
 # 4. LÓGICA DE TEMPO: DATA-DRIVEN (A PLANILHA MANDA)
 # ==========================================
-try:
-    df = carregar_dados()
-    
-    # Verifica se as colunas existem e possuem dados válidos (formato DD/MM/AAAA)
-    if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
-        # Pega a data da primeira linha do arquivo
-        dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
-        data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0], dayfirst=True).date()
-        
-        # O Fim do ciclo (teto) ainda usa a regra do dia 25 baseada na data de início extraída
-        if dt_inicio.day >= 26:
-            mes_fim = dt_inicio.month + 1 if dt_inicio.month < 12 else 1
-            ano_fim = dt_inicio.year if dt_inicio.month < 12 else dt_inicio.year + 1
-            dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
-        else:
-            dt_fim_ciclo = datetime.date(dt_inicio.year, dt_inicio.month, 25)
-            
-    else:
-        # PLANO B (Fallback): Caso a planilha venha sem as colunas novas, usa o relógio
-        hoje_brasil = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).date()
-        data_apuracao = hoje_brasil - datetime.timedelta(days=1)
+df = carregar_dados()
 
-        if data_apuracao.day >= 26:
-            dt_inicio = datetime.date(data_apuracao.year, data_apuracao.month, 26)
-            mes_fim = data_apuracao.month + 1 if data_apuracao.month < 12 else 1
-            ano_fim = data_apuracao.year if data_apuracao.month < 12 else data_apuracao.year + 1
-            dt_fim_ciclo = datetime.date(ano_fim, mes_fim, 25)
-        else:
-            mes_ant = data_apuracao.month - 1 if data_apuracao.month > 1 else 12
-            ano_ant = data_apuracao.year if data_apuracao.month > 1 else data_apuracao.year - 1
-            dt_inicio = datetime.date(ano_ant, mes_ant, 26)
-            dt_fim_ciclo = datetime.date(data_apuracao.year, data_apuracao.month, 25)
+if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
+    dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
+    data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0], dayfirst=True).date()
+    dt_fim_ciclo = data_apuracao
+else:
+    hoje = datetime.date.today()
+    dt_inicio = datetime.date(hoje.year, hoje.month, 26)
+    dt_fim_ciclo = datetime.date(hoje.year, hoje.month, 25)
+    data_apuracao = hoje - datetime.timedelta(days=1)
 
-    # 🔥 MÁGICA DO 6x1: Pega todos os dias do período e remove APENAS os domingos (dia 6)
-    dias_totais_calendario = pd.date_range(start=dt_inicio, end=dt_fim_ciclo)
-    dias_uteis_totais = dias_totais_calendario[dias_totais_calendario.weekday != 6]
+# Cálculo de dias (6x1: remove apenas domingo = 6)
+dias_totais_range = pd.date_range(start=dt_inicio, end=dt_fim_ciclo)
+dias_uteis_totais = dias_totais_range[dias_totais_range.weekday != 6]
+dias_decorridos_range = pd.date_range(start=dt_inicio, end=data_apuracao)
+dias_decorridos = dias_decorridos_range[dias_decorridos_range.weekday != 6]
 
-    dias_decorridos_calendario = pd.date_range(start=dt_inicio, end=data_apuracao)
-    dias_decorridos = dias_decorridos_calendario[dias_decorridos_calendario.weekday != 6]
-
-    DIAS_UTEIS_MES = float(len(dias_uteis_totais))
-    DIAS_DECORRIDOS = float(len(dias_decorridos))
-    FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
-
-except Exception as e:
-    st.error(f"⚠️ Erro crítico na leitura de datas: {e}")
-    st.stop()
+DIAS_UTEIS_MES = float(len(dias_uteis_totais))
+DIAS_DECORRIDOS = float(len(dias_decorridos))
+FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
 
 # ==========================================
 # 5. CONSTRUÇÃO DA TELA
 # ==========================================
-try:
-    st.sidebar.title("🔍 Filtros do Painel")
-    lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
-    turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
-    df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
+st.sidebar.title("🔍 Filtros do Painel")
+lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
+turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
+
+lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
+cargo_selecionado = st.sidebar.selectbox("2. Cargo/Função:", lista_cargos)
+if cargo_selecionado != "Todos":
+    df_filtrado = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_selecionado]
     
-    lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
-    cargo_selecionado = st.sidebar.selectbox("2. Cargo/Função:", lista_cargos)
-    if cargo_selecionado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_selecionado]
-        
-    lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
-    pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
+lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
+pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
 
     st.sidebar.markdown("---")
     focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
