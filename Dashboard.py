@@ -212,7 +212,15 @@ for nome_colab in df_filtrado['NOME'].unique():
             df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
         st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
         csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
-        st.sidebar.download_button("📥 Baixar Planilha do RH", csv_rh, "Fechamento_RH.csv", "text/csv", type="primary", use_container_width=True)
+        st.sidebar.download_button(
+    "📥 Baixar Planilha do RH", 
+    data=csv_rh, 
+    file_name="Fechamento_RH.csv", 
+    mime="text/csv", 
+    type="primary", 
+    use_container_width=True, 
+    key="btn_rh_download"  # <--- ESSA É A CHAVE ÚNICA QUE RESOLVE O ERRO
+)
 else:
         st.sidebar.info("Nenhum dado processado.")
 
