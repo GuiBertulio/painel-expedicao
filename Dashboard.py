@@ -5,7 +5,7 @@ import plotly.express as px
 import gspread
 
 # ==========================================
-# CONEXÃO COM GOOGLE SHEETS PARA REGISTRO DE RH
+# CONEXÃO COM GOOGLE SHEETS (FEEDBACK/RECICLAGEM)
 # ==========================================
 def conectar_planilha():
     cred_dict = dict(st.secrets["gcp_service_account"])
@@ -31,17 +31,16 @@ st.markdown("""
 C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS (NOVA ABA RELATÓRIO)
+# 2. CARREGAMENTO DOS DADOS (ABA RELATÓRIO)
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
-    # LINK DA ABA "RELATÓRIO_RH" - SUBSTITUA SE FOR DIFERENTE
+    # LINK DA ABA "RELATÓRIO_RH" 
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=1520498693&single=true&output=csv"
     
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     
-    # Mapeamento Inteligente das colunas expandidas do Relatório (Tira as repetições do Pandas como .1, .2)
     colunas_renomeadas = {}
     prefixos = [
         ('', '', '', '', '', '', '', '', ''), 
@@ -68,26 +67,40 @@ def carregar_dados():
         df = df.dropna(subset=['NOME'])
         df = df[df['NOME'] != '-'] 
         
-    if 'FUNÇÃO' in df.columns:
-        df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
-    if 'TURNO' in df.columns:
-        df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
+    if 'FUNÇÃO' in df.columns: df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
+    if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
         
-    # Limpa valores nulos e converte moedas para números usáveis no Python
     for col in df.columns:
         if 'Valor' in col or 'Alvo' in col or 'Perc' in col or 'Realizado' in col or col == 'Valor Final':
             df[col] = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.replace('-', '0', regex=False)
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
+    # Garante que as colunas de dias existam mesmo se não vierem do Sheets
+    if 'Dias Meta' not in df.columns: df['Dias Meta'] = 26
+    if 'Dias Uteis' not in df.columns: df['Dias Uteis'] = 26
+    if 'Dias Trabalhados' not in df.columns: df['Dias Trabalhados'] = 26
+
     return df
 
 # ==========================================
-# 3. CONSTRUÇÃO DA TELA (TUDO INTEGRADO)
+# 3. LÓGICA DE DATAS E FILTROS
 # ==========================================
 try:
     df = carregar_dados()
     
-    # Filtros Laterais
+    # --- DATAS ---
+    if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
+        dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
+        data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0], dayfirst=True).date()
+    else:
+        hoje = datetime.date.today()
+        dt_inicio = datetime.date(hoje.year, hoje.month, 26) if hoje.day >= 26 else datetime.date(hoje.year if hoje.month > 1 else hoje.year - 1, hoje.month - 1 if hoje.month > 1 else 12, 26)
+        data_apuracao = hoje - datetime.timedelta(days=1)
+
+    dias_uteis_base = int(df['Dias Uteis'].max()) if not df.empty and df['Dias Uteis'].max() > 0 else 26
+    dias_decorridos_base = int(df['Dias Trabalhados'].max()) if not df.empty and df['Dias Trabalhados'].max() > 0 else dias_uteis_base
+
+    # --- FILTROS ---
     st.sidebar.title("🔍 Filtros do Painel")
     lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
@@ -100,31 +113,135 @@ try:
     lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
     pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
     
-    # Cabeçalho Principal
-    st.title("📊 Monitor de Produtividade")
-    st.info("💡 **Atenção:** Os dados exibidos abaixo são processados e validados na origem pela equipe de Logística.")
+    focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
+
+    # ==========================================
+    # 🔥 MÓDULO FECHAMENTO RH
+    # ==========================================
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🗃️ Fechamento RH")
+    
+    # O cálculo do RH agora é instantâneo: apenas puxamos a coluna 'Valor Final' já mastigada!
+    df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
+    df_rh = df_rh.rename(columns={'Valor Final': 'Premiação (R$)'})
+    df_rh = df_rh.sort_values(by='NOME')
+    
+    if not df_rh.empty:
+        st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
+        csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+        st.sidebar.download_button("📥 Baixar Planilha do RH", csv_rh, f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv", "text/csv", type="primary", use_container_width=True)
+    else:
+        st.sidebar.info("Nenhum dado processado.")
+
+    # ==========================================
+    # 🌟 CABEÇALHO E KPIs GERAIS
+    # ==========================================
+    col_titulo, col_kpis = st.columns([1, 1.2])
+    with col_titulo:
+        st.title("📊 Monitor de Produtividade")
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')} | 🏢 **{dias_decorridos_base} Dias Processados de {dias_uteis_base}**")
+
+    with col_kpis:
+        st.markdown("## 🎯 Visão Geral do Período")
+        kpi1, kpi2, kpi3 = st.columns(3)
+        
+        # Como as colunas reais mudam dinamicamente, vamos somar e fazer médias buscando os termos nos Indicadores
+        vol_total = 0
+        hora_total = 0
+        
+        for n in range(1, 5):
+            nome_col = f'Ind_{n}_Nome'
+            real_col = f'Ind_{n}_Realizado'
+            if nome_col in df_filtrado.columns and real_col in df_filtrado.columns:
+                # Soma tudo que parece "Volume"
+                mascara_vol = df_filtrado[nome_col].astype(str).str.contains('Itens|Carga|Palets|Mov', case=False, na=False)
+                vol_total += df_filtrado.loc[mascara_vol, real_col].sum()
+
+        kpi1.metric("📦 Volume Total Geral", f"{vol_total:,.0f}".replace(',', '.'))
+        kpi2.metric("👥 Colaboradores Ativos", f"{len(df_filtrado)}")
+        
+        if 'Horas' in df_filtrado.columns: hora_total = df_filtrado['Horas'].sum()
+        kpi3.metric("⏱️ Horas Registradas", f"{hora_total:.1f} h" if hora_total > 0 else "-")
+
     st.divider()
 
     # ==========================================
-    # VISÃO INDIVIDUAL DO COLABORADOR
+    # 🚨 MÓDULO DETRATORES
     # ==========================================
-    if pessoa_selecionada != "Nenhum":
+    if focar_detratores:
+        st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
+        houve_detrator = False
+        
+        for idx, row in df_filtrado.iterrows():
+            detalhes_gargalo = []
+            
+            for n in range(1, 5):
+                nome_ind = row.get(f'Ind_{n}_Nome', '-')
+                if pd.notna(nome_ind) and str(nome_ind).strip() != '-' and str(nome_ind).strip() != '0':
+                    perc = row.get(f'Ind_{n}_Perc', 0)
+                    realizado = row.get(f'Ind_{n}_Realizado', 0)
+                    alvo = row.get(f'Ind_{n}_Alvo_100', 0)
+                    
+                    # Se o percentual do Excel for menor que 100% (ou 1.0)
+                    if perc < 1.0:
+                        if "%" in str(nome_ind) or "Avaria" in str(nome_ind) or perc < 0.10: # Formatação
+                            detalhes_gargalo.append(f"❌ {nome_ind}: {realizado * 100:.2f}% atingido vs Alvo {alvo * 100:.2f}%")
+                        else:
+                            detalhes_gargalo.append(f"❌ {nome_ind}: {realizado:,.0f} atingido vs Alvo {alvo:,.0f}".replace(',','.'))
+                            
+            if detalhes_gargalo:
+                houve_detrator = True
+                nome_c, cod_c, cargo_c, turno_c = row['NOME'], row['CÓD.'], row['FUNÇÃO'], row['TURNO']
+                d_trab = int(row.get('Dias Trabalhados', 0))
+                
+                with st.container():
+                    st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Lançados:</b> {d_trab} dias<br><br><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
+                    
+                    col_feed, col_trein = st.columns(2)
+                    with col_feed:
+                        with st.expander(f"💬 Registrar Feedback: {nome_c}"):
+                            with st.form(key=f"form_feed_{idx}"):
+                                texto_feedback = st.text_area("Descreva o que foi conversado:")
+                                if st.form_submit_button("Salvar no Histórico"):
+                                    if texto_feedback:
+                                        try:
+                                            aba_rh = conectar_planilha()
+                                            agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
+                                            aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback])
+                                            st.success("✅ Salvo!")
+                                        except Exception as e: st.error(f"Erro: {e}")
+                                    else: st.error("⚠️ Digite algo.")
+
+                    with col_trein:
+                        with st.expander(f"🎯 Solicitar Reciclagem: {nome_c}"):
+                            with st.form(key=f"form_trein_{idx}"):
+                                motivo = st.selectbox("Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo"])
+                                if st.form_submit_button("Enviar Solicitação"):
+                                    try:
+                                        aba_rh = conectar_planilha()
+                                        agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
+                                        aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo])
+                                        st.success("📧 Enviado!")
+                                    except Exception as e: st.error(f"Erro: {e}")
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+        if not houve_detrator: st.success("🎉 Nenhum detrator encontrado!")
+
+    # ==========================================
+    # 👁️ VISÃO INDIVIDUAL DO COLABORADOR
+    # ==========================================
+    elif pessoa_selecionada != "Nenhum":
         st.subheader(f"🎯 Atingimento: {pessoa_selecionada}")
         dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
         
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
-            
-            # --- 1. RENDERIZA OS CARTÕES DE INDICADORES ---
             cols_meta = st.columns(4) 
             col_idx = 0
             grafico_dados = []
             
-            # Loop pelos 4 possíveis indicadores dinâmicos vindos da planilha
             for n in range(1, 5):
                 nome_ind = row.get(f'Ind_{n}_Nome', '-')
-                
-                # Se o indicador for válido (não for '-' ou NaN)
                 if pd.notna(nome_ind) and str(nome_ind).strip() != '-' and str(nome_ind).strip() != '0':
                     
                     realizado = row.get(f'Ind_{n}_Realizado', 0)
@@ -132,25 +249,19 @@ try:
                     perc_atingimento = row.get(f'Ind_{n}_Perc', 0)
                     valor_reais = row.get(f'Ind_{n}_Valor', 0)
                     
-                    # Salva dados pro gráfico
-                    grafico_dados.append({'Indicador': f"<b>{nome_ind}</b>", 'Atingimento (%)': min(perc_atingimento * 100 if perc_atingimento < 10 else perc_atingimento, 120), 'Real': perc_atingimento * 100 if perc_atingimento < 10 else perc_atingimento})
+                    # Converte decimal pra % pra não dar bug no gráfico
+                    real_perc = perc_atingimento * 100 if perc_atingimento <= 2.0 else perc_atingimento 
+                    grafico_dados.append({'Indicador': f"<b>{nome_ind}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
                     
-                    # Define Cores e Status baseado na porcentagem validada pelo Excel
-                    if perc_atingimento >= 1.2 or perc_atingimento >= 120:
-                        cor, icone, status = C_AZUL, "🔵", "Superou"
-                    elif perc_atingimento >= 1.0 or perc_atingimento >= 100:
-                        cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                    elif perc_atingimento >= 0.5 or perc_atingimento >= 50:
-                        cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                    else:
-                        cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                    if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superou"
+                    elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                    elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
                     html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {valor_reais:,.2f}</span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_reais > 0 else ""
                     
-                    # Tratamento visual
                     if "Tempo" in str(nome_ind) or ":" in str(realizado):
-                         val_tela = str(realizado) 
-                         alvo_tela = str(alvo_100)
+                         val_tela, alvo_tela = str(realizado), str(alvo_100)
                     elif "%" in str(nome_ind) or "Avaria" in str(nome_ind):
                         val_tela = f"{realizado * 100:.2f}%" if realizado < 1 else f"{realizado:.2f}%"
                         alvo_tela = f"{alvo_100 * 100:.2f}%" if alvo_100 < 1 else f"{alvo_100:.2f}%"
@@ -163,13 +274,11 @@ try:
                     
                     col_idx += 1
             
-            # --- 2. RENDERIZA O TOTAL ACUMULADO DIRETO DO EXCEL ---
             valor_final = row.get('Valor Final', 0)
             if valor_final > 0:
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {valor_final:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
-            # --- 3. GRÁFICOS E TABELA INDIVIDUAL ---
             st.divider()
             st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
             
@@ -186,23 +295,74 @@ try:
                 st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================
-    # VISÃO GERAL EQUIPE (MÚLTIPLOS COLABORADORES)
+    # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
     # ==========================================
     else:
-        st.markdown("### 📋 Tabela de Produtividade (Relatório Gerencial)")
+        cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
         
-        # Filtra as colunas limpas para montar uma visão gerencial bonitona
+        for cargo_atual in cargos_render:
+            df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
+            if df_cargo.empty: continue
+            
+            st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Média da Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
+            cols_eq = st.columns(4)
+            col_idx = 0
+            
+            for n in range(1, 5):
+                nome_col_ind = f'Ind_{n}_Nome'
+                if nome_col_ind in df_cargo.columns:
+                    # Pega o nome do indicador (o mais comum pra essa função)
+                    nomes_validos = df_cargo[df_cargo[nome_col_ind] != '-'][nome_col_ind]
+                    if nomes_validos.empty or str(nomes_validos.mode()[0]) == '0': continue
+                    
+                    nome_ind_equipe = nomes_validos.mode()[0]
+                    real_med = df_cargo[f'Ind_{n}_Realizado'].mean()
+                    alvo_med = df_cargo[f'Ind_{n}_Alvo_100'].mean()
+                    perc_med = df_cargo[f'Ind_{n}_Perc'].mean()
+                    soma_total = df_cargo[f'Ind_{n}_Realizado'].sum()
+                    
+                    real_perc = perc_med * 100 if perc_med <= 2.0 else perc_med
+                    
+                    if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
+                    elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                    elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                    
+                    if "Tempo" in str(nome_ind_equipe):
+                         v_tela, t_tela, html_soma = f"{real_med:.0f}", f"{alvo_med:.0f}", ""
+                    elif "%" in str(nome_ind_equipe) or "Avaria" in str(nome_ind_equipe):
+                        v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
+                        t_tela = f"{alvo_med * 100:.2f}%" if alvo_med < 1 else f"{alvo_med:.2f}%"
+                        html_soma = ""
+                    else:
+                        v_tela = f"{real_med:,.0f}".replace(',','.')
+                        t_tela = f"{alvo_med:,.0f}".replace(',','.')
+                        html_soma = f"<span class='texto-card-secundario'>| Soma Equipe: {soma_total:,.0f}</span>".replace(',', '.')
+                        
+                    with cols_eq[col_idx]:
+                        st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>Média: {nome_ind_equipe} (Alvo: {t_tela})</div><div class='texto-card-principal'>{v_tela} {html_soma}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
+                    
+                    col_idx += 1
+        
+        if len(cargos_render) > 0: st.divider()
+
+        st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
         colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final']
         
-        # Puxa dinamicamente os Indicadores Reais preenchidos
+        # Puxa dinamicamente as colunas de "Perc" (Atingimento) para a tabela de resumo
         for n in range(1, 5):
-            nome_col = f'Ind_{n}_Realizado'
+            nome_col = f'Ind_{n}_Perc'
             if nome_col in df_filtrado.columns:
                 colunas_exibicao.append(nome_col)
 
         df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
         
-        # Aplica uma formatação de grana na coluna de Valor Final
+        # Converte as colunas Perc para % bonito na tabela
+        for col in df_tabela.columns:
+            if 'Perc' in col:
+                df_tabela[col] = df_tabela[col].apply(lambda x: f"{x * 100:.1f}%" if x <= 2.0 else f"{x:.1f}%")
+                
+        df_tabela = df_tabela.rename(columns={'Ind_1_Perc': 'Ating. Ind 1', 'Ind_2_Perc': 'Ating. Ind 2', 'Ind_3_Perc': 'Ating. Ind 3', 'Ind_4_Perc': 'Ating. Ind 4'})
         config = {'Valor Final': st.column_config.NumberColumn("Valor R$", format="R$ %.2f")}
         
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
