@@ -137,81 +137,59 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🗃️ Fechamento RH")
 
-# CORREÇÃO PRINCIPAL: loop apenas acumula dados — nada de widget dentro do for
-dados_rh = []
-for nome_colab in df_filtrado['NOME'].unique():
-    row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
-    turno_c, cargo_c, cod_c = row['TURNO'], row['FUNÇÃO'], row['CÓD.']
+# ==========================================
+    # 🔥 MÓDULO DE EXTRAÇÃO RH (VERSÃO SEGURA)
+    # ==========================================
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🗃️ Fechamento RH")
 
-    val_du = float(row.get('Dias Uteis', 0))
-    dias_uteis_excel = val_du if pd.notna(val_du) and val_du > 0 else DIAS_UTEIS_MES
+    # DEBUG: ISSO VAI MOSTRAR NA TELA OS NOMES REAIS DAS COLUNAS
+    # Se os dados não aparecerem, olhe o que está escrito no site e ajuste o 'metas_100'
+    # st.write("Colunas disponíveis no CSV:", df_filtrado.columns.tolist()) 
 
-    val_dt = float(row.get('Dias Trabalhados', 0))
-    d_trab = val_dt if pd.notna(val_dt) and val_dt > 0 else dias_uteis_excel
+    dados_rh = []
+    for nome_colab in df_filtrado['NOME'].unique():
+        row = df_filtrado[df_filtrado['NOME'] == nome_colab].iloc[0]
+        turno_c, cargo_c, cod_c = row['TURNO'], row['FUNÇÃO'], row['CÓD.']
 
-    val_dm = float(row.get('Dias Meta', 0))
-    d_meta = val_dm if pd.notna(val_dm) and val_dm > 0 else dias_uteis_excel
+        # Garantir que temos dias (evita erro de divisão por zero)
+        d_meta = float(row.get('Dias Meta', 26))
+        d_uteis = float(row.get('Dias Uteis', 26))
+        d_trab = float(row.get('Dias Trabalhados', d_uteis))
+        
+        fator_premio = d_trab / d_uteis if d_uteis > 0 else 1
+        metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
+        premio_total = 0.0
 
-    fator_premio = d_trab / dias_uteis_excel
-    metas_c = metas_100.get(turno_c, {}).get(cargo_c, {})
-    premio_total = 0.0
+        if metas_c:
+            for ind, regra in metas_c.items():
+                # A CORREÇÃO: Verificamos se o indicador existe nas colunas antes de ler
+                if ind in row.index:
+                    realizado = float(row[ind])
+                    tipo = regra['tipo']
+                    
+                    # Lógica de metas
+                    proporcao = d_uteis / d_meta if d_meta > 0 else 1
+                    t100 = regra['t100'] * proporcao if regra['prop'] else regra['t100']
+                    v100 = regra['v100'] * fator_premio
+                    
+                    if tipo == '>':
+                        if realizado >= t100: premio_total += v100
+                    else:
+                        if realizado <= t100: premio_total += v100
+        
+        dados_rh.append({'Matrícula': cod_c, 'Nome': nome_colab, 'Premiação (R$)': round(premio_total, 2)})
 
-    if metas_c:
-        for ind, regra in metas_c.items():
-            if ind in row.index:
-                realizado = float(row[ind])
-                tipo = regra['tipo']
-                proporcao_meta = (dias_uteis_excel / d_meta) if d_meta > 0 else 1.0
-
-                if regra['prop']:
-                    t50 = regra['t50'] * proporcao_meta
-                    t100 = regra['t100'] * proporcao_meta
-                    t120 = regra['t120'] * proporcao_meta
-                else:
-                    t50, t100, t120 = regra['t50'], regra['t100'], regra['t120']
-
-                v100 = regra['v100'] * fator_premio
-
-                if tipo == '>':
-                    if realizado >= t120: premio_total += v100 * 1.2
-                    elif realizado >= t100: premio_total += v100
-                    elif realizado >= t50: premio_total += v100 * 0.5
-                else:
-                    if pd.notna(realizado) and realizado > 0:
-                        if realizado <= t120: premio_total += v100 * 1.2
-                        elif realizado <= t100: premio_total += v100
-                        elif realizado <= t50: premio_total += v100 * 0.5
-
-        metrica_rank = next((ind for ind, r in metas_c.items() if r['prop']), list(metas_c.keys())[0] if metas_c else None)
-        if metrica_rank and metrica_rank in df.columns:
-            df_eq = df[(df['TURNO'] == turno_c) & (df['FUNÇÃO'] == cargo_c)].copy()
-            ordem_cresc = False if metas_c[metrica_rank]['tipo'] == '>' else True
-            df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc).reset_index(drop=True)
-            try:
-                pos = df_eq[df_eq['NOME'] == nome_colab].index[0] + 1
-                if pos == 1: val_rank = 250.0 if turno_c == 'T3' and 'SEPARADOR' in cargo_c else (150.0 if turno_c == 'T2' and 'SEPARADOR' in cargo_c else 0.0)
-                elif pos == 2: val_rank = 200.0 if turno_c == 'T3' and 'SEPARADOR' in cargo_c else (100.0 if turno_c == 'T2' and 'SEPARADOR' in cargo_c else 0.0)
-                elif pos == 3: val_rank = 100.0 if turno_c == 'T3' and 'SEPARADOR' in cargo_c else (50.0 if turno_c == 'T2' and 'SEPARADOR' in cargo_c else 0.0)
-                else: val_rank = 0.0
-                premio_total += (val_rank * fator_premio)
-            except: pass
-
-    dados_rh.append({'Matrícula': cod_c, 'Nome': nome_colab, 'Premiação (R$)': round(premio_total, 2)})
-
-# CORREÇÃO: if/else fora do loop — widgets renderizados apenas uma vez
-if dados_rh:
-    df_rh = pd.DataFrame(dados_rh).sort_values(by='Nome')
-    st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
-    csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
-    st.sidebar.download_button(
-        "📥 Baixar Planilha do RH",
-        data=csv_rh,
-        file_name=f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
-        mime="text/csv",
-        type="primary",
-        use_container_width=True,
-        key="btn_rh_download"
-    )
+    # O botão de download fica aqui, FORA do loop 'for'
+    if dados_rh:
+        df_rh = pd.DataFrame(dados_rh)
+        csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+        st.sidebar.download_button(
+            "📥 Baixar Planilha do RH", 
+            data=csv_rh, 
+            file_name="Fechamento_RH.csv", 
+            key="btn_rh_unica" # Chave única para evitar DuplicateElementKey
+        )
 else:
     st.sidebar.info("Nenhum dado processado.")
 # ==========================================
