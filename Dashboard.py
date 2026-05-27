@@ -141,7 +141,7 @@ metas_100 = {
 }
 
 # ==========================================
-# 3. CARREGAMENTO DOS DADOS
+# 3. CARREGAMENTO DOS DADOS (BLINDADO)
 # ==========================================
 @st.cache_data(ttl=600) 
 def carregar_dados():
@@ -151,14 +151,21 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
+    # 🔥 SUPER AUTO-CORRETOR (Pega qualquer nome que você digitou no Excel)
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
-        if ("MED" in nome_limpo or "MÉD" in nome_limpo) and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
+        if "MED" in nome_limpo and ("PALET" in nome_limpo or "PALLET" in nome_limpo):
             df = df.rename(columns={c: 'Méd. Palets Conf.'})
         elif "JORNADA" in nome_limpo and "EQ" in nome_limpo:
             df = df.rename(columns={c: 'Jornada Líq. Eq.'})
         elif "RESSUP" in nome_limpo and "EQ" in nome_limpo:
             df = df.rename(columns={c: 'Ressup. Eq.'})
+        elif "TRAB" in nome_limpo and "DIAS" in nome_limpo:
+            df = df.rename(columns={c: 'Dias Trabalhados'})
+        elif "META" in nome_limpo and "DIAS" in nome_limpo:
+            df = df.rename(columns={c: 'Dias Meta'})
+        elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo:
+            df = df.rename(columns={c: 'Dias Uteis'})
 
     if 'NOME' in df.columns:
         df = df.dropna(subset=['NOME'])
@@ -191,7 +198,7 @@ def carregar_dados():
     return df[colunas_existentes]
 
 # ==========================================
-# 4. LÓGICA DE TEMPO: D-1
+# 4. LÓGICA DE TEMPO: ESCALA 6x1 (APENAS DOMINGO É FOLGA)
 # ==========================================
 hoje_brasil = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).date()
 data_apuracao = hoje_brasil - datetime.timedelta(days=1)
@@ -207,18 +214,14 @@ else:
     dt_inicio = datetime.date(ano_ant, mes_ant, 26)
     dt_fim_ciclo = datetime.date(data_apuracao.year, data_apuracao.month, 25)
 
-dias_uteis_totais = pd.bdate_range(start=dt_inicio, end=dt_fim_ciclo)
-dias_decorridos = pd.bdate_range(start=dt_inicio, end=data_apuracao)
+# 🔥 MÁGICA DO 6x1: Pega todos os dias do período e remove APENAS os domingos (dia 6)
+dias_totais_calendario = pd.date_range(start=dt_inicio, end=dt_fim_ciclo)
+dias_uteis_totais = dias_totais_calendario[dias_totais_calendario.weekday != 6]
 
-try:
-    import holidays
-    feriados_br = holidays.Brazil(years=[dt_inicio.year, dt_fim_ciclo.year])
-    dias_uteis_totais = dias_uteis_totais.drop([d for d in dias_uteis_totais if d.date() in feriados_br])
-    dias_decorridos = dias_decorridos.drop([d for d in dias_decorridos if d.date() in feriados_br])
-except ImportError:
-    pass 
+dias_decorridos_calendario = pd.date_range(start=dt_inicio, end=data_apuracao)
+dias_decorridos = dias_decorridos_calendario[dias_decorridos_calendario.weekday != 6]
 
-DIAS_UTEIS_MES = float(len(dias_uteis_totais))
+DIAS_UTEIS_MES = float(len(dias_uteis_totais)) # ISSO AGORA VAI CRAVAR 26 DIAS NO SEU MÊS!
 DIAS_DECORRIDOS = float(len(dias_decorridos))
 FATOR_PROPORCIONAL = DIAS_DECORRIDOS / DIAS_UTEIS_MES
 
@@ -256,15 +259,15 @@ try:
         cargo_c = row['FUNÇÃO']
         cod_c = row['CÓD.']
         
-        # 🔥 PROTEÇÃO CONTRA VALORES ZERADOS OU VAZIOS NO EXCEL
-        val_du = float(row['Dias Uteis']) if 'Dias Uteis' in row and pd.notna(row['Dias Uteis']) else 0
-        dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
+        # Leitura blindada contra 0's acidentais do Excel
+        val_du = float(row.get('Dias Uteis', 0))
+        dias_uteis_excel = val_du if pd.notna(val_du) and val_du > 0 else DIAS_UTEIS_MES
         
-        val_dt = float(row['Dias Trabalhados']) if 'Dias Trabalhados' in row and pd.notna(row['Dias Trabalhados']) else 0
-        d_trab = val_dt if val_dt > 0 else dias_uteis_excel
+        val_dt = float(row.get('Dias Trabalhados', 0))
+        d_trab = val_dt if pd.notna(val_dt) and val_dt > 0 else dias_uteis_excel
         
-        val_dm = float(row['Dias Meta']) if 'Dias Meta' in row and pd.notna(row['Dias Meta']) else 0
-        d_meta = val_dm if val_dm > 0 else dias_uteis_excel
+        val_dm = float(row.get('Dias Meta', 0))
+        d_meta = val_dm if pd.notna(val_dm) and val_dm > 0 else dias_uteis_excel
         
         fator_meta = d_meta / dias_uteis_excel
         fator_premio = d_trab / dias_uteis_excel
@@ -278,12 +281,10 @@ try:
                     realizado = float(row[ind])
                     tipo, prop = regra['tipo'], regra['prop']
                     
-                    # Fator de Meta APENAS se for proporcional
                     t100 = regra['t100'] * fator_meta if prop else regra['t100']
                     t120 = regra['t120'] * fator_meta if prop else regra['t120']
                     t50 = regra['t50'] * fator_meta if prop else regra['t50']
                     
-                    # Fator de Premiação para TODOS os indicadores
                     v100 = regra['v100'] * fator_premio
                     
                     if tipo == '>':
@@ -342,7 +343,7 @@ try:
     col_titulo, col_kpis = st.columns([1, 1.2])
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_DECORRIDOS)} Dias Corridos de {int(DIAS_UTEIS_MES)}**")
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')} | 🏢 **{int(DIAS_DECORRIDOS)} Dias Úteis (6x1) de {int(DIAS_UTEIS_MES)}**")
 
     with col_kpis:
         st.markdown("## 🎯 Visão Geral do Período")
@@ -390,12 +391,11 @@ try:
             nome_c = row['NOME']
             cod_c = row['CÓD.']
             
-            # 🔥 PROTEÇÃO CONTRA ZEROS NO DETRATOR
-            val_du = float(row['Dias Uteis']) if 'Dias Uteis' in df_filtrado.columns and pd.notna(row['Dias Uteis']) else 0
-            dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
+            val_du = float(row.get('Dias Uteis', 0))
+            dias_uteis_excel = val_du if pd.notna(val_du) and val_du > 0 else DIAS_UTEIS_MES
             
-            val_dm = float(row['Dias Meta']) if 'Dias Meta' in df_filtrado.columns and pd.notna(row['Dias Meta']) else 0
-            d_meta = val_dm if val_dm > 0 else dias_uteis_excel
+            val_dm = float(row.get('Dias Meta', 0))
+            d_meta = val_dm if pd.notna(val_dm) and val_dm > 0 else dias_uteis_excel
             
             fator_meta = d_meta / dias_uteis_excel
             
@@ -472,7 +472,7 @@ try:
             cargo_p = dados_pessoa['FUNÇÃO'].values[0]
             metas_cargo = metas_100.get(turno_p, {}).get(cargo_p, {})
             
-            # 🔥 PROTEÇÃO CONTRA ZEROS NA VISÃO INDIVIDUAL
+            # 🔥 LEITURA BLINDADA PARA AS DATAS DO EXCEL
             val_du = float(dados_pessoa['Dias Uteis'].values[0]) if 'Dias Uteis' in dados_pessoa.columns and pd.notna(dados_pessoa['Dias Uteis'].values[0]) else 0
             dias_uteis_excel = val_du if val_du > 0 else DIAS_UTEIS_MES
             
@@ -514,7 +514,6 @@ try:
                         else: 
                             medalha, cor_rank, valor_premio_ranking = "🏅", "gray", 0.0
                             
-                        # Aplica o fator de premiação no bônus de ranking
                         valor_premio_ranking = valor_premio_ranking * fator_premio
                             
                         texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio: R$ {valor_premio_ranking:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_premio_ranking > 0 else ""
@@ -532,12 +531,10 @@ try:
                         realizado = float(dados_pessoa[ind].values[0])
                         tipo, prop = regra['tipo'], regra['prop']
                         
-                        # Alvo proporcional à Meta
                         t100 = regra['t100'] * fator_meta if prop else regra['t100']
                         t120 = regra['t120'] * fator_meta if prop else regra['t120']
                         t50 = regra['t50'] * fator_meta if prop else regra['t50']
                         
-                        # Valor financeiro proporcional ao Trabalho
                         v100 = regra['v100'] * fator_premio
                         
                         pagamento_ind = 0.0
@@ -559,11 +556,7 @@ try:
                         texto_grana = f"R$ {pagamento_ind:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 {texto_grana}</span>" if pagamento_ind > 0 else ""
                         
-                        # Texto explicativo dos dias na tela
-                        if prop:
-                            aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Meta a {int(d_meta)}d)</span>"
-                        else:
-                            aviso_prop = ""
+                        aviso_prop = f" <span style='font-size: 14px; font-weight: normal;'>(Meta a {int(d_meta)}d)</span>" if prop else ""
                             
                         if "Tempo Médio" in ind:
                             valor_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
@@ -630,7 +623,6 @@ try:
                         df_valido = df_cargo[df_cargo[ind] > 0]
                         if not df_valido.empty:
                             valores = df_valido[ind]
-                            # Usa Dias Trabalhados se existir, senão assume mês cheio (DIAS_UTEIS_MES)
                             pesos = df_valido['Dias Trabalhados'].apply(lambda x: x if pd.notna(x) and x > 0 else DIAS_UTEIS_MES) if 'Dias Trabalhados' in df_valido.columns else 1
                             real_med, soma_total = float((valores * pesos).sum() / pesos.sum()), float(valores.sum())
                         else:
@@ -683,7 +675,7 @@ try:
         for c in df_tabela.columns:
             if c in cols_basicas or c == 'Tempo Médio': continue
             elif c in ['Avaria', 'Corte %', 'Dev. %']: config[c] = st.column_config.NumberColumn(c, format="%.2f%%")
-            elif "Líq." in c: config[c] = st.column_config.NumberColumn(c, format="%d%%")
+            elif "Líq." in c: config[c] = config[c] = st.column_config.NumberColumn(c, format="%d%%")
             else: config[c] = st.column_config.NumberColumn(c, format="%d")
             
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
