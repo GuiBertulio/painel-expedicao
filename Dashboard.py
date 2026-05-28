@@ -64,6 +64,10 @@ def carregar_dados():
         elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
         elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
 
+    # >>> A MÁGICA QUE RESOLVE O SEU ERRO ESTÁ AQUI <<<
+    # Remove qualquer coluna com nome duplicado antes de tentar limpar o texto
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
     if 'NOME' in df.columns: df = df.dropna(subset=['NOME'])
     if 'FUNÇÃO' in df.columns: df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
@@ -79,7 +83,7 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
-    # Cria uma coluna 'Valor Final' sumando todos os "_Valor" se ela não existir
+    # Cria uma coluna 'Valor Final' somando todos os "_Valor" se ela não existir
     if 'Valor Final' not in df.columns:
         colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
         df['Valor Final'] = df[colunas_valor].sum(axis=1)
