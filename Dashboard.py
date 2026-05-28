@@ -30,7 +30,7 @@ st.markdown("""
 C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS (BLINDADO E DINÂMICO)
+# 2. CARREGAMENTO DOS DADOS E CÁLCULO DE RANKING
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -43,19 +43,19 @@ def carregar_dados():
     colunas = list(df.columns)
     for i, col in enumerate(colunas):
         if "RACIONAL" in col.upper():
-            nome_kpi = colunas[i-1] # O indicador é sempre a coluna anterior ao Racional
+            nome_kpi = colunas[i-1] 
             try:
                 df.rename(columns={
                     colunas[i]: f"{nome_kpi}_Racional",
                     colunas[i+1]: f"{nome_kpi}_Meta1",
-                    colunas[i+2]: f"{nome_kpi}_Meta2", # Meta 2 é considerada a Meta 100%
+                    colunas[i+2]: f"{nome_kpi}_Meta2", 
                     colunas[i+3]: f"{nome_kpi}_Meta3",
                     colunas[i+4]: f"{nome_kpi}_Valor"
                 }, inplace=True)
             except IndexError:
-                pass # Ignora se as colunas acabarem antes
+                pass 
 
-    # Auto-corretor de colunas básicas
+    # Limpeza de nomes
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
         if "TRAB" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
@@ -64,15 +64,12 @@ def carregar_dados():
         elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
         elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
 
-    # >>> A MÁGICA QUE RESOLVE O SEU ERRO ESTÁ AQUI <<<
-    # Remove qualquer coluna com nome duplicado antes de tentar limpar o texto
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
     if 'NOME' in df.columns: df = df.dropna(subset=['NOME'])
     if 'FUNÇÃO' in df.columns: df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
-    # Converte todas as colunas de valor e meta para número
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Data Inicio', 'Data Fim']
     for col in df.columns:
         if col not in colunas_texto:
@@ -83,10 +80,50 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
     
-    # Cria uma coluna 'Valor Final' somando todos os "_Valor" se ela não existir
-    if 'Valor Final' not in df.columns:
-        colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
-        df['Valor Final'] = df[colunas_valor].sum(axis=1)
+    # ========================================================
+    # INJEÇÃO DO BÔNUS DE RANKING NO DATAFRAME
+    # ========================================================
+    df['Valor Ranking'] = 0.0
+    df['Posicao Ranking'] = 0
+    
+    for turno in ['T2', 'T3']:
+        for cargo in df['FUNÇÃO'].unique():
+            if 'SEPARADOR' in str(cargo).upper():
+                df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
+                if df_eq.empty: continue
+                
+                kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
+                if not kpis: continue
+                metrica_rank = kpis[0] # Usa o primeiro indicador do Separador para rankear
+                
+                racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
+                ordem_cresc = False if racional == 1 else True
+                
+                df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc)
+                
+                pos = 1
+                for idx, row_eq in df_eq.iterrows():
+                    # Ignora quem não teve produtividade para não ganhar ranking de graça
+                    if float(row_eq.get(metrica_rank, 0)) <= 0: continue
+                    
+                    df.at[idx, 'Posicao Ranking'] = pos
+                    
+                    if pos == 1: val_base = 250.0 if turno == 'T3' else 150.0
+                    elif pos == 2: val_base = 200.0 if turno == 'T3' else 100.0
+                    elif pos == 3: val_base = 100.0 if turno == 'T3' else 50.0
+                    else: val_base = 0.0
+                    
+                    if val_base > 0:
+                        d_uteis = float(row_eq.get('Dias Uteis', 26))
+                        d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
+                        fator = d_trab / d_uteis if d_uteis > 0 else 1
+                        df.at[idx, 'Valor Ranking'] = val_base * fator
+                    
+                    pos += 1
+
+    # Calcula o Valor Final somando as metas do Excel + o Ranking do Python
+    colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
+    df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
     return df
 
@@ -122,7 +159,6 @@ focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🗃️ Fechamento RH")
 
-# O cálculo do RH agora é apenas pegar os dados que a planilha gerou
 if not df_filtrado.empty:
     df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
     df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
@@ -157,7 +193,6 @@ try:
     with col_kpis:
         st.markdown("## 🎯 Visão Geral")
         kpi1, kpi2, kpi3 = st.columns(3)
-        # Identifica a primeira métrica de volume para exibir no cabeçalho
         col_vol = next((k for k in kpis_mapeados if 'itens' in k.lower() or 'palet' in k.lower() or 'mov' in k.lower()), kpis_mapeados[0] if kpis_mapeados else None)
         total_vol = df_filtrado[col_vol].sum() if col_vol and col_vol in df_filtrado.columns else 0
         
@@ -192,9 +227,9 @@ try:
 
                 if abaixo_da_meta:
                     if "%" in kpi or "Avaria" in kpi:
-                        detalhes_gargalo.append(f"❌ {kpi}: {realizado * 100:.2f}% vs Alvo {meta2 * 100:.2f}%")
+                        detalhes_gargalo.append(f"❌ {kpi}: {realizado * 100:.2f}% vs Alvo Base {meta2 * 100:.2f}%")
                     else:
-                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo {meta2:,.0f}".replace(',', '.'))
+                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Base {meta2:,.0f}".replace(',', '.'))
 
             if detalhes_gargalo:
                 houve_detrator = True
@@ -242,10 +277,25 @@ try:
 
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
+            
+            # --- CARD DE RANKING VISUAL ---
+            if row.get('Valor Ranking', 0) > 0:
+                pos = int(row.get('Posicao Ranking', 0))
+                cargo_p = row.get('FUNÇÃO', '')
+                total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == cargo_p)])
+                val_rank = row.get('Valor Ranking', 0)
+                
+                if pos == 1: medalha, cor_rank = "🥇", "#ffd700"
+                elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0"
+                elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32"
+                else: medalha, cor_rank = "🏅", "gray"
+                
+                texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {cargo_p}{texto_premio_rank}</div>", unsafe_allow_html=True)
+
             cols_meta = st.columns(4)
             col_idx = 0
             grafico_dados = []
-            premio_total = 0.0
 
             for kpi in kpis_mapeados:
                 meta2 = row.get(f"{kpi}_Meta2", 0)
@@ -255,8 +305,6 @@ try:
                 meta1, meta2, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(meta2), float(row.get(f"{kpi}_Meta3", 0))
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
-
-                premio_total += valor_reais
 
                 # Lógica de Cores validada pelo Excel
                 if racional == 1: 
@@ -277,23 +325,25 @@ try:
 
                 html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {valor_reais:,.2f}</span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_reais > 0 else ""
 
+                # Alterado para exibir a META 3 como alvo no painel
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
-                     alvo_tela = f"{int(meta2)//3600:02d}:{(int(meta2)%3600)//60:02d}:{int(meta2)%60:02d}"
+                     alvo_tela = f"{int(meta3)//3600:02d}:{(int(meta3)%3600)//60:02d}:{int(meta3)%60:02d}"
                 elif "%" in str(kpi) or "Avaria" in str(kpi):
                     val_tela = f"{realizado * 100:.2f}%" if realizado < 1 else f"{realizado:.2f}%"
-                    alvo_tela = f"{meta2 * 100:.2f}%" if meta2 < 1 else f"{meta2:.2f}%"
+                    alvo_tela = f"{meta3 * 100:.2f}%" if meta3 < 1 else f"{meta3:.2f}%"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
-                    alvo_tela = f"{meta2:,.0f}".replace(',', '.')
+                    alvo_tela = f"{meta3:,.0f}".replace(',', '.')
 
                 with cols_meta[col_idx % 4]:
                     st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi} (Alvo: {alvo_tela})</div><div class='texto-card-principal'>{val_tela}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
                 col_idx += 1
 
-            if premio_total > 0:
+            valor_final_total = row.get('Valor Final', 0)
+            if valor_final_total > 0:
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {premio_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
             st.divider()
             st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
@@ -308,7 +358,30 @@ try:
                 fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1)))
                 fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                 fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
-                st.plotly_chart(fig, use_container_width=True)
+                
+                # --- DIVIDE A TELA ENTRE GRÁFICO E TABELA ---
+                col_grafico, col_tabela = st.columns([1.2, 1])
+                
+                with col_grafico:
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col_tabela:
+                    # Puxa informações vitais + os indicadores exclusivos deste cargo
+                    col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_mapeados
+                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
+                    
+                    if 'Tempo Médio' in df_tabela_mini.columns:
+                        df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
+                    
+                    config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
+                    
+                    for col in df_tabela_mini.columns:
+                        if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+                        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+                    
+                    st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
 
     # ==========================================
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
@@ -343,15 +416,18 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
+                    # Alvo da equipe também passa a exibir Meta 3 média
+                    meta3_med = df_cargo[f"{kpi}_Meta3"].mean()
+                    
                     if "Tempo" in str(kpi):
-                        v_tela, t_tela, html_soma = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(meta2_med)//3600:02d}:{(int(meta2_med)%3600)//60:02d}:{(int(meta2_med)%60):02d}", ""
+                        v_tela, t_tela, html_soma = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(meta3_med)//3600:02d}:{(int(meta3_med)%3600)//60:02d}:{(int(meta3_med)%60):02d}", ""
                     elif "%" in str(kpi) or "Avaria" in str(kpi):
                         v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
-                        t_tela = f"{meta2_med * 100:.2f}%" if meta2_med < 1 else f"{meta2_med:.2f}%"
+                        t_tela = f"{meta3_med * 100:.2f}%" if meta3_med < 1 else f"{meta3_med:.2f}%"
                         html_soma = ""
                     else:
                         v_tela = f"{real_med:,.0f}".replace(',', '.')
-                        t_tela = f"{meta2_med:,.0f}".replace(',', '.')
+                        t_tela = f"{meta3_med:,.0f}".replace(',', '.')
                         html_soma = f"<span class='texto-card-secundario'>| Soma Equipe: {soma_total:,.0f}</span>".replace(',', '.')
 
                     with cols_eq[col_idx % 4]:
@@ -361,10 +437,13 @@ try:
         if len(cargos_render) > 0: st.divider()
         st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
         
-        colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_mapeados
+        colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Ranking', 'Valor Final'] + kpis_mapeados
         df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
-        config = {'Valor Final': st.column_config.NumberColumn("Valor R$", format="R$ %.2f")}
+        config = {
+            'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f"),
+            'Valor Ranking': st.column_config.NumberColumn("Rank R$", format="R$ %.2f")
+        }
         st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
 except Exception as e:
