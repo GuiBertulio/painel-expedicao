@@ -303,14 +303,26 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
-                if racional == 1: 
+                # --- [COMO EDITAR: LÓGICA DA PRÓXIMA META (INDIVIDUAL)] ---
+                # Essa estrutura define qual meta vai aparecer no card baseada no que o colaborador já atingiu.
+                if racional == 1: # Maior é melhor (ex: Itens Sep)
                     perc_atingimento = (realizado / meta2) if meta2 > 0 else 0
+                    if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                    elif realizado < meta2: alvo_atual, nome_alvo = meta2, "Meta 2"
+                    elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                    else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                    
                     if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
                     elif realizado >= meta2: cor, icone, status = C_VERDE, "🟢", "Atingiu"
                     elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                else: 
+                else: # Menor é melhor (ex: Avaria)
                     perc_atingimento = (meta2 / realizado) if realizado > 0 else 1.2
+                    if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                    elif realizado > meta2: alvo_atual, nome_alvo = meta2, "Meta 2"
+                    elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                    else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+
                     if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
                     elif realizado <= meta2: cor, icone, status = C_VERDE, "🟢", "Atingiu"
                     elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
@@ -318,26 +330,23 @@ try:
 
                 real_perc = perc_atingimento * 100
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
-
                 html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {valor_reais:,.2f}</span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_reais > 0 else ""
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
-                     alvo_tela = f"{int(meta3)//3600:02d}:{(int(meta3)%3600)//60:02d}:{int(meta3)%60:02d}"
+                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
                 elif "%" in str(kpi) or "Avaria" in str(kpi):
                     val_tela = f"{realizado * 100:.2f}%" if realizado < 1 else f"{realizado:.2f}%"
-                    alvo_tela = f"{meta3 * 100:.2f}%" if meta3 < 1 else f"{meta3:.2f}%"
+                    alvo_tela = f"{alvo_atual * 100:.2f}%" if alvo_atual < 1 else f"{alvo_atual:.2f}%"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
-                    alvo_tela = f"{meta3:,.0f}".replace(',', '.')
+                    alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
 
-                # --- [COMO EDITAR: LAYOUT DO CARD INDIVIDUAL] ---
-                # A variável 'alvo_formatado' insere a meta ao lado do valor com texto menor
-                titulo_card = kpi
-                alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo (Meta 3): {alvo_tela}</span>"
+                # --- [COMO EDITAR: TEXTO DO ALVO INDIVIDUAL] ---
+                alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
 
                 with cols_meta[col_idx % 4]:
-                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
                 col_idx += 1
 
             valor_final_total = row.get('Valor Final', 0)
@@ -398,12 +407,29 @@ try:
                     meta2_med = df_cargo[f"{kpi}_Meta2"].mean()
                     if pd.isna(meta2_med) or meta2_med <= 0: continue
 
+                    meta1_med = df_cargo[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_cargo.columns else meta2_med
+                    meta3_med = df_cargo[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_cargo.columns else meta2_med
+                    
                     real_med = df_cargo[kpi].mean()
                     racional = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
                     soma_total = df_cargo[kpi].sum()
 
-                    if racional == 1: perc = (real_med / meta2_med) if meta2_med > 0 else 0
-                    else: perc = (meta2_med / real_med) if real_med > 0 else 1.2
+                    # --- [COMO EDITAR: LÓGICA DA PRÓXIMA META (EQUIPE)] ---
+                    # Avalia a média da equipe e ajusta qual será a próxima meta que a equipe tem que bater
+                    if racional == 1: 
+                        if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                        elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                        elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                        else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                        
+                        perc = (real_med / meta2_med) if meta2_med > 0 else 0
+                    else: 
+                        if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                        elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                        elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                        else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                        
+                        perc = (meta2_med / real_med) if real_med > 0 else 1.2
 
                     real_perc = perc * 100
 
@@ -412,33 +438,27 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                    meta3_med = df_cargo[f"{kpi}_Meta3"].mean()
-                    
                     # --- [COMO EDITAR: LISTA DE MÉTRICAS GLOBAIS] ---
-                    # Adicione aqui palavras-chave dos indicadores que NÃO devem ter a palavra 'Média' nem exibir 'Soma Equipe'
                     metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
                     eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                     
                     if "Tempo" in str(kpi):
                         v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                        t_tela = f"{int(meta3_med)//3600:02d}:{(int(meta3_med)%3600)//60:02d}:{(int(meta3_med)%60):02d}"
+                        t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                     elif "%" in str(kpi) or "Avaria" in str(kpi):
                         v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
-                        t_tela = f"{meta3_med * 100:.2f}%" if meta3_med < 1 else f"{meta3_med:.2f}%"
+                        t_tela = f"{alvo_atual_med * 100:.2f}%" if alvo_atual_med < 1 else f"{alvo_atual_med:.2f}%"
                     else:
                         v_tela = f"{real_med:,.0f}".replace(',', '.')
-                        t_tela = f"{meta3_med:,.0f}".replace(',', '.')
+                        t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
-                    # --- [COMO EDITAR: LAYOUT DO CARD DA EQUIPE] ---
-                    # Se for métrica global, o título é só o nome (ex: "Avaria").
-                    # Se não for, ele mostra "Média: Itens Sep (Soma: 52.000)"
                     if eh_global:
                         titulo_card = f"{kpi}"
                     else:
                         soma_str = f"{soma_total:,.0f}".replace(',', '.')
                         titulo_card = f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {soma_str})</span>"
                         
-                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo (Meta 3): {t_tela}</span>"
+                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
                     with cols_eq[col_idx % 4]:
                         st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
