@@ -39,7 +39,7 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # --- MAPEAMENTO INTELIGENTE DO EXCEL (AUX CALC) ---
+    # --- MAPEAMENTO INTELIGENTE DO EXCEL ---
     colunas = list(df.columns)
     for i, col in enumerate(colunas):
         if "RACIONAL" in col.upper():
@@ -55,7 +55,6 @@ def carregar_dados():
             except IndexError:
                 pass 
 
-    # Limpeza de nomes
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
         if "TRAB" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
@@ -77,17 +76,10 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                # --- [COMO EDITAR: LIMPEZA BLINDADA DE NÚMEROS E PERCENTUAIS] ---
-                # Remove os caracteres de texto comuns para isolar o número puro
+                # Limpeza cirúrgica para proteger o 0.05%
                 s = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.strip()
-                
-                # CORREÇÃO DO BUG DO 5.00%: Criamos uma máscara para verificar se a célula usa VÍRGULA (Padrão BR)
                 mask_virgula = s.str.contains(',', regex=False)
-                
-                # Se a linha contiver vírgula, tiramos o ponto de milhar e trocamos a vírgula por ponto decimal
                 s_br = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                
-                # Se NÃO contiver vírgula (caso do 0.05 lido direto), o .where preserva a string original intacta
                 df[col] = pd.to_numeric(s_br.where(mask_virgula, s), errors='coerce').fillna(0)
     
     # ========================================================
@@ -162,7 +154,7 @@ pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", list
 focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
 # ==========================================
-# 🔥 MÓDULO DE EXTRAÇÃO RH (DIRETO DA PLANILHA)
+# 🔥 MÓDULO DE EXTRAÇÃO RH (COM R$ FORMATADO)
 # ==========================================
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🗃️ Fechamento RH")
@@ -171,30 +163,23 @@ if not df_filtrado.empty:
     df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
     df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
     
-    # Arredonda o valor numérico para a exibição no site
     df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
     df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome'])
     df_rh = df_rh.sort_values(by='Nome')
     
-    # Configuração visual do site (mantém filtros ativos)
     config_rh = {
         "Matrícula": st.column_config.TextColumn("Matrícula"), 
         "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f")
     }
     
-    # Mostra a tabela interativa na barra lateral
     st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
     
-    # --- [COMO EDITAR: FORMATAÇÃO EXCLUSIVA DO DOWNLOAD] ---
-    # Criamos uma cópia separada para o download não estragar a tabela do site
+    # Criamos uma cópia para texturizar com "R$" antes do download
     df_download = df_rh.copy()
-    
-    # Essa linha converte o número em texto e adiciona o "R$ " e os pontos/vírgulas do padrão BR
     df_download['Premiação (R$)'] = df_download['Premiação (R$)'].apply(
         lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     )
     
-    # Gera o CSV usando a tabela que foi texturizada com "R$"
     csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
     
     st.sidebar.download_button(
@@ -210,7 +195,7 @@ else:
     st.sidebar.info("Nenhum dado processado.")
 
 # ==========================================
-# 4. RENDERIZAÇÃO DA TELA (COM TRY/EXCEPT)
+# 4. RENDERIZAÇÃO DA TELA
 # ==========================================
 try:
     kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
@@ -251,18 +236,15 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 meta2 = float(meta2)
 
-                # --- [COMO EDITAR: IGNORAR ZEROS NOS DETRATORES] ---
-                # Se o colaborador tirou 0 em volume, significa que não fez o processo. Ele NÃO é detrator.
-                if racional == 1 and realizado == 0:
-                    continue
+                if racional == 1 and realizado == 0: continue # Ignora zerados (faltas/sem dados) em métricas de volume
 
                 abaixo_da_meta = False
                 if racional == 1 and realizado < meta2: abaixo_da_meta = True
                 elif racional == 0 and realizado > meta2: abaixo_da_meta = True
 
                 if abaixo_da_meta:
-                    if "%" in kpi or "Avaria" in kpi:
-                        detalhes_gargalo.append(f"❌ {kpi}: {realizado * 100:.2f}% vs Alvo Base {meta2 * 100:.2f}%")
+                    if "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi:
+                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Base {meta2:.2f}%")
                     else:
                         detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Base {meta2:,.0f}".replace(',', '.'))
 
@@ -340,9 +322,7 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
-                # --- [COMO EDITAR: LÓGICA DA PRÓXIMA META (INDIVIDUAL)] ---
-                # Essa estrutura define qual meta vai aparecer no card baseada no que o colaborador já atingiu.
-                if racional == 1: # Maior é melhor (ex: Itens Sep)
+                if racional == 1: 
                     perc_atingimento = (realizado / meta2) if meta2 > 0 else 0
                     if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
                     elif realizado < meta2: alvo_atual, nome_alvo = meta2, "Meta 2"
@@ -353,7 +333,7 @@ try:
                     elif realizado >= meta2: cor, icone, status = C_VERDE, "🟢", "Atingiu"
                     elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                else: # Menor é melhor (ex: Avaria)
+                else: 
                     perc_atingimento = (meta2 / realizado) if realizado > 0 else 1.2
                     if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
                     elif realizado > meta2: alvo_atual, nome_alvo = meta2, "Meta 2"
@@ -372,17 +352,13 @@ try:
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                      alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
-                
                 elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                    # Removido a multiplicação por 100. Puxa exato como no Excel.
                     val_tela = f"{realizado:.2f}%"
                     alvo_tela = f"{alvo_atual:.2f}%"
-                
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
 
-                # --- [COMO EDITAR: TEXTO DO ALVO INDIVIDUAL] ---
                 alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
 
                 with cols_meta[col_idx % 4]:
@@ -431,9 +407,6 @@ try:
     # ==========================================
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
     # ==========================================
-    # ==========================================
-    # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
-    # ==========================================
     else:
         cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
@@ -450,15 +423,11 @@ try:
                     
                     racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
                     
-                    # --- [COMO EDITAR: FILTRO INTELIGENTE DE ZEROS] ---
-                    # Volume/Velocidade (Racional 1) exclui os zeros da média
-                    # Erro/Avaria (Racional 0) mantém os zeros como nota perfeita
-                    if racional_temp == 1: 
-                        df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
-                    else: 
-                        df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
+                    # Filtra zeros baseados no racional (0 afunda volume, mas é nota máxima em qualidade)
+                    if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
+                    else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
                         
-                    if df_kpi_valido.empty: continue # Pula o card se ninguém tiver dados
+                    if df_kpi_valido.empty: continue
 
                     meta2_med = df_kpi_valido[f"{kpi}_Meta2"].mean()
                     if pd.isna(meta2_med) or meta2_med <= 0: continue
@@ -492,15 +461,16 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
+                    # Esconde palavras 'Média' e 'Soma' se o indicador for global
                     metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
                     eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                     
                     if "Tempo" in str(kpi):
                         v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                         t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                    elif "%" in str(kpi) or "Avaria" in str(kpi):
-                        v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
-                        t_tela = f"{alvo_atual_med * 100:.2f}%" if alvo_atual_med < 1 else f"{alvo_atual_med:.2f}%"
+                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                        v_tela = f"{real_med:.2f}%"
+                        t_tela = f"{alvo_atual_med:.2f}%"
                     else:
                         v_tela = f"{real_med:,.0f}".replace(',', '.')
                         t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
