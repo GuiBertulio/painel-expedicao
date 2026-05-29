@@ -152,7 +152,7 @@ pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", list
 focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
 # ==========================================
-# 🔥 MÓDULO DE EXTRAÇÃO RH
+# 🔥 MÓDULO DE EXTRAÇÃO RH (DIRETO DA PLANILHA)
 # ==========================================
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🗃️ Fechamento RH")
@@ -160,9 +160,27 @@ st.sidebar.markdown("### 🗃️ Fechamento RH")
 if not df_filtrado.empty:
     df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
     df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
+    
+    # --- [COMO EDITAR: ARREDONDAMENTO E LIMPEZA] ---
+    # Arredonda o valor para 2 casas decimais para o Excel não receber "215,7692308"
+    df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
+    
+    # Remove colaboradores duplicados (caso apareçam em mais de uma linha na mesma função)
+    df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome'])
+    
     df_rh = df_rh.sort_values(by='Nome')
     
-    st.sidebar.dataframe(df_rh.style.format({'Premiação (R$)': 'R$ {:,.2f}'}), hide_index=True, use_container_width=True)
+    # --- [COMO EDITAR: TABELA INTERATIVA DO RH NO SITE] ---
+    # Usando st.column_config nós ativamos os FILTROS nativos da tabela no Streamlit
+    config_rh = {
+        "Matrícula": st.column_config.TextColumn("Matrícula"), # Evita que a matrícula fique com vírgula (ex: 2.345)
+        "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f")
+    }
+    
+    # Renderiza a tabela na barra lateral com os filtros ativos
+    st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
+    
+    # Exporta o CSV (já arredondado) no padrão brasileiro
     csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
     
     st.sidebar.download_button(
