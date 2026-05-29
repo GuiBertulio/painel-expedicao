@@ -241,6 +241,11 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 meta2 = float(meta2)
 
+                # --- [COMO EDITAR: IGNORAR ZEROS NOS DETRATORES] ---
+                # Se o colaborador tirou 0 em volume, significa que não fez o processo. Ele NÃO é detrator.
+                if racional == 1 and realizado == 0:
+                    continue
+
                 abaixo_da_meta = False
                 if racional == 1 and realizado < meta2: abaixo_da_meta = True
                 elif racional == 0 and realizado > meta2: abaixo_da_meta = True
@@ -416,6 +421,9 @@ try:
     # ==========================================
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
     # ==========================================
+    # ==========================================
+    # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
+    # ==========================================
     else:
         cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
@@ -429,18 +437,29 @@ try:
 
             for kpi in kpis_mapeados:
                 if f"{kpi}_Meta2" in df_cargo.columns:
-                    meta2_med = df_cargo[f"{kpi}_Meta2"].mean()
+                    
+                    racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
+                    
+                    # --- [COMO EDITAR: FILTRO INTELIGENTE DE ZEROS] ---
+                    # Volume/Velocidade (Racional 1) exclui os zeros da média
+                    # Erro/Avaria (Racional 0) mantém os zeros como nota perfeita
+                    if racional_temp == 1: 
+                        df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
+                    else: 
+                        df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
+                        
+                    if df_kpi_valido.empty: continue # Pula o card se ninguém tiver dados
+
+                    meta2_med = df_kpi_valido[f"{kpi}_Meta2"].mean()
                     if pd.isna(meta2_med) or meta2_med <= 0: continue
 
-                    meta1_med = df_cargo[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_cargo.columns else meta2_med
-                    meta3_med = df_cargo[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_cargo.columns else meta2_med
+                    meta1_med = df_kpi_valido[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_kpi_valido.columns else meta2_med
+                    meta3_med = df_kpi_valido[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_kpi_valido.columns else meta2_med
                     
-                    real_med = df_cargo[kpi].mean()
-                    racional = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
-                    soma_total = df_cargo[kpi].sum()
+                    real_med = df_kpi_valido[kpi].mean()
+                    racional = racional_temp
+                    soma_total = df_kpi_valido[kpi].sum()
 
-                    # --- [COMO EDITAR: LÓGICA DA PRÓXIMA META (EQUIPE)] ---
-                    # Avalia a média da equipe e ajusta qual será a próxima meta que a equipe tem que bater
                     if racional == 1: 
                         if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
                         elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
@@ -463,21 +482,15 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                    # --- [COMO EDITAR: LISTA DE MÉTRICAS GLOBAIS] ---
                     metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
                     eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                     
-                    # --- [COMO EDITAR: FORMATO DOS NÚMEROS DA EQUIPE] ---
-                    # Mesma regra: aqui você edita a formatação visual dos números da equipe
                     if "Tempo" in str(kpi):
                         v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                         t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                    
-                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                        # Sem multiplicação, mostra o valor limpo (0.05 vira 0.05%)
-                        v_tela = f"{real_med:.2f}%"
-                        t_tela = f"{alvo_atual_med:.2f}%"
-                    
+                    elif "%" in str(kpi) or "Avaria" in str(kpi):
+                        v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
+                        t_tela = f"{alvo_atual_med * 100:.2f}%" if alvo_atual_med < 1 else f"{alvo_atual_med:.2f}%"
                     else:
                         v_tela = f"{real_med:,.0f}".replace(',', '.')
                         t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
