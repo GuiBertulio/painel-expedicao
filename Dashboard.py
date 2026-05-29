@@ -353,9 +353,12 @@ try:
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                      alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
-                elif "%" in str(kpi) or "Avaria" in str(kpi):
-                    val_tela = f"{realizado * 100:.2f}%" if realizado < 1 else f"{realizado:.2f}%"
-                    alvo_tela = f"{alvo_atual * 100:.2f}%" if alvo_atual < 1 else f"{alvo_atual:.2f}%"
+                
+                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                    # Removido a multiplicação por 100. Puxa exato como no Excel.
+                    val_tela = f"{realizado:.2f}%"
+                    alvo_tela = f"{alvo_atual:.2f}%"
+                
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
@@ -460,12 +463,17 @@ try:
                     metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
                     eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                     
+                    # --- [COMO EDITAR: FORMATO DOS NÚMEROS DA EQUIPE] ---
+                    # Mesma regra: aqui você edita a formatação visual dos números da equipe
                     if "Tempo" in str(kpi):
                         v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                         t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                    elif "%" in str(kpi) or "Avaria" in str(kpi):
-                        v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
-                        t_tela = f"{alvo_atual_med * 100:.2f}%" if alvo_atual_med < 1 else f"{alvo_atual_med:.2f}%"
+                    
+                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                        # Sem multiplicação, mostra o valor limpo (0.05 vira 0.05%)
+                        v_tela = f"{real_med:.2f}%"
+                        t_tela = f"{alvo_atual_med:.2f}%"
+                    
                     else:
                         v_tela = f"{real_med:,.0f}".replace(',', '.')
                         t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
