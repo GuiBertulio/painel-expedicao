@@ -161,27 +161,31 @@ if not df_filtrado.empty:
     df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
     df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
     
-    # --- [COMO EDITAR: ARREDONDAMENTO E LIMPEZA] ---
-    # Arredonda o valor para 2 casas decimais para o Excel não receber "215,7692308"
+    # Arredonda o valor numérico para a exibição no site
     df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
-    
-    # Remove colaboradores duplicados (caso apareçam em mais de uma linha na mesma função)
     df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome'])
-    
     df_rh = df_rh.sort_values(by='Nome')
     
-    # --- [COMO EDITAR: TABELA INTERATIVA DO RH NO SITE] ---
-    # Usando st.column_config nós ativamos os FILTROS nativos da tabela no Streamlit
+    # Configuração visual do site (mantém filtros ativos)
     config_rh = {
-        "Matrícula": st.column_config.TextColumn("Matrícula"), # Evita que a matrícula fique com vírgula (ex: 2.345)
+        "Matrícula": st.column_config.TextColumn("Matrícula"), 
         "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f")
     }
     
-    # Renderiza a tabela na barra lateral com os filtros ativos
+    # Mostra a tabela interativa na barra lateral
     st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
     
-    # Exporta o CSV (já arredondado) no padrão brasileiro
-    csv_rh = df_rh.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+    # --- [COMO EDITAR: FORMATAÇÃO EXCLUSIVA DO DOWNLOAD] ---
+    # Criamos uma cópia separada para o download não estragar a tabela do site
+    df_download = df_rh.copy()
+    
+    # Essa linha converte o número em texto e adiciona o "R$ " e os pontos/vírgulas do padrão BR
+    df_download['Premiação (R$)'] = df_download['Premiação (R$)'].apply(
+        lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    )
+    
+    # Gera o CSV usando a tabela que foi texturizada com "R$"
+    csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
     
     st.sidebar.download_button(
         label="📥 Baixar Planilha do RH",
