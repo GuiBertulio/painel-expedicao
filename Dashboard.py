@@ -77,8 +77,18 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                texto_limpo = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                df[col] = pd.to_numeric(texto_limpo, errors='coerce').fillna(0)
+                # --- [COMO EDITAR: LIMPEZA BLINDADA DE NÚMEROS E PERCENTUAIS] ---
+                # Remove os caracteres de texto comuns para isolar o número puro
+                s = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.strip()
+                
+                # CORREÇÃO DO BUG DO 5.00%: Criamos uma máscara para verificar se a célula usa VÍRGULA (Padrão BR)
+                mask_virgula = s.str.contains(',', regex=False)
+                
+                # Se a linha contiver vírgula, tiramos o ponto de milhar e trocamos a vírgula por ponto decimal
+                s_br = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                
+                # Se NÃO contiver vírgula (caso do 0.05 lido direto), o .where preserva a string original intacta
+                df[col] = pd.to_numeric(s_br.where(mask_virgula, s), errors='coerce').fillna(0)
     
     # ========================================================
     # INJEÇÃO DO BÔNUS DE RANKING NO DATAFRAME
