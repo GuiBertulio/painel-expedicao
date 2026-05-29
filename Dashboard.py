@@ -94,7 +94,7 @@ def carregar_dados():
                 
                 kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
                 if not kpis: continue
-                metrica_rank = kpis[0] # Usa o primeiro indicador do Separador para rankear
+                metrica_rank = kpis[0] 
                 
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
                 ordem_cresc = False if racional == 1 else True
@@ -103,7 +103,6 @@ def carregar_dados():
                 
                 pos = 1
                 for idx, row_eq in df_eq.iterrows():
-                    # Ignora quem não teve produtividade para não ganhar ranking de graça
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue
                     
                     df.at[idx, 'Posicao Ranking'] = pos
@@ -121,7 +120,6 @@ def carregar_dados():
                     
                     pos += 1
 
-    # Calcula o Valor Final somando as metas do Excel + o Ranking do Python
     colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
     df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
@@ -154,7 +152,7 @@ pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", list
 focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
 # ==========================================
-# 🔥 MÓDULO DE EXTRAÇÃO RH (DIRETO DA PLANILHA)
+# 🔥 MÓDULO DE EXTRAÇÃO RH
 # ==========================================
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🗃️ Fechamento RH")
@@ -278,7 +276,6 @@ try:
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
             
-            # --- CARD DE RANKING VISUAL ---
             if row.get('Valor Ranking', 0) > 0:
                 pos = int(row.get('Posicao Ranking', 0))
                 cargo_p = row.get('FUNÇÃO', '')
@@ -306,7 +303,6 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
-                # Lógica de Cores validada pelo Excel
                 if racional == 1: 
                     perc_atingimento = (realizado / meta2) if meta2 > 0 else 0
                     if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
@@ -325,7 +321,6 @@ try:
 
                 html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {valor_reais:,.2f}</span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_reais > 0 else ""
 
-                # Alterado para exibir a META 3 como alvo no painel
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                      alvo_tela = f"{int(meta3)//3600:02d}:{(int(meta3)%3600)//60:02d}:{int(meta3)%60:02d}"
@@ -336,8 +331,13 @@ try:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{meta3:,.0f}".replace(',', '.')
 
+                # --- [COMO EDITAR: LAYOUT DO CARD INDIVIDUAL] ---
+                # A variável 'alvo_formatado' insere a meta ao lado do valor com texto menor
+                titulo_card = kpi
+                alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo (Meta 3): {alvo_tela}</span>"
+
                 with cols_meta[col_idx % 4]:
-                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi} (Alvo: {alvo_tela})</div><div class='texto-card-principal'>{val_tela}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
                 col_idx += 1
 
             valor_final_total = row.get('Valor Final', 0)
@@ -359,14 +359,10 @@ try:
                 fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                 fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                 
-                # --- DIVIDE A TELA ENTRE GRÁFICO E TABELA ---
                 col_grafico, col_tabela = st.columns([1.2, 1])
-                
                 with col_grafico:
                     st.plotly_chart(fig, use_container_width=True)
-                
                 with col_tabela:
-                    # Puxa informações vitais + os indicadores exclusivos deste cargo
                     col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_mapeados
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                     
@@ -393,7 +389,7 @@ try:
             df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
             if df_cargo.empty: continue
 
-            st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Média da Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
             cols_eq = st.columns(4)
             col_idx = 0
 
@@ -416,22 +412,36 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                    # Alvo da equipe também passa a exibir Meta 3 média
                     meta3_med = df_cargo[f"{kpi}_Meta3"].mean()
                     
+                    # --- [COMO EDITAR: LISTA DE MÉTRICAS GLOBAIS] ---
+                    # Adicione aqui palavras-chave dos indicadores que NÃO devem ter a palavra 'Média' nem exibir 'Soma Equipe'
+                    metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
+                    eh_global = any(g in str(kpi).upper() for g in metricas_globais)
+                    
                     if "Tempo" in str(kpi):
-                        v_tela, t_tela, html_soma = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(meta3_med)//3600:02d}:{(int(meta3_med)%3600)//60:02d}:{(int(meta3_med)%60):02d}", ""
+                        v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                        t_tela = f"{int(meta3_med)//3600:02d}:{(int(meta3_med)%3600)//60:02d}:{(int(meta3_med)%60):02d}"
                     elif "%" in str(kpi) or "Avaria" in str(kpi):
                         v_tela = f"{real_med * 100:.2f}%" if real_med < 1 else f"{real_med:.2f}%"
                         t_tela = f"{meta3_med * 100:.2f}%" if meta3_med < 1 else f"{meta3_med:.2f}%"
-                        html_soma = ""
                     else:
                         v_tela = f"{real_med:,.0f}".replace(',', '.')
                         t_tela = f"{meta3_med:,.0f}".replace(',', '.')
-                        html_soma = f"<span class='texto-card-secundario'>| Soma Equipe: {soma_total:,.0f}</span>".replace(',', '.')
+
+                    # --- [COMO EDITAR: LAYOUT DO CARD DA EQUIPE] ---
+                    # Se for métrica global, o título é só o nome (ex: "Avaria").
+                    # Se não for, ele mostra "Média: Itens Sep (Soma: 52.000)"
+                    if eh_global:
+                        titulo_card = f"{kpi}"
+                    else:
+                        soma_str = f"{soma_total:,.0f}".replace(',', '.')
+                        titulo_card = f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {soma_str})</span>"
+                        
+                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo (Meta 3): {t_tela}</span>"
 
                     with cols_eq[col_idx % 4]:
-                        st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>Média: {kpi} (Alvo: {t_tela})</div><div class='texto-card-principal'>{v_tela} {html_soma}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
                     col_idx += 1
 
         if len(cargos_render) > 0: st.divider()
