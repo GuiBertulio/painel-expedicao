@@ -9,7 +9,7 @@ import gspread
 # ==========================================
 # --- [COMO EDITAR: TROCAR SENHAS E ADICIONAR USUÁRIOS] ---
 USUARIOS = {
-    "Diego": {"senha": "log@2026", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "diego": {"senha": "log@2026", "perfil": "Gerente", "turno_acesso": "Todos"},
     "lidert1": {"senha": "liderT1@2026", "perfil": "Líder", "turno_acesso": "T1"},
     "lidert2": {"senha": "liderT2@2026", "perfil": "Líder", "turno_acesso": "T2"},
     "lidert3": {"senha": "liderT3@2026", "perfil": "Líder", "turno_acesso": "T3"}
