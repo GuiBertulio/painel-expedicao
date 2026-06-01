@@ -234,19 +234,23 @@ try:
                 
                 realizado = float(row.get(kpi, 0))
                 racional = float(row.get(f"{kpi}_Racional", 1))
-                meta2 = float(meta2)
+                
+                # --- [COMO EDITAR: LÓGICA DO DETRATOR (META 1)] ---
+                # Agora o código puxa a Meta 1. Se não existir, ele usa a Meta 2 como segurança.
+                meta1 = float(row.get(f"{kpi}_Meta1", meta2))
 
                 if racional == 1 and realizado == 0: continue # Ignora zerados (faltas/sem dados) em métricas de volume
 
+                # A avaliação do gargalo agora é feita contra o piso (Meta 1)
                 abaixo_da_meta = False
-                if racional == 1 and realizado < meta2: abaixo_da_meta = True
-                elif racional == 0 and realizado > meta2: abaixo_da_meta = True
+                if racional == 1 and realizado < meta1: abaixo_da_meta = True
+                elif racional == 0 and realizado > meta1: abaixo_da_meta = True
 
                 if abaixo_da_meta:
                     if "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi:
-                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Base {meta2:.2f}%")
+                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Mínimo (Meta 1) {meta1:.2f}%")
                     else:
-                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Base {meta2:,.0f}".replace(',', '.'))
+                        detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Mínimo (Meta 1) {meta1:,.0f}".replace(',', '.'))
 
             if detalhes_gargalo:
                 houve_detrator = True
