@@ -5,13 +5,15 @@ import plotly.express as px
 import gspread
 
 # ==========================================
-# CONEXÃO COM GOOGLE SHEETS
+# 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS
 # ==========================================
-def conectar_planilha():
-    cred_dict = dict(st.secrets["gcp_service_account"])
-    client = gspread.service_account_from_dict(cred_dict)
-    planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
-    return planilha.worksheet("Historico_RH")
+# --- [COMO EDITAR: TROCAR SENHAS E ADICIONAR USUÁRIOS] ---
+USUARIOS = {
+    "gerente": {"senha": "123", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "lidert1": {"senha": "t1", "perfil": "Líder", "turno_acesso": "T1"},
+    "lidert2": {"senha": "t2", "perfil": "Líder", "turno_acesso": "T2"},
+    "lidert3": {"senha": "t3", "perfil": "Líder", "turno_acesso": "T3"}
+}
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E CSS
@@ -30,6 +32,42 @@ st.markdown("""
 C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
 
 # ==========================================
+# 🚪 TELA DE LOGIN (BARREIRA DE SEGURANÇA)
+# ==========================================
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
+
+if not st.session_state["logado"]:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        st.title("🔐 Login - Dashboard Logístico")
+        with st.form("login_form"):
+            usuario = st.text_input("Usuário").strip().lower()
+            senha = st.text_input("Senha", type="password")
+            btn_entrar = st.form_submit_button("Entrar", use_container_width=True)
+            
+            if btn_entrar:
+                if usuario in USUARIOS and USUARIOS[usuario]["senha"] == senha:
+                    st.session_state["logado"] = True
+                    st.session_state["usuario"] = usuario
+                    st.session_state["perfil"] = USUARIOS[usuario]["perfil"]
+                    st.session_state["turno_acesso"] = USUARIOS[usuario]["turno_acesso"]
+                    st.rerun() # Recarrega a página agora logado
+                else:
+                    st.error("❌ Usuário ou senha incorretos.")
+    st.stop() # Interrompe a leitura do código aqui. Ninguém passa se não logar.
+
+# ==========================================
+# CONEXÃO COM GOOGLE SHEETS
+# ==========================================
+def conectar_planilha():
+    cred_dict = dict(st.secrets["gcp_service_account"])
+    client = gspread.service_account_from_dict(cred_dict)
+    planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
+    return planilha.worksheet("Historico_RH")
+
+# ==========================================
 # 2. CARREGAMENTO DOS DADOS E CÁLCULO DE RANKING
 # ==========================================
 @st.cache_data(ttl=60) 
@@ -39,7 +77,6 @@ def carregar_dados():
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # --- MAPEAMENTO INTELIGENTE DO EXCEL ---
     colunas = list(df.columns)
     for i, col in enumerate(colunas):
         if "RACIONAL" in col.upper():
@@ -76,15 +113,11 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
-                # Limpeza cirúrgica para proteger o 0.05%
                 s = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.strip()
                 mask_virgula = s.str.contains(',', regex=False)
                 s_br = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(s_br.where(mask_virgula, s), errors='coerce').fillna(0)
     
-    # ========================================================
-    # INJEÇÃO DO BÔNUS DE RANKING NO DATAFRAME
-    # ========================================================
     df['Valor Ranking'] = 0.0
     df['Posicao Ranking'] = 0
     
@@ -130,7 +163,7 @@ def carregar_dados():
 df = carregar_dados()
 
 # ==========================================
-# 3. LÓGICA DE DATAS E FILTROS
+# 3. LÓGICA DE DATAS E FILTROS (C/ AUTENTICAÇÃO)
 # ==========================================
 if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
     dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
@@ -140,9 +173,26 @@ else:
     dt_inicio = datetime.date(hoje.year, hoje.month, 26)
     data_apuracao = hoje - datetime.timedelta(days=1)
 
+# --- CABEÇALHO DA BARRA LATERAL ---
+st.sidebar.markdown(f"👤 **Logado como:** {st.session_state['usuario'].capitalize()} ({st.session_state['perfil']})")
+if st.sidebar.button("Sair / Logout", use_container_width=True):
+    st.session_state["logado"] = False
+    st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.title("🔍 Filtros do Painel")
-lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
-turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+
+# --- LÓGICA DO FILTRO DE TURNO ---
+turno_logado = st.session_state["turno_acesso"]
+
+if turno_logado == "Todos":
+    lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
+    turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+else:
+    # Se for líder, força o turno e exibe apenas um aviso
+    turno_selecionado = turno_logado
+    st.sidebar.info(f"🔒 Acesso restrito ao Turno: **{turno_selecionado}**")
+
 df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
 
 lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
@@ -154,45 +204,46 @@ pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", list
 focar_detratores = st.sidebar.checkbox("🚨 Filtrar Desempenho Abaixo da Meta")
 
 # ==========================================
-# 🔥 MÓDULO DE EXTRAÇÃO RH (COM R$ FORMATADO)
+# 🔥 MÓDULO DE EXTRAÇÃO RH
 # ==========================================
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🗃️ Fechamento RH")
+# Apenas o Gerente pode baixar o fechamento financeiro do RH
+if st.session_state["perfil"] == "Gerente":
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🗃️ Fechamento RH")
 
-if not df_filtrado.empty:
-    df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
-    df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
-    
-    df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
-    df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome'])
-    df_rh = df_rh.sort_values(by='Nome')
-    
-    config_rh = {
-        "Matrícula": st.column_config.TextColumn("Matrícula"), 
-        "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f")
-    }
-    
-    st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
-    
-    # Criamos uma cópia para texturizar com "R$" antes do download
-    df_download = df_rh.copy()
-    df_download['Premiação (R$)'] = df_download['Premiação (R$)'].apply(
-        lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    )
-    
-    csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
-    
-    st.sidebar.download_button(
-        label="📥 Baixar Planilha do RH",
-        data=csv_rh,
-        file_name=f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
-        mime="text/csv",
-        type="primary",
-        use_container_width=True,
-        key="btn_rh_unico_download"
-    )
-else:
-    st.sidebar.info("Nenhum dado processado.")
+    if not df_filtrado.empty:
+        df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
+        df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
+        
+        df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
+        df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome'])
+        df_rh = df_rh.sort_values(by='Nome')
+        
+        config_rh = {
+            "Matrícula": st.column_config.TextColumn("Matrícula"), 
+            "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f")
+        }
+        
+        st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
+        
+        df_download = df_rh.copy()
+        df_download['Premiação (R$)'] = df_download['Premiação (R$)'].apply(
+            lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        )
+        
+        csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+        
+        st.sidebar.download_button(
+            label="📥 Baixar Planilha do RH",
+            data=csv_rh,
+            file_name=f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
+            mime="text/csv",
+            type="primary",
+            use_container_width=True,
+            key="btn_rh_unico_download"
+        )
+    else:
+        st.sidebar.info("Nenhum dado processado.")
 
 # ==========================================
 # 4. RENDERIZAÇÃO DA TELA
@@ -235,13 +286,10 @@ try:
                 realizado = float(row.get(kpi, 0))
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 
-                # --- [COMO EDITAR: LÓGICA DO DETRATOR (META 1)] ---
-                # Agora o código puxa a Meta 1. Se não existir, ele usa a Meta 2 como segurança.
                 meta1 = float(row.get(f"{kpi}_Meta1", meta2))
 
-                if racional == 1 and realizado == 0: continue # Ignora zerados (faltas/sem dados) em métricas de volume
+                if racional == 1 and realizado == 0: continue 
 
-                # A avaliação do gargalo agora é feita contra o piso (Meta 1)
                 abaixo_da_meta = False
                 if racional == 1 and realizado < meta1: abaixo_da_meta = True
                 elif racional == 0 and realizado > meta1: abaixo_da_meta = True
@@ -369,6 +417,8 @@ try:
                     st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
                 col_idx += 1
 
+            # Somente exibe prêmio se for o Gerente logado ou se não quisermos esconder dinheiro do líder
+            # Se quiser esconder, adicione um if st.session_state["perfil"] == "Gerente":
             valor_final_total = row.get('Valor Final', 0)
             if valor_final_total > 0:
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -427,7 +477,6 @@ try:
                     
                     racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
                     
-                    # Filtra zeros baseados no racional (0 afunda volume, mas é nota máxima em qualidade)
                     if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
                     else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
                         
@@ -465,7 +514,6 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                    # Esconde palavras 'Média' e 'Soma' se o indicador for global
                     metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
                     eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                     
