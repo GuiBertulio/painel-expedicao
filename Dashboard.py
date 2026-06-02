@@ -9,10 +9,18 @@ import gspread
 # ==========================================
 # --- [COMO EDITAR: TROCAR SENHAS E ADICIONAR USUÁRIOS] ---
 USUARIOS = {
-    "diego": {"senha": "log@2026", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "lidert1": {"senha": "liderT1@2026", "perfil": "Líder", "turno_acesso": "T1"},
-    "lidert2": {"senha": "liderT2@2026", "perfil": "Líder", "turno_acesso": "T2"},
-    "lidert3": {"senha": "liderT3@2026", "perfil": "Líder", "turno_acesso": "T3"}
+    "diegoc": {"senha": "ger#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "guilhermeb": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "flamarion": {"senha": "sub#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
+    "luciano": {"senha": "Luciano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
+    "wagner": {"senha": "Wagner@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
+    "jorge": {"senha": "Jorge@26TAF", "perfil": "Líder", "turno_acesso": "T2"},
+    "diego": {"senha": "Diego@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
+    "carlos": {"senha": "Carlos@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
+    "luis": {"senha": "Luis@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
+    "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T3"}
 }
 
 # ==========================================
