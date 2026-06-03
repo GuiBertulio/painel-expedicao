@@ -174,8 +174,8 @@ df = carregar_dados()
 # 3. LÓGICA DE DATAS E FILTROS (C/ AUTENTICAÇÃO)
 # ==========================================
 if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
-    dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0], dayfirst=True).date()
-    data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0], dayfirst=True).date()
+    dt_Dinicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0].date()
+    data_apuracao = pd.to_datetime(df['Data Fim'].dropna().iloc[0].date()
 else:
     hoje = datetime.date.today()
     dt_inicio = datetime.date(hoje.year, hoje.month, 26)
