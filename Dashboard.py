@@ -450,7 +450,16 @@ try:
                 with col_grafico:
                     st.plotly_chart(fig, use_container_width=True)
                 with col_tabela:
-                    col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_mapeados
+                    # --- [COMO EDITAR: FILTRO DINÂMICO DE COLUNAS (TABELA INDIVIDUAL)] ---
+                    # Puxa apenas os KPIs que possuem Meta > 0 para este colaborador específico
+                    kpis_ativos_pessoa = []
+                    for k in kpis_mapeados:
+                        m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
+                        if pd.notna(m2) and m2 > 0:
+                            kpis_ativos_pessoa.append(k)
+
+                    # Mantém as colunas de Dias sempre fixas, independente do filtro
+                    col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_pessoa
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                     
                     if 'Tempo Médio' in df_tabela_mini.columns:
@@ -465,7 +474,6 @@ try:
                         else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                     
                     st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
-
     # ==========================================
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
     # ==========================================
@@ -547,10 +555,20 @@ try:
                         st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
                     col_idx += 1
 
-        if len(cargos_render) > 0: st.divider()
+       if len(cargos_render) > 0: st.divider()
         st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
         
-        colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Ranking', 'Valor Final'] + kpis_mapeados
+        # --- [COMO EDITAR: FILTRO DINÂMICO DE COLUNAS (TABELA GERAL)] ---
+        # Varre os KPIs e descobre quais têm meta > 0 dentro do filtro selecionado (Turno/Função)
+        kpis_ativos_tabela = []
+        for kpi in kpis_mapeados:
+            if f"{kpi}_Meta2" in df_filtrado.columns:
+                metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
+                if metas_validas.sum() > 0:
+                    kpis_ativos_tabela.append(kpi)
+
+        # Mantém as colunas de dias sempre fixas, independente do filtro, somando aos KPIs ativos
+        colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Ranking', 'Valor Final'] + kpis_ativos_tabela
         df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
         config = {
