@@ -49,20 +49,21 @@ if not st.session_state["logado"]:
     with col2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.title("🔐 Login - Dashboard Logístico")
-        with st.form("login_form"):
-            usuario = st.text_input("Usuário").strip().lower()
-            senha = st.text_input("Senha", type="password")
-            btn_entrar = st.form_submit_button("Entrar", use_container_width=True)
-            
-            if btn_entrar:
-                if usuario in USUARIOS and USUARIOS[usuario]["senha"] == senha:
-                    st.session_state["logado"] = True
-                    st.session_state["usuario"] = usuario
-                    st.session_state["perfil"] = USUARIOS[usuario]["perfil"]
-                    st.session_state["turno_acesso"] = USUARIOS[usuario]["turno_acesso"]
-                    st.rerun() 
-                else:
-                    st.error("❌ Usuário ou senha incorretos.")
+        
+        # Tiramos o st.form para a memória do Streamlit funcionar 100% das vezes
+        usuario = st.text_input("Usuário").strip().lower()
+        senha = st.text_input("Senha", type="password").strip() # <-- Proteção contra espaços invisíveis
+        btn_entrar = st.button("Entrar", type="primary", use_container_width=True)
+        
+        if btn_entrar:
+            if usuario in USUARIOS and USUARIOS[usuario]["senha"] == senha:
+                st.session_state["logado"] = True
+                st.session_state["usuario"] = usuario
+                st.session_state["perfil"] = USUARIOS[usuario]["perfil"]
+                st.session_state["turno_acesso"] = USUARIOS[usuario]["turno_acesso"]
+                st.rerun() 
+            else:
+                st.error("❌ Usuário ou senha incorretos.")
     st.stop() 
 
 # ==========================================
