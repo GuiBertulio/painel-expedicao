@@ -465,7 +465,6 @@ try:
                     # 🔥 NOVO: DRILL-DOWN DIÁRIO (APENAS T3 SEPARADOR)
                     # ==========================================
                     if turno_p == "T3" and "SEPARADOR" in cargo_p:
-                        st.markdown("### 📅 Resultado Diário")
                         if not df_diario.empty:
                             df_pessoa_diario = df_diario[df_diario['NOME'] == pessoa_selecionada]
                             if not df_pessoa_diario.empty:
@@ -475,9 +474,23 @@ try:
                                 cols_datas = [c for c in df_diario.columns if isinstance(c, str) and c.count('/') == 2 and len(c.strip()) in [8, 10]]
                                 
                                 if cols_datas:
-                                    data_escolhida = st.selectbox("Selecione a Data da Apuração:", cols_datas)
+                                    # --- [COMO EDITAR: ALINHAMENTO DO TÍTULO COM A SELEÇÃO DE DATA] ---
+                                    # Cria duas colunas paralelas para colocar o selectbox do lado do título
+                                    col_tit_diario, col_data_diario = st.columns([1.6, 1])
                                     
-                                    # Pega a posição exata da data para puxar as 3 colunas seguintes
+                                    with col_tit_diario:
+                                        st.markdown("### 📅 Resultado Diário")
+                                        
+                                    with col_data_diario:
+                                        # O label_visibility="collapsed" esconde o texto de cima e deixa só a caixinha alinhada
+                                        data_escolhida = st.selectbox(
+                                            "Data Apuração", 
+                                            cols_datas, 
+                                            label_visibility="collapsed", 
+                                            key="sel_data_diario_alinhado"
+                                        )
+                                    
+                                    # Pega a posição exata da data selecionada para puxar as métricas diárias
                                     col_index = list(df_diario.columns).index(data_escolhida)
                                     
                                     val_itens = pessoa_d_row.iloc[col_index]
@@ -485,7 +498,7 @@ try:
                                     val_itens_hora = pessoa_d_row.iloc[col_index + 2]
                                     val_jl = pessoa_d_row.iloc[col_index + 3]
                                     
-                                    # Design dos cartões diários
+                                    # Renderiza os cartões com os resultados do dia escolhido
                                     st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{val_itens if val_itens else '0'}</h2></div>", unsafe_allow_html=True)
                                     
                                     c1, c2, c3 = st.columns(3)
@@ -493,10 +506,13 @@ try:
                                     c2.metric("⚡ Itens/Hora", val_itens_hora if val_itens_hora else "0")
                                     c3.metric("🎯 JL", f"{val_jl}" if val_jl else "0%")
                                 else:
+                                    st.markdown("### 📅 Resultado Diário")
                                     st.info("Nenhuma data foi identificada no cabeçalho do Relatório Diário.")
                             else:
+                                st.markdown("### 📅 Resultado Diário")
                                 st.warning("Colaborador não encontrado na aba 'Relatorio Diario'.")
                         else:
+                            st.markdown("### 📅 Resultado Diário")
                             st.warning("⚠️ Não foi possível carregar os dados. Verifique se o nome da aba é 'Relatorio Diario'.")
 
                     # ==========================================
