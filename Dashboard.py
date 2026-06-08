@@ -163,12 +163,18 @@ def carregar_dados():
 def carregar_diario():
     try:
         planilha = conectar_planilha()
-        # SE O NOME DA ABA FOR DIFERENTE, ALTERE AQUI DENTRO DAS ASPAS
         aba = planilha.worksheet("Relatorio Diario") 
         dados = aba.get_all_values()
-        if len(dados) > 2:
-            cabecalhos = dados[2] # Puxa a linha 3 (índice 2) que tem CÓD, NOME e as DATAS
-            df_d = pd.DataFrame(dados[3:], columns=cabecalhos)
+        
+        if len(dados) > 0:
+            # --- [CORREÇÃO] ---
+            # Agora puxa a linha 1 (índice 0) porque o script de upload já enviou a tabela limpa!
+            cabecalhos = dados[0] 
+            df_d = pd.DataFrame(dados[1:], columns=cabecalhos)
+            
+            # Limpa os nomes das colunas para garantir que nenhum espaço invisível dê erro
+            df_d.columns = df_d.columns.astype(str).str.strip()
+            
             return df_d
         return pd.DataFrame()
     except Exception as e:
