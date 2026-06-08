@@ -518,27 +518,54 @@ try:
                                     nome_coluna_real = cols_datas_reais[idx_escolha]
                                     col_index = list(df_diario.columns).index(nome_coluna_real)
                                     
-                                    # Puxa os valores e garante que se vier nulo/vazio, vire "0"
+                                    # Puxa os valores brutos da planilha
                                     val_itens = str(pessoa_d_row.iloc[col_index]).strip()
                                     val_horas = str(pessoa_d_row.iloc[col_index + 1]).strip()
                                     val_itens_hora = str(pessoa_d_row.iloc[col_index + 2]).strip()
-                                    val_jl = str(pessoa_d_row.iloc[col_index + 3]).strip()
+                                    val_jl_raw = str(pessoa_d_row.iloc[col_index + 3]).strip()
                                     
                                     val_itens = val_itens if val_itens and val_itens.lower() not in ['nan', 'none'] else "0"
                                     val_horas = val_horas if val_horas and val_horas.lower() not in ['nan', 'none'] else "0"
                                     val_itens_hora = val_itens_hora if val_itens_hora and val_itens_hora.lower() not in ['nan', 'none'] else "0"
-                                    val_jl = val_jl if val_jl and val_jl.lower() not in ['nan', 'none'] else "0%"
                                     
-                                    # Design dos cartões diários
-                                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{val_itens}</h2></div>", unsafe_allow_html=True)
+                                    # --- 1. FORMATAÇÃO DA JL (Somente número inteiro) ---
+                                    try:
+                                        if val_jl_raw and val_jl_raw.lower() not in ['nan', 'none']:
+                                            val_jl_num = float(val_jl_raw.replace(',', '.').replace('%', ''))
+                                            if val_jl_num <= 2.0 and "%" not in val_jl_raw: 
+                                                val_jl_num = val_jl_num * 100
+                                            # O int() garante que o número perca as casas decimais (ex: 76.82 vira 76)
+                                            jl_display = f"{int(val_jl_num)}%" 
+                                        else:
+                                            jl_display = "0%"
+                                    except:
+                                        jl_display = "0%"
+                                        
+                                    # --- 2. FORMATAÇÃO DE ITENS E ITENS/HORA (Arredondado) ---
+                                    try: val_itens = f"{float(val_itens.replace(',', '.')):,.0f}".replace(',', '.')
+                                    except: pass
                                     
+                                    try: val_itens_hora = f"{int(round(float(val_itens_hora.replace(',', '.'))))}"
+                                    except: val_itens_hora = "0"
+
+                                    # --- 3. FORMATAÇÃO DE HORAS (Decimal para HH:MM:SS) ---
+                                    try:
+                                        horas_dec = float(val_horas.replace(',', '.'))
+                                        h = int(horas_dec)
+                                        m = int((horas_dec - h) * 60)
+                                        s = int((((horas_dec - h) * 60) - m) * 60)
+                                        val_horas_formatado = f"{h:02d}:{m:02d}:{s:02d}"
+                                    except:
+                                        val_horas_formatado = "00:00:00"
+
+                                    # --- NOVO LAYOUT (Cartões menores em cima, Itens Separados em destaque embaixo) ---
                                     c1, c2, c3 = st.columns(3)
-                                    c1.metric("⏱️ Horas", val_horas)
+                                    c1.metric("⏱️ Horas", val_horas_formatado)
                                     c2.metric("⚡ Itens/Hora", val_itens_hora)
-                                    
-                                    # Adiciona o símbolo de % no JL se ele não tiver vindo
-                                    jl_display = val_jl if "%" in val_jl else f"{val_jl}%"
                                     c3.metric("🎯 JL", jl_display)
+                                    
+                                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{val_itens}</h2></div>", unsafe_allow_html=True)
+                                    
                                 else:
                                     st.markdown("### 📅 Resultado Diário")
                                     st.info("Nenhuma data foi identificada no cabeçalho do Relatório Diário.")
