@@ -8,18 +8,10 @@ import gspread
 # 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS
 # ==========================================
 USUARIOS = {
-    "diegoc": {"senha": "ger#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "flamarion": {"senha": "sub#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
-    "luciano": {"senha": "Luciano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
-    "wagner": {"senha": "Wagner@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
-    "jorge": {"senha": "Jorge@26TAF", "perfil": "Líder", "turno_acesso": "T2"},
-    "diego": {"senha": "Diego@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
-    "carlos": {"senha": "Carlos@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
-    "luis": {"senha": "Luis@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
-    "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T3"}
+    "diego": {"senha": "log@2026", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "lidert1": {"senha": "liderT1@2026", "perfil": "Líder", "turno_acesso": "T1"},
+    "lidert2": {"senha": "liderT2@2026", "perfil": "Líder", "turno_acesso": "T2"},
+    "lidert3": {"senha": "liderT3@2026", "perfil": "Líder", "turno_acesso": "T3"}
 }
 
 # ==========================================
@@ -72,10 +64,10 @@ def conectar_planilha():
     cred_dict = dict(st.secrets["gcp_service_account"])
     client = gspread.service_account_from_dict(cred_dict)
     planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
-    return planilha.worksheet("Historico_RH")
+    return planilha
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS E CÁLCULO DE RANKING
+# 2. CARREGAMENTO DOS DADOS (GERAL + DIÁRIO)
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -167,7 +159,23 @@ def carregar_dados():
 
     return df
 
+@st.cache_data(ttl=60)
+def carregar_diario():
+    try:
+        planilha = conectar_planilha()
+        # SE O NOME DA ABA FOR DIFERENTE, ALTERE AQUI DENTRO DAS ASPAS
+        aba = planilha.worksheet("Relatorio Diario") 
+        dados = aba.get_all_values()
+        if len(dados) > 2:
+            cabecalhos = dados[2] # Puxa a linha 3 (índice 2) que tem CÓD, NOME e as DATAS
+            df_d = pd.DataFrame(dados[3:], columns=cabecalhos)
+            return df_d
+        return pd.DataFrame()
+    except Exception as e:
+        return pd.DataFrame()
+
 df = carregar_dados()
+df_diario = carregar_diario()
 
 # ==========================================
 # 3. LÓGICA DE DATAS E FILTROS (C/ AUTENTICAÇÃO)
@@ -290,7 +298,6 @@ try:
                 
                 realizado = float(row.get(kpi, 0))
                 racional = float(row.get(f"{kpi}_Racional", 1))
-                
                 meta1 = float(row.get(f"{kpi}_Meta1", meta2))
 
                 if racional == 1 and realizado == 0: continue 
@@ -321,7 +328,7 @@ try:
                                 if st.form_submit_button("Salvar no Histórico"):
                                     if texto_feedback:
                                         try:
-                                            aba_rh = conectar_planilha()
+                                            aba_rh = conectar_planilha().worksheet("Historico_RH")
                                             agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                                             aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback])
                                             st.success("✅ Salvo!")
@@ -333,7 +340,7 @@ try:
                                 motivo = st.selectbox("Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo"])
                                 if st.form_submit_button("Enviar Solicitação"):
                                     try:
-                                        aba_rh = conectar_planilha()
+                                        aba_rh = conectar_planilha().worksheet("Historico_RH")
                                         agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                                         aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo])
                                         st.success("📧 Enviado!")
@@ -445,30 +452,75 @@ try:
                 with col_grafico:
                     st.plotly_chart(fig, use_container_width=True)
                 with col_tabela:
-                    kpis_ativos_pessoa = []
-                    for k in kpis_mapeados:
-                        m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
-                        if pd.notna(m2) and m2 > 0:
-                            kpis_ativos_pessoa.append(k)
+                    cargo_p = str(row.get('FUNÇÃO', '')).upper()
+                    turno_p = str(row.get('TURNO', '')).upper()
 
-                    col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_pessoa
-                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
-                    
-                    if 'Tempo Médio' in df_tabela_mini.columns:
-                        df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
-                    
-                    config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
-                    
-                    for col in df_tabela_mini.columns:
-                        if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
-                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
-                    
-                    st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
+                    # ==========================================
+                    # 🔥 NOVO: DRILL-DOWN DIÁRIO (APENAS T3 SEPARADOR)
+                    # ==========================================
+                    if turno_p == "T3" and "SEPARADOR" in cargo_p:
+                        st.markdown("### 📅 Resultado Diário")
+                        if not df_diario.empty:
+                            df_pessoa_diario = df_diario[df_diario['NOME'] == pessoa_selecionada]
+                            if not df_pessoa_diario.empty:
+                                pessoa_d_row = df_pessoa_diario.iloc[0]
+                                
+                                # Procura colunas na aba nova que tenham o formato de data "dd/mm/aaaa"
+                                cols_datas = [c for c in df_diario.columns if isinstance(c, str) and c.count('/') == 2 and len(c.strip()) in [8, 10]]
+                                
+                                if cols_datas:
+                                    data_escolhida = st.selectbox("Selecione a Data da Apuração:", cols_datas)
+                                    
+                                    # Pega a posição exata da data para puxar as 3 colunas seguintes
+                                    col_index = list(df_diario.columns).index(data_escolhida)
+                                    
+                                    val_itens = pessoa_d_row.iloc[col_index]
+                                    val_horas = pessoa_d_row.iloc[col_index + 1]
+                                    val_itens_hora = pessoa_d_row.iloc[col_index + 2]
+                                    val_jl = pessoa_d_row.iloc[col_index + 3]
+                                    
+                                    # Design dos cartões diários
+                                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{val_itens if val_itens else '0'}</h2></div>", unsafe_allow_html=True)
+                                    
+                                    c1, c2, c3 = st.columns(3)
+                                    c1.metric("⏱️ Horas", val_horas if val_horas else "0")
+                                    c2.metric("⚡ Itens/Hora", val_itens_hora if val_itens_hora else "0")
+                                    c3.metric("🎯 JL", f"{val_jl}" if val_jl else "0%")
+                                else:
+                                    st.info("Nenhuma data foi identificada no cabeçalho do Relatório Diário.")
+                            else:
+                                st.warning("Colaborador não encontrado na aba 'Relatorio Diario'.")
+                        else:
+                            st.warning("⚠️ Não foi possível carregar os dados. Verifique se o nome da aba é 'Relatorio Diario'.")
+
+                    # ==========================================
+                    # TABELA NORMAL (PARA CONFERENTES, T1 E T2)
+                    # ==========================================
+                    else:
+                        kpis_ativos_pessoa = []
+                        for k in kpis_mapeados:
+                            m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
+                            if pd.notna(m2) and m2 > 0:
+                                kpis_ativos_pessoa.append(k)
+
+                        col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_pessoa
+                        df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
+                        
+                        if 'Tempo Médio' in df_tabela_mini.columns:
+                            df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
+                        
+                        config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
+                        
+                        for col in df_tabela_mini.columns:
+                            if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                            elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                            elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+                            else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+                        
+                        st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
 
     # ==========================================
-    # 👥 VISÃO GERAL EQUIPE (MÉDIAS)
+    # 👥 VISÃO GERAL EQUIPE (MÉDIAS) E TABELAS
     # ==========================================
     else:
         cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
@@ -483,7 +535,6 @@ try:
 
             for kpi in kpis_mapeados:
                 if f"{kpi}_Meta2" in df_cargo.columns:
-                    
                     racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
                     
                     if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
@@ -506,14 +557,12 @@ try:
                         elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
                         elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
                         else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                        
                         perc = (real_med / meta2_med) if meta2_med > 0 else 0
                     else: 
                         if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
                         elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
                         elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
                         else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                        
                         perc = (meta2_med / real_med) if real_med > 0 else 1.2
 
                     real_perc = perc * 100
@@ -548,24 +597,32 @@ try:
                         st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
                     col_idx += 1
 
-        if len(cargos_render) > 0: st.divider()
-        st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
-        
-        kpis_ativos_tabela = []
-        for kpi in kpis_mapeados:
-            if f"{kpi}_Meta2" in df_filtrado.columns:
-                metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
-                if metas_validas.sum() > 0:
-                    kpis_ativos_tabela.append(kpi)
+        # ==========================================
+        # 🔥 NOVO: ESCONDER TABELA GERENCIAL SEM FILTRO
+        # ==========================================
+        filtros_ativos = (turno_selecionado != "Todos") or (cargo_selecionado != "Todos")
 
-        colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Ranking', 'Valor Final'] + kpis_ativos_tabela
-        df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
+        if filtros_ativos:
+            if len(cargos_render) > 0: st.divider()
+            st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
+            
+            kpis_ativos_tabela = []
+            for kpi in kpis_mapeados:
+                if f"{kpi}_Meta2" in df_filtrado.columns:
+                    metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
+                    if metas_validas.sum() > 0:
+                        kpis_ativos_tabela.append(kpi)
 
-        config = {
-            'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f"),
-            'Valor Ranking': st.column_config.NumberColumn("Rank R$", format="R$ %.2f")
-        }
-        st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Ranking', 'Valor Final'] + kpis_ativos_tabela
+            df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
+
+            config = {
+                'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f"),
+                'Valor Ranking': st.column_config.NumberColumn("Rank R$", format="R$ %.2f")
+            }
+            st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
+        else:
+            st.info("💡 Aplique um filtro na barra lateral (Turno ou Função) para visualizar a tabela detalhada da equipe.")
 
 except Exception as e:
     st.error(f"⚠️ Erro ao renderizar painel: {e}")
