@@ -470,41 +470,66 @@ try:
                             if not df_pessoa_diario.empty:
                                 pessoa_d_row = df_pessoa_diario.iloc[0]
                                 
-                                # Procura colunas na aba nova que tenham o formato de data "dd/mm/aaaa"
-                                cols_datas = [c for c in df_diario.columns if isinstance(c, str) and c.count('/') == 2 and len(c.strip()) in [8, 10]]
+                                # Procura colunas na aba nova que pareçam datas (blindado contra formatos de nuvem)
+                                cols_datas_reais = []
+                                opcoes_datas_formatadas = []
                                 
-                                if cols_datas:
-                                    # --- [COMO EDITAR: ALINHAMENTO DO TÍTULO COM A SELEÇÃO DE DATA] ---
-                                    # Cria duas colunas paralelas para colocar o selectbox do lado do título
+                                for c in df_diario.columns:
+                                    c_str = str(c).strip()
+                                    # Se a coluna tem número, traço ou barra, e não é uma das colunas fixas textuais
+                                    if any(char.isdigit() for char in c_str) and ('/' in c_str or '-' in c_str) and 'Inicio' not in c_str and 'Horas' not in c_str and 'Itens' not in c_str and 'JL' not in c_str:
+                                        cols_datas_reais.append(c_str)
+                                        
+                                        # Embeleza a data para o padrão BR na caixinha de seleção
+                                        data_limpa = c_str.split(' ')[0] # Tira o " 00:00:00" se o Python tiver enviado
+                                        if '-' in data_limpa and len(data_limpa.split('-')[0]) == 4:
+                                            ano, mes, dia = data_limpa.split('-')
+                                            opcoes_datas_formatadas.append(f"{dia}/{mes}/{ano}")
+                                        else:
+                                            opcoes_datas_formatadas.append(data_limpa)
+                                
+                                if cols_datas_reais:
+                                    # Cria duas colunas paralelas para colocar a lista do lado do título
                                     col_tit_diario, col_data_diario = st.columns([1.6, 1])
                                     
                                     with col_tit_diario:
                                         st.markdown("### 📅 Resultado Diário")
                                         
                                     with col_data_diario:
-                                        # O label_visibility="collapsed" esconde o texto de cima e deixa só a caixinha alinhada
-                                        data_escolhida = st.selectbox(
+                                        # A caixinha de seleção de datas com as datas limpas
+                                        data_escolhida_display = st.selectbox(
                                             "Data Apuração", 
-                                            cols_datas, 
+                                            opcoes_datas_formatadas, 
                                             label_visibility="collapsed", 
                                             key="sel_data_diario_alinhado"
                                         )
                                     
-                                    # Pega a posição exata da data selecionada para puxar as métricas diárias
-                                    col_index = list(df_diario.columns).index(data_escolhida)
+                                    # Encontra a posição da coluna real no banco de dados baseado na escolha
+                                    idx_escolha = opcoes_datas_formatadas.index(data_escolhida_display)
+                                    nome_coluna_real = cols_datas_reais[idx_escolha]
+                                    col_index = list(df_diario.columns).index(nome_coluna_real)
                                     
-                                    val_itens = pessoa_d_row.iloc[col_index]
-                                    val_horas = pessoa_d_row.iloc[col_index + 1]
-                                    val_itens_hora = pessoa_d_row.iloc[col_index + 2]
-                                    val_jl = pessoa_d_row.iloc[col_index + 3]
+                                    # Puxa os valores e garante que se vier nulo/vazio, vire "0"
+                                    val_itens = str(pessoa_d_row.iloc[col_index]).strip()
+                                    val_horas = str(pessoa_d_row.iloc[col_index + 1]).strip()
+                                    val_itens_hora = str(pessoa_d_row.iloc[col_index + 2]).strip()
+                                    val_jl = str(pessoa_d_row.iloc[col_index + 3]).strip()
                                     
-                                    # Renderiza os cartões com os resultados do dia escolhido
-                                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{val_itens if val_itens else '0'}</h2></div>", unsafe_allow_html=True)
+                                    val_itens = val_itens if val_itens and val_itens.lower() not in ['nan', 'none'] else "0"
+                                    val_horas = val_horas if val_horas and val_horas.lower() not in ['nan', 'none'] else "0"
+                                    val_itens_hora = val_itens_hora if val_itens_hora and val_itens_hora.lower() not in ['nan', 'none'] else "0"
+                                    val_jl = val_jl if val_jl and val_jl.lower() not in ['nan', 'none'] else "0%"
+                                    
+                                    # Design dos cartões diários
+                                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{val_itens}</h2></div>", unsafe_allow_html=True)
                                     
                                     c1, c2, c3 = st.columns(3)
-                                    c1.metric("⏱️ Horas", val_horas if val_horas else "0")
-                                    c2.metric("⚡ Itens/Hora", val_itens_hora if val_itens_hora else "0")
-                                    c3.metric("🎯 JL", f"{val_jl}" if val_jl else "0%")
+                                    c1.metric("⏱️ Horas", val_horas)
+                                    c2.metric("⚡ Itens/Hora", val_itens_hora)
+                                    
+                                    # Adiciona o símbolo de % no JL se ele não tiver vindo
+                                    jl_display = val_jl if "%" in val_jl else f"{val_jl}%"
+                                    c3.metric("🎯 JL", jl_display)
                                 else:
                                     st.markdown("### 📅 Resultado Diário")
                                     st.info("Nenhuma data foi identificada no cabeçalho do Relatório Diário.")
