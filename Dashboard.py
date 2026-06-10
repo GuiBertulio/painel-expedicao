@@ -50,9 +50,8 @@ if not st.session_state["logado"]:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.title("🔐 Login - Dashboard Logístico")
         
-        # Tiramos o st.form para a memória do Streamlit funcionar 100% das vezes
         usuario = st.text_input("Usuário").strip().lower()
-        senha = st.text_input("Senha", type="password").strip() # <-- Proteção contra espaços invisíveis
+        senha = st.text_input("Senha", type="password").strip() 
         btn_entrar = st.button("Entrar", type="primary", use_container_width=True)
         
         if btn_entrar:
@@ -117,8 +116,6 @@ def carregar_dados():
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Data Inicio', 'Data Fim']
     for col in df.columns:
         if col not in colunas_texto:
-            # --- [NOVA REGRA] --- 
-            # Pega o 'Tempo Médio' e todas as suas '_Meta', convertendo tudo para segundos. Ignora Racional e Valor (R$).
             if 'TEMPO' in col.upper() and not col.upper().endswith('_VALOR') and not col.upper().endswith('_RACIONAL'): 
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
@@ -152,7 +149,6 @@ def carregar_dados():
                     
                     df.at[idx, 'Posicao Ranking'] = pos
                     
-                    # --- [NOVO: VALORES EXATOS DO SEU PRINT] ---
                     if turno == 'T3':
                         if pos == 1: val_base = 250.0
                         elif pos == 2: val_base = 200.0
@@ -187,14 +183,9 @@ def carregar_diario():
         dados = aba.get_all_values()
         
         if len(dados) > 0:
-            # --- [CORREÇÃO] ---
-            # Agora puxa a linha 1 (índice 0) porque o script de upload já enviou a tabela limpa!
             cabecalhos = dados[0] 
             df_d = pd.DataFrame(dados[1:], columns=cabecalhos)
-            
-            # Limpa os nomes das colunas para garantir que nenhum espaço invisível dê erro
             df_d.columns = df_d.columns.astype(str).str.strip()
-            
             return df_d
         return pd.DataFrame()
     except Exception as e:
@@ -388,8 +379,8 @@ try:
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
             
-            # --- [NOVO: EXIBE SOMENTE SE FOR TOP 3 (1, 2 ou 3) E TIVER VALOR] ---
-            if 1 <= pos <= 3 and val_rank > 0:
+            # --- [NOVO: EXIBE SOMENTE SE FOR TOP 3 (1, 2 ou 3) MESMO SE O CÁLCULO ESTIVER ZERADO] ---
+            if 1 <= pos <= 3:
                 cargo_p = row.get('FUNÇÃO', '')
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == cargo_p)])
                 
@@ -491,18 +482,15 @@ try:
                             if not df_pessoa_diario.empty:
                                 pessoa_d_row = df_pessoa_diario.iloc[0]
                                 
-                                # Procura colunas na aba nova que pareçam datas (blindado contra formatos de nuvem)
                                 cols_datas_reais = []
                                 opcoes_datas_formatadas = []
                                 
                                 for c in df_diario.columns:
                                     c_str = str(c).strip()
-                                    # Se a coluna tem número, traço ou barra, e não é uma das colunas fixas textuais
                                     if any(char.isdigit() for char in c_str) and ('/' in c_str or '-' in c_str) and 'Inicio' not in c_str and 'Horas' not in c_str and 'Itens' not in c_str and 'JL' not in c_str:
                                         cols_datas_reais.append(c_str)
                                         
-                                        # Embeleza a data para o padrão BR na caixinha de seleção
-                                        data_limpa = c_str.split(' ')[0] # Tira o " 00:00:00" se o Python tiver enviado
+                                        data_limpa = c_str.split(' ')[0] 
                                         if '-' in data_limpa and len(data_limpa.split('-')[0]) == 4:
                                             ano, mes, dia = data_limpa.split('-')
                                             opcoes_datas_formatadas.append(f"{dia}/{mes}/{ano}")
@@ -510,14 +498,12 @@ try:
                                             opcoes_datas_formatadas.append(data_limpa)
                                 
                                 if cols_datas_reais:
-                                    # Cria duas colunas paralelas para colocar a lista do lado do título
                                     col_tit_diario, col_data_diario = st.columns([1.6, 1])
                                     
                                     with col_tit_diario:
                                         st.markdown("### 📅 Resultado Diário")
                                         
                                     with col_data_diario:
-                                        # A caixinha de seleção de datas com as datas limpas
                                         data_escolhida_display = st.selectbox(
                                             "Data Apuração", 
                                             opcoes_datas_formatadas, 
@@ -525,12 +511,10 @@ try:
                                             key="sel_data_diario_alinhado"
                                         )
                                     
-                                    # Encontra a posição da coluna real no banco de dados baseado na escolha
                                     idx_escolha = opcoes_datas_formatadas.index(data_escolhida_display)
                                     nome_coluna_real = cols_datas_reais[idx_escolha]
                                     col_index = list(df_diario.columns).index(nome_coluna_real)
                                     
-                                    # Puxa os valores brutos da planilha
                                     val_itens = str(pessoa_d_row.iloc[col_index]).strip()
                                     val_horas = str(pessoa_d_row.iloc[col_index + 1]).strip()
                                     val_itens_hora = str(pessoa_d_row.iloc[col_index + 2]).strip()
@@ -540,27 +524,23 @@ try:
                                     val_horas = val_horas if val_horas and val_horas.lower() not in ['nan', 'none'] else "0"
                                     val_itens_hora = val_itens_hora if val_itens_hora and val_itens_hora.lower() not in ['nan', 'none'] else "0"
                                     
-                                    # --- 1. FORMATAÇÃO DA JL (Somente número inteiro) ---
                                     try:
                                         if val_jl_raw and val_jl_raw.lower() not in ['nan', 'none']:
                                             val_jl_num = float(val_jl_raw.replace(',', '.').replace('%', ''))
                                             if val_jl_num <= 2.0 and "%" not in val_jl_raw: 
                                                 val_jl_num = val_jl_num * 100
-                                            # O int() garante que o número perca as casas decimais (ex: 76.82 vira 76)
                                             jl_display = f"{int(val_jl_num)}%" 
                                         else:
                                             jl_display = "0%"
                                     except:
                                         jl_display = "0%"
                                         
-                                    # --- 2. FORMATAÇÃO DE ITENS E ITENS/HORA (Arredondado) ---
                                     try: val_itens = f"{float(val_itens.replace(',', '.')):,.0f}".replace(',', '.')
                                     except: pass
                                     
                                     try: val_itens_hora = f"{int(round(float(val_itens_hora.replace(',', '.'))))}"
                                     except: val_itens_hora = "0"
 
-                                    # --- 3. FORMATAÇÃO DE HORAS (Decimal para HH:MM:SS) ---
                                     try:
                                         horas_dec = float(val_horas.replace(',', '.'))
                                         h = int(horas_dec)
@@ -570,7 +550,6 @@ try:
                                     except:
                                         val_horas_formatado = "00:00:00"
 
-                                    # --- NOVO LAYOUT (Cartões menores em cima, Itens Separados em destaque embaixo) ---
                                     c1, c2, c3 = st.columns(3)
                                     c1.metric("⏱️ Horas", val_horas_formatado)
                                     c2.metric("⚡ Itens/Hora", val_itens_hora)
@@ -716,7 +695,6 @@ try:
             config = {
                 'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")
             }
-            st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
         else:
             st.info("💡 Aplique um filtro na barra lateral (Turno ou Função) para visualizar a tabela detalhada da equipe.")
