@@ -152,10 +152,19 @@ def carregar_dados():
                     
                     df.at[idx, 'Posicao Ranking'] = pos
                     
-                    if pos == 1: val_base = 250.0 if turno == 'T3' else 150.0
-                    elif pos == 2: val_base = 200.0 if turno == 'T3' else 100.0
-                    elif pos == 3: val_base = 100.0 if turno == 'T3' else 50.0
-                    else: val_base = 0.0
+                    # --- [NOVO: VALORES EXATOS DO SEU PRINT] ---
+                    if turno == 'T3':
+                        if pos == 1: val_base = 250.0
+                        elif pos == 2: val_base = 200.0
+                        elif pos == 3: val_base = 100.0
+                        else: val_base = 0.0
+                    elif turno == 'T2':
+                        if pos == 1: val_base = 100.0
+                        elif pos == 2: val_base = 80.0
+                        elif pos == 3: val_base = 50.0
+                        else: val_base = 0.0
+                    else:
+                        val_base = 0.0
                     
                     if val_base > 0:
                         d_uteis = float(row_eq.get('Dias Uteis', 26))
@@ -376,18 +385,19 @@ try:
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
             
-            if row.get('Valor Ranking', 0) > 0:
-                pos = int(row.get('Posicao Ranking', 0))
+            pos = int(row.get('Posicao Ranking', 0))
+            val_rank = row.get('Valor Ranking', 0)
+            
+            # --- [NOVO: EXIBE SOMENTE SE FOR TOP 3 (1, 2 ou 3) E TIVER VALOR] ---
+            if 1 <= pos <= 3 and val_rank > 0:
                 cargo_p = row.get('FUNÇÃO', '')
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == cargo_p)])
-                val_rank = row.get('Valor Ranking', 0)
                 
                 if pos == 1: medalha, cor_rank = "🥇", "#ffd700"
                 elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0"
                 elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32"
-                else: medalha, cor_rank = "🏅", "gray"
                 
-                texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
+                texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
                 st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {cargo_p}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             cols_meta = st.columns(4)
@@ -698,13 +708,15 @@ try:
                     if metas_validas.sum() > 0:
                         kpis_ativos_tabela.append(kpi)
 
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Ranking', 'Valor Final'] + kpis_ativos_tabela
+            # Removemos o 'Valor Ranking' dessa lista
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
+            # Removemos a formatação do Valor Ranking
             config = {
-                'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f"),
-                'Valor Ranking': st.column_config.NumberColumn("Rank R$", format="R$ %.2f")
+                'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")
             }
+            st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
         else:
             st.info("💡 Aplique um filtro na barra lateral (Turno ou Função) para visualizar a tabela detalhada da equipe.")
