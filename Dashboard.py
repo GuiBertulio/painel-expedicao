@@ -75,7 +75,7 @@ def conectar_planilha():
     return planilha
 
 # ==========================================
-# 2. CARREGAMENTO DOS DADOS (GERAL + DIÁRIO)
+# 2. CARREGAMENTO DOS DADOS E CÁLCULO DE RANKING
 # ==========================================
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -136,7 +136,14 @@ def carregar_dados():
                 
                 kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
                 if not kpis: continue
-                metrica_rank = kpis[0] 
+                
+                # --- [NOVA LÓGICA DE RANKING ESPECÍFICA POR TURNO] ---
+                if turno == 'T2':
+                    # Procura a métrica que tenha "RESSUP" no nome. Se não achar nada, pega a primeira por segurança.
+                    metrica_rank = next((k for k in kpis if 'RESSUP' in k.upper()), kpis[0])
+                else:
+                    # Para o T3, procura "ITENS".
+                    metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
                 
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
                 ordem_cresc = False if racional == 1 else True
