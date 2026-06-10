@@ -117,7 +117,9 @@ def carregar_dados():
     colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Data Inicio', 'Data Fim']
     for col in df.columns:
         if col not in colunas_texto:
-            if col == 'Tempo Médio': 
+            # --- [NOVA REGRA] --- 
+            # Pega o 'Tempo Médio' e todas as suas '_Meta', convertendo tudo para segundos. Ignora Racional e Valor (R$).
+            if 'TEMPO' in col.upper() and not col.upper().endswith('_VALOR') and not col.upper().endswith('_RACIONAL'): 
                 texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
             else:
