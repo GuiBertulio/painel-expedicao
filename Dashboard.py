@@ -655,7 +655,7 @@ try:
                     elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                    metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO', 'MÉD. PALET']
+                    metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
                     eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                     
                     if "Tempo" in str(kpi):
