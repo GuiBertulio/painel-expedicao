@@ -238,12 +238,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             d_meta = float(row.get('Dias Meta', 0))
             d_trab = float(row.get('Dias Trabalhados', 0))
             
-            pos = int(row.get('Posicao Ranking', 0))
-            if pos > 0 and 'SEPARADOR' in str(funcao).upper():
-                pos_str = f"{pos}º Lugar"
-            else:
-                pos_str = "-"
-            
+            # --- 1. GERA AS LINHAS DOS INDICADORES NORMAIS ---
             for kpi in kpis_gerais:
                 meta2 = float(row.get(f"{kpi}_Meta2", 0))
                 
@@ -281,7 +276,6 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                         "NOME": nome,
                         "TURNO": turno,
                         "FUNÇÃO": funcao,
-                        "POSIÇÃO RANKING": pos_str,
                         "DIAS ÚTEIS": int(d_uteis),
                         "DIAS META": int(d_meta),
                         "DIAS TRAB.": int(d_trab),
@@ -290,9 +284,32 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                         "VALOR GANHO (R$)": valor,
                         "META ATINGIDA": faixa_meta
                     })
+            
+            # --- 2. [NOVO] GERA A LINHA EXCLUSIVA DO RANKING PARA SEPARADORES ---
+            pos = int(row.get('Posicao Ranking', 0))
+            if pos > 0 and 'SEPARADOR' in str(funcao).upper():
+                val_rank = float(row.get('Valor Ranking', 0))
+                
+                # Garantia de segurança: Se for maior que 3º lugar, força o valor ganho a R$ 0,00
+                if pos > 3: val_rank = 0.0
+                
+                df_auditoria.append({
+                    "CÓD.": cod,
+                    "NOME": nome,
+                    "TURNO": turno,
+                    "FUNÇÃO": funcao,
+                    "DIAS ÚTEIS": int(d_uteis),
+                    "DIAS META": int(d_meta),
+                    "DIAS TRAB.": int(d_trab),
+                    "INDICADOR": "Ranking",
+                    "REALIZADO": f"{pos}º Lugar",
+                    "VALOR GANHO (R$)": val_rank,
+                    "META ATINGIDA": "-"
+                })
         
         df_export = pd.DataFrame(df_auditoria)
         
+        # --- MOTOR DO EXCEL (Ajustado para as novas 11 colunas) ---
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             df_export.to_excel(writer, index=False, sheet_name='Auditoria_Fechamento', header=False, startrow=1)
@@ -311,16 +328,15 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                 'style': 'Table Style Medium 2'
             })
             
-            worksheet.set_column('A:A', 10, formato_central) 
-            worksheet.set_column('B:B', 38)                  
-            worksheet.set_column('C:C', 12, formato_central) 
-            worksheet.set_column('D:D', 22)                  
-            worksheet.set_column('E:E', 18, formato_central) 
-            worksheet.set_column('F:H', 13, formato_central) 
-            worksheet.set_column('I:I', 25)                  
-            worksheet.set_column('J:J', 15, formato_central) 
-            worksheet.set_column('K:K', 20, formato_moeda)   
-            worksheet.set_column('L:L', 18, formato_central) 
+            worksheet.set_column('A:A', 10, formato_central) # CÓD.
+            worksheet.set_column('B:B', 38)                  # NOME
+            worksheet.set_column('C:C', 12, formato_central) # TURNO
+            worksheet.set_column('D:D', 22)                  # FUNÇÃO
+            worksheet.set_column('E:G', 13, formato_central) # DIAS
+            worksheet.set_column('H:H', 25)                  # INDICADOR
+            worksheet.set_column('I:I', 15, formato_central) # REALIZADO
+            worksheet.set_column('J:J', 20, formato_moeda)   # VALOR GANHO
+            worksheet.set_column('K:K', 18, formato_central) # META ATINGIDA
         
         st.sidebar.download_button(
             label="📥 Baixar Auditoria",
@@ -332,7 +348,6 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
         )
     else:
         st.sidebar.button("🔒 Fechamento (Auditoria)", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
-
 st.sidebar.markdown("---")
 st.sidebar.title("🔍 Filtros do Painel")
 
