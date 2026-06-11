@@ -354,14 +354,30 @@ st.sidebar.title("🔍 Filtros do Painel")
 # --- LÓGICA DO FILTRO DE TURNO ---
 turno_logado = st.session_state["turno_acesso"]
 
+# --- LÓGICA DO FILTRO DE TURNO ---
+turno_logado = st.session_state["turno_acesso"]
+
 if turno_logado == "Todos":
     lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+    df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
+
+elif isinstance(turno_logado, list):
+    # Se o usuário tem uma LISTA de turnos (Ex: Flamarion com T1 e T2)
+    st.sidebar.info(f"🔒 Acesso restrito aos Turnos: **{', '.join(turno_logado)}**")
+    lista_turnos = ["Todos Permitidos"] + turno_logado
+    turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+    
+    if turno_selecionado == "Todos Permitidos":
+        df_filtrado = df[df['TURNO'].isin(turno_logado)].copy()
+    else:
+        df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
+
 else:
+    # Se o usuário tem apenas UM turno restrito (Ex: T3)
     turno_selecionado = turno_logado
     st.sidebar.info(f"🔒 Acesso restrito ao Turno: **{turno_selecionado}**")
-
-df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
+    df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
 
 lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 cargo_selecionado = st.sidebar.selectbox("2. Cargo/Função:", lista_cargos)
@@ -778,7 +794,7 @@ try:
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS) E TABELAS
     # ==========================================
     else:
-        filtros_ativos = (turno_selecionado != "Todos") or (cargo_selecionado != "Todos")
+        filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
 
         if not filtros_ativos:
             # --- 🚀 TELA DE BOAS-VINDAS (LANDING PAGE) ---
