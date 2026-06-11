@@ -596,8 +596,46 @@ try:
                 st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
             st.divider()
-            st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
 
+            # ==========================================
+            # 🔥 NOVO: GESTÃO E FEEDBACK INDIVIDUAL
+            # ==========================================
+            nome_c = row.get('NOME', pessoa_selecionada)
+            cod_c = row.get('CÓD.', '')
+
+            st.markdown(f"### 🗣️ Ações de Gestão: {nome_c}")
+            col_feed_ind, col_trein_ind = st.columns(2)
+            
+            with col_feed_ind:
+                with st.expander(f"💬 Registrar Feedback"):
+                    # Usamos o código do colaborador na chave (key) para o Streamlit não bugar
+                    with st.form(key=f"form_feed_ind_{cod_c}"):
+                        texto_feedback = st.text_area("Descreva o que foi conversado (Elogios, Alinhamentos, etc):")
+                        if st.form_submit_button("Salvar no Histórico"):
+                            if texto_feedback:
+                                try:
+                                    aba_rh = conectar_planilha().worksheet("Historico_RH")
+                                    agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
+                                    aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback])
+                                    st.success("✅ Salvo!")
+                                except Exception as e: st.error(f"Erro: {e}")
+                            else: st.error("⚠️ Digite algo.")
+            
+            with col_trein_ind:
+                with st.expander(f"🎯 Solicitar Reciclagem"):
+                    with st.form(key=f"form_trein_ind_{cod_c}"):
+                        motivo = st.selectbox("Motivo/Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo", "Comportamental", "Outros"])
+                        if st.form_submit_button("Enviar Solicitação"):
+                            try:
+                                aba_rh = conectar_planilha().worksheet("Historico_RH")
+                                agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
+                                aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo])
+                                st.success("📧 Enviado!")
+                            except Exception as e: st.error(f"Erro: {e}")
+
+            st.divider()
+            st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
+            
             if grafico_dados:
                 df_grafico = pd.DataFrame(grafico_dados)
                 df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
