@@ -604,87 +604,109 @@ try:
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS) E TABELAS
     # ==========================================
     else:
-        cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
-
-        for cargo_atual in cargos_render:
-            df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
-            if df_cargo.empty: continue
-
-            st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
-            cols_eq = st.columns(4)
-            col_idx = 0
-
-            for kpi in kpis_mapeados:
-                if f"{kpi}_Meta2" in df_cargo.columns:
-                    racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
-                    
-                    if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
-                    else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
-                        
-                    if df_kpi_valido.empty: continue
-
-                    meta2_med = df_kpi_valido[f"{kpi}_Meta2"].mean()
-                    if pd.isna(meta2_med) or meta2_med <= 0: continue
-
-                    meta1_med = df_kpi_valido[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_kpi_valido.columns else meta2_med
-                    meta3_med = df_kpi_valido[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_kpi_valido.columns else meta2_med
-                    
-                    real_med = df_kpi_valido[kpi].mean()
-                    racional = racional_temp
-                    soma_total = df_kpi_valido[kpi].sum()
-
-                    if racional == 1: 
-                        if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                        elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                        elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                        else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                        perc = (real_med / meta2_med) if meta2_med > 0 else 0
-                    else: 
-                        if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                        elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                        elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                        else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                        perc = (meta2_med / real_med) if real_med > 0 else 1.2
-
-                    real_perc = perc * 100
-
-                    if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                    elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                    elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-
-                    metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
-                    eh_global = any(g in str(kpi).upper() for g in metricas_globais)
-                    
-                    if "Tempo" in str(kpi):
-                        v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                        t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                        v_tela = f"{real_med:.2f}%"
-                        t_tela = f"{alvo_atual_med:.2f}%"
-                    else:
-                        v_tela = f"{real_med:,.0f}".replace(',', '.')
-                        t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
-
-                    if eh_global:
-                        titulo_card = f"{kpi}"
-                    else:
-                        soma_str = f"{soma_total:,.0f}".replace(',', '.')
-                        titulo_card = f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {soma_str})</span>"
-                        
-                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
-
-                    with cols_eq[col_idx % 4]:
-                        st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
-                    col_idx += 1
-
-        # ==========================================
-        # 🔥 NOVO: ESCONDER TABELA GERENCIAL SEM FILTRO
-        # ==========================================
+        # A variável que checa se algum filtro principal foi ativado
         filtros_ativos = (turno_selecionado != "Todos") or (cargo_selecionado != "Todos")
 
+        if not filtros_ativos:
+            # --- 🚀 TELA DE BOAS-VINDAS (LANDING PAGE) ---
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Criando 3 colunas para o "Manual de Uso"
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos. O sistema calculará as médias automaticamente e indicará o atingimento das metas.</p></div>", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios conquistados, posição no Ranking e o detalhamento da produção diária.</p></div>", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identificar gargalos na operação, registrar feedbacks diretos e solicitar reciclagens para o RH.</p></div>", unsafe_allow_html=True)
+            st.markdown("<br><br>", unsafe_allow_html=True)
+
+        else:
+            # --- SÓ RENDERIZA OS CARDS DAS EQUIPES SE HOUVER FILTRO ---
+            cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
+
+            for cargo_atual in cargos_render:
+                df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
+                if df_cargo.empty: continue
+
+                st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
+                cols_eq = st.columns(4)
+                col_idx = 0
+
+                for kpi in kpis_mapeados:
+                    if f"{kpi}_Meta2" in df_cargo.columns:
+                        racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
+                        
+                        if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
+                        else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
+                            
+                        if df_kpi_valido.empty: continue
+
+                        meta2_med = df_kpi_valido[f"{kpi}_Meta2"].mean()
+                        if pd.isna(meta2_med) or meta2_med <= 0: continue
+
+                        meta1_med = df_kpi_valido[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_kpi_valido.columns else meta2_med
+                        meta3_med = df_kpi_valido[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_kpi_valido.columns else meta2_med
+                        
+                        real_med = df_kpi_valido[kpi].mean()
+                        racional = racional_temp
+                        soma_total = df_kpi_valido[kpi].sum()
+
+                        if racional == 1: 
+                            if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                            elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                            elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                            else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                            perc = (real_med / meta2_med) if meta2_med > 0 else 0
+                        else: 
+                            if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                            elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                            elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                            else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                            perc = (meta2_med / real_med) if real_med > 0 else 1.2
+
+                        real_perc = perc * 100
+
+                        if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
+                        elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                        elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+
+                        metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
+                        eh_global = any(g in str(kpi).upper() for g in metricas_globais)
+                        
+                        if "Tempo" in str(kpi):
+                            v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                            t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                            v_tela = f"{real_med:.2f}%"
+                            t_tela = f"{alvo_atual_med:.2f}%"
+                        else:
+                            v_tela = f"{real_med:,.0f}".replace(',', '.')
+                            t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
+
+                        if eh_global:
+                            titulo_card = f"{kpi}"
+                        else:
+                            soma_str = f"{soma_total:,.0f}".replace(',', '.')
+                            titulo_card = f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {soma_str})</span>"
+                            
+                        alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
+
+                        with cols_eq[col_idx % 4]:
+                            st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
+                        col_idx += 1
+
+        # ==========================================
+        # 🔥 TABELA GERENCIAL (SÓ APARECE SE FILTRAR)
+        # ==========================================
         if filtros_ativos:
-            if len(cargos_render) > 0: st.divider()
+            # Como a indentação mudou para cair dentro do 'else', checamos a variável 'cargos_render' de forma segura
+            if 'cargos_render' in locals() and len(cargos_render) > 0: st.divider()
+            
             st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
             
             kpis_ativos_tabela = []
@@ -694,17 +716,13 @@ try:
                     if metas_validas.sum() > 0:
                         kpis_ativos_tabela.append(kpi)
 
-            # Removemos o 'Valor Ranking' dessa lista
             colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
-            # Removemos a formatação do Valor Ranking
             config = {
                 'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")
             }
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
-        else:
-            st.info("💡 Aplique um filtro na barra lateral (Turno ou Função) para visualizar a tabela detalhada da equipe.")
 
 except Exception as e:
     st.error(f"⚠️ Erro ao renderizar painel: {e}")
