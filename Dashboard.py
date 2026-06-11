@@ -328,6 +328,27 @@ try:
                                 real = float(row.get(kpi, 0))
                                 valor = float(row.get(f"{kpi}_Valor", 0))
                                 
+                                # Resgata as Metas 1 e 3 e o Racional para descobrir a faixa
+                                meta1 = float(row.get(f"{kpi}_Meta1", 0))
+                                meta3 = float(row.get(f"{kpi}_Meta3", 0))
+                                racional = float(row.get(f"{kpi}_Racional", 1))
+                                
+                                # Proteção caso a Meta 1 ou 3 não estejam cadastradas no Excel
+                                if meta1 <= 0: meta1 = meta2
+                                if meta3 <= 0: meta3 = meta2
+                                
+                                # --- CÁLCULO DA FAIXA ATINGIDA (0%, 50%, 100% ou 120%) ---
+                                if racional == 1: # Quanto MAIOR, Melhor (Ex: Itens)
+                                    if real < meta1: faixa_meta = "0%"
+                                    elif real < meta2: faixa_meta = "50%"
+                                    elif real < meta3: faixa_meta = "100%"
+                                    else: faixa_meta = "120%"
+                                else: # Quanto MENOR, Melhor (Ex: Avarias, Tempo)
+                                    if real > meta1: faixa_meta = "0%"
+                                    elif real > meta2: faixa_meta = "50%"
+                                    elif real > meta3: faixa_meta = "100%"
+                                    else: faixa_meta = "120%"
+                                
                                 # Função para aplicar % ou Horas conforme o tipo de Indicador
                                 def formata(v):
                                     if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
@@ -346,7 +367,8 @@ try:
                                     "DIAS TRAB.": int(d_trab),
                                     "INDICADOR": kpi,
                                     "REALIZADO": real_str,
-                                    "VALOR GANHO (R$)": valor
+                                    "VALOR GANHO (R$)": valor,
+                                    "META ATINGIDA": faixa_meta
                                 })
                     
                     df_export = pd.DataFrame(df_auditoria)
@@ -371,7 +393,7 @@ try:
                             'style': 'Table Style Medium 2'
                         })
                         
-                        # Ajustando as novas posições e larguras das colunas
+                        # Ajustando as novas posições e larguras (Agora indo até a coluna K)
                         worksheet.set_column('A:A', 10, formato_central) # CÓD.
                         worksheet.set_column('B:B', 38)                  # NOME
                         worksheet.set_column('C:C', 12, formato_central) # TURNO
@@ -380,6 +402,7 @@ try:
                         worksheet.set_column('H:H', 25)                  # INDICADOR
                         worksheet.set_column('I:I', 15, formato_central) # REALIZADO
                         worksheet.set_column('J:J', 20, formato_moeda)   # VALOR GANHO
+                        worksheet.set_column('K:K', 18, formato_central) # META ATINGIDA
                     
                     st.download_button(
                         label="📥 Baixar Auditoria",
