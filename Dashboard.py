@@ -286,12 +286,103 @@ if st.session_state["perfil"] == "Gerente":
 # 4. RENDERIZAÇÃO DA TELA
 # ==========================================
 try:
+    import io # <-- Import necessário para gerar o Excel em memória
+    
     kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
 
     col_titulo, col_kpis = st.columns([1, 1.2])
+    
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
+        
+        # --- [NOVO: BOTÃO DE AUDITORIA EXCLUSIVO E CONDICIONAL] ---
+        c_info, c_btn = st.columns([1.8, 1])
+        with c_info:
+            st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
+            
+        with c_btn:
+            # Checa se é o Guilherme ou o Nilo logado
+            if st.session_state.get("usuario") in ["guilherme", "nilo"]:
+                st.markdown("<br>", unsafe_allow_html=True) # Alinha o botão com a caixa de data
+                # Regra de Fechamento: Começa dia 26 e termina dia 25
+                is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
+                
+                if is_fechado:
+                    # Gera a tabela "Longa" com base no df raiz (empresa toda)
+                    df_auditoria = []
+                    for idx, row in df.iterrows():
+                        cod = row.get('CÓD.', '')
+                        nome = row.get('NOME', '')
+                        funcao = row.get('FUNÇÃO', '')
+                        turno = row.get('TURNO', '')
+                        
+                        for kpi in kpis_mapeados:
+                            meta1 = float(row.get(f"{kpi}_Meta1", 0))
+                            meta2 = float(row.get(f"{kpi}_Meta2", 0))
+                            meta3 = float(row.get(f"{kpi}_Meta3", 0))
+                            racional = float(row.get(f"{kpi}_Racional", 1))
+                            real = float(row.get(kpi, 0))
+                            valor = float(row.get(f"{kpi}_Valor", 0))
+                            
+                            # Função para aplicar % ou Horas conforme a regra
+                            def formata(v):
+                                if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
+                                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%"
+                                else: return f"{v:,.0f}".replace(',', '.')
+                            
+                            # Se a equipe tem esse indicador cadastrado (Meta 2 > 0)
+                            if meta2 > 0:
+                                if racional == 1: # Quanto maior, melhor
+                                    if real < meta1: prox = meta1
+                                    elif real < meta2: prox = meta2
+                                    elif real < meta3: prox = meta3
+                                    else: prox = "MAX"
+                                else: # Quanto menor, melhor
+                                    if real > meta1: prox = meta1
+                                    elif real > meta2: prox = meta2
+                                    elif real > meta3: prox = meta3
+                                    else: prox = "MAX"
+                                    
+                                prox_str = "Máxima" if prox == "MAX" else formata(prox)
+                                real_str = formata(real)
+                            else:
+                                # Regra: Se a pessoa não tem esse indicador, zera tudo
+                                prox_str = "0"
+                                real_str = "0"
+                                valor = 0.0
+                            
+                            df_auditoria.append({
+                                "CÓD.": cod,
+                                "NOME": nome,
+                                "TURNO": turno,
+                                "FUNÇÃO": funcao,
+                                "INDICADOR": kpi,
+                                "REALIZADO": real_str,
+                                "VALOR GANHO (R$)": valor,
+                                "PRÓXIMA META": prox_str
+                            })
+                    
+                    df_export = pd.DataFrame(df_auditoria)
+                    
+                    # Motor de criação do Excel com Filtros direto na Memória
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                        df_export.to_excel(writer, index=False, sheet_name='Auditoria_Detalhada')
+                        worksheet = writer.sheets['Auditoria_Detalhada']
+                        worksheet.autofilter(0, 0, len(df_export), len(df_export.columns) - 1)
+                        for i, col in enumerate(df_export.columns):
+                            worksheet.set_column(i, i, max(len(col), 15))
+                    
+                    st.download_button(
+                        label="📥 Baixar Auditoria",
+                        data=buffer.getvalue(),
+                        file_name=f"Auditoria_Produtividade_Fechamento.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                else:
+                    st.button("🔒 Fechamento", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
     
     with col_kpis:
         st.markdown("## 🎯 Visão Geral")
