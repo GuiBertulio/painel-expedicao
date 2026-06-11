@@ -586,7 +586,8 @@ try:
                                         try:
                                             aba_rh = conectar_planilha().worksheet("Historico_RH")
                                             agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                                            aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback])
+                                            gestor = st.session_state["usuario"].capitalize() # <--- SALVA O NOME DO LÍDER AQUI
+                                            aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback, gestor])
                                             st.success("✅ Salvo!")
                                         except Exception as e: st.error(f"Erro: {e}")
                                     else: st.error("⚠️ Digite algo.")
@@ -598,7 +599,8 @@ try:
                                     try:
                                         aba_rh = conectar_planilha().worksheet("Historico_RH")
                                         agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                                        aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo])
+                                        gestor = st.session_state["usuario"].capitalize() # <--- SALVA O NOME DO LÍDER AQUI
+                                        aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo, gestor])
                                         st.success("📧 Enviado!")
                                     except Exception as e: st.error(f"Erro: {e}")
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -728,7 +730,8 @@ try:
                                 try:
                                     aba_rh = conectar_planilha().worksheet("Historico_RH")
                                     agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                                    aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback])
+                                    gestor = st.session_state["usuario"].capitalize() # <--- SALVA O NOME DO LÍDER AQUI
+                                    aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback, gestor])
                                     st.success("✅ Salvo!")
                                 except Exception as e: st.error(f"Erro: {e}")
                             else: st.error("⚠️ Digite algo.")
@@ -742,7 +745,8 @@ try:
                             try:
                                 aba_rh = conectar_planilha().worksheet("Historico_RH")
                                 agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                                aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo])
+                                gestor = st.session_state["usuario"].capitalize() # <--- SALVA O NOME DO LÍDER AQUI
+                                aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo, gestor])
                                 st.success("📧 Enviado!")
                             except Exception as e: st.error(f"Erro: {e}")
 
