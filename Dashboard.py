@@ -286,7 +286,7 @@ if st.session_state["perfil"] == "Gerente":
 # 4. RENDERIZAÇÃO DA TELA
 # ==========================================
 try:
-    import io # <-- Import necessário para gerar o Excel em memória
+    import io # <-- Import necessário para gerar a Tabela Excel profissional em memória
     
     kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
 
@@ -295,7 +295,7 @@ try:
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
         
-        # --- [NOVO: BOTÃO DE AUDITORIA EXCLUSIVO E CONDICIONAL] ---
+        # --- [BOTÃO DE AUDITORIA EXCLUSIVO E CONDICIONAL] ---
         c_info, c_btn = st.columns([1.8, 1])
         with c_info:
             st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
@@ -303,12 +303,11 @@ try:
         with c_btn:
             # Checa se é o Guilherme ou o Nilo logado
             if st.session_state.get("usuario") in ["guilherme", "nilo"]:
-                st.markdown("<br>", unsafe_allow_html=True) # Alinha o botão com a caixa de data
+                st.markdown("<br>", unsafe_allow_html=True)
                 # Regra de Fechamento: Começa dia 26 e termina dia 25
                 is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
                 
                 if is_fechado:
-                    # Gera a tabela "Longa" com base no df raiz (empresa toda)
                     df_auditoria = []
                     for idx, row in df.iterrows():
                         cod = row.get('CÓD.', '')
@@ -317,38 +316,46 @@ try:
                         turno = row.get('TURNO', '')
                         
                         for kpi in kpis_mapeados:
-                            meta1 = float(row.get(f"{kpi}_Meta1", 0))
                             meta2 = float(row.get(f"{kpi}_Meta2", 0))
-                            meta3 = float(row.get(f"{kpi}_Meta3", 0))
+                            meta1 = float(row.get(f"{kpi}_Meta1", meta2))
+                            meta3 = float(row.get(f"{kpi}_Meta3", meta2))
+                            
                             racional = float(row.get(f"{kpi}_Racional", 1))
                             real = float(row.get(kpi, 0))
                             valor = float(row.get(f"{kpi}_Valor", 0))
                             
-                            # Função para aplicar % ou Horas conforme a regra
+                            # Função para aplicar % ou Horas conforme o tipo de Indicador
                             def formata(v):
                                 if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
-                                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%"
+                                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%".replace('.', ',')
                                 else: return f"{v:,.0f}".replace(',', '.')
                             
                             # Se a equipe tem esse indicador cadastrado (Meta 2 > 0)
                             if meta2 > 0:
-                                if racional == 1: # Quanto maior, melhor
+                                if racional == 1: 
                                     if real < meta1: prox = meta1
                                     elif real < meta2: prox = meta2
                                     elif real < meta3: prox = meta3
                                     else: prox = "MAX"
-                                else: # Quanto menor, melhor
+                                else: 
                                     if real > meta1: prox = meta1
                                     elif real > meta2: prox = meta2
                                     elif real > meta3: prox = meta3
                                     else: prox = "MAX"
                                     
-                                prox_str = "Máxima" if prox == "MAX" else formata(prox)
+                                prox_str = "Meta Máxima" if prox == "MAX" else formata(prox)
                                 real_str = formata(real)
                             else:
-                                # Regra: Se a pessoa não tem esse indicador, zera tudo
-                                prox_str = "0"
-                                real_str = "0"
+                                # Regra: Se a pessoa não tem esse indicador, zera com o formato correto
+                                if "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                                    prox_str = "0,00%"
+                                    real_str = "0,00%"
+                                elif "Tempo" in str(kpi):
+                                    prox_str = "00:00:00"
+                                    real_str = "00:00:00"
+                                else:
+                                    prox_str = "0"
+                                    real_str = "0"
                                 valor = 0.0
                             
                             df_auditoria.append({
@@ -364,14 +371,36 @@ try:
                     
                     df_export = pd.DataFrame(df_auditoria)
                     
-                    # Motor de criação do Excel com Filtros direto na Memória
+                    # --- MOTOR DE CRIAÇÃO DO EXCEL FORMATADO ---
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                        df_export.to_excel(writer, index=False, sheet_name='Auditoria_Detalhada')
-                        worksheet = writer.sheets['Auditoria_Detalhada']
-                        worksheet.autofilter(0, 0, len(df_export), len(df_export.columns) - 1)
-                        for i, col in enumerate(df_export.columns):
-                            worksheet.set_column(i, i, max(len(col), 15))
+                        # startrow=1 deixa a linha de cima livre para a formatação de tabela
+                        df_export.to_excel(writer, index=False, sheet_name='Auditoria_Fechamento', header=False, startrow=1)
+                        
+                        workbook  = writer.book
+                        worksheet = writer.sheets['Auditoria_Fechamento']
+                        
+                        formato_moeda = workbook.add_format({'num_format': 'R$ #,##0.00'})
+                        formato_central = workbook.add_format({'align': 'center'})
+                        
+                        (max_row, max_col) = df_export.shape
+                        
+                        # Adiciona o layout de "Tabela do Excel" (Cabeçalho azul, linhas zebradas e filtros nativos)
+                        col_settings = [{'header': column} for column in df_export.columns]
+                        worksheet.add_table(0, 0, max_row, max_col - 1, {
+                            'columns': col_settings,
+                            'style': 'Table Style Medium 2' # Tema idêntico ao do seu print
+                        })
+                        
+                        # Alarga as colunas para nada ficar espremido (#REF!)
+                        worksheet.set_column('A:A', 10, formato_central) # CÓD.
+                        worksheet.set_column('B:B', 38) # NOME
+                        worksheet.set_column('C:C', 12, formato_central) # TURNO
+                        worksheet.set_column('D:D', 22) # FUNÇÃO
+                        worksheet.set_column('E:E', 25) # INDICADOR
+                        worksheet.set_column('F:F', 15, formato_central) # REALIZADO
+                        worksheet.set_column('G:G', 20, formato_moeda)   # VALOR GANHO (R$)
+                        worksheet.set_column('H:H', 18, formato_central) # PRÓXIMA META
                     
                     st.download_button(
                         label="📥 Baixar Auditoria",
