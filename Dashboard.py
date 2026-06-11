@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import gspread
+import io # <-- Import para gerar o Excel em memória adicionado aqui no topo
 
 # ==========================================
 # 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS
@@ -139,10 +140,8 @@ def carregar_dados():
                 
                 # --- [NOVA LÓGICA DE RANKING ESPECÍFICA POR TURNO] ---
                 if turno == 'T2':
-                    # Procura a métrica que tenha "RESSUP" no nome. Se não achar nada, pega a primeira por segurança.
                     metrica_rank = next((k for k in kpis if 'RESSUP' in k.upper()), kpis[0])
                 else:
-                    # Para o T3, procura "ITENS".
                     metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
                 
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
@@ -218,6 +217,122 @@ if st.sidebar.button("Sair / Logout", use_container_width=True):
     st.session_state["logado"] = False
     st.rerun()
 
+# ==========================================
+# 📥 BOTÃO DE AUDITORIA (MOVIDO PARA A BARRA LATERAL)
+# ==========================================
+if st.session_state.get("usuario") in ["guilherme", "nilo"]:
+    # Regra de Fechamento: Começa dia 26 e termina dia 25
+    is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
+    
+    if is_fechado:
+        df_auditoria = []
+        kpis_gerais = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c]
+        
+        for idx, row in df.iterrows():
+            cod = row.get('CÓD.', '')
+            nome = row.get('NOME', '')
+            funcao = row.get('FUNÇÃO', '')
+            turno = row.get('TURNO', '')
+            
+            d_uteis = float(row.get('Dias Uteis', 0))
+            d_meta = float(row.get('Dias Meta', 0))
+            d_trab = float(row.get('Dias Trabalhados', 0))
+            
+            pos = int(row.get('Posicao Ranking', 0))
+            if pos > 0 and 'SEPARADOR' in str(funcao).upper():
+                pos_str = f"{pos}º Lugar"
+            else:
+                pos_str = "-"
+            
+            for kpi in kpis_gerais:
+                meta2 = float(row.get(f"{kpi}_Meta2", 0))
+                
+                if meta2 > 0:
+                    real = float(row.get(kpi, 0))
+                    valor = float(row.get(f"{kpi}_Valor", 0))
+                    
+                    meta1 = float(row.get(f"{kpi}_Meta1", 0))
+                    meta3 = float(row.get(f"{kpi}_Meta3", 0))
+                    racional = float(row.get(f"{kpi}_Racional", 1))
+                    
+                    if meta1 <= 0: meta1 = meta2
+                    if meta3 <= 0: meta3 = meta2
+                    
+                    if racional == 1: 
+                        if real < meta1: faixa_meta = "0%"
+                        elif real < meta2: faixa_meta = "50%"
+                        elif real < meta3: faixa_meta = "100%"
+                        else: faixa_meta = "120%"
+                    else: 
+                        if real > meta1: faixa_meta = "0%"
+                        elif real > meta2: faixa_meta = "50%"
+                        elif real > meta3: faixa_meta = "100%"
+                        else: faixa_meta = "120%"
+                    
+                    def formata(v):
+                        if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%".replace('.', ',')
+                        else: return f"{v:,.0f}".replace(',', '.')
+                    
+                    real_str = formata(real)
+                    
+                    df_auditoria.append({
+                        "CÓD.": cod,
+                        "NOME": nome,
+                        "TURNO": turno,
+                        "FUNÇÃO": funcao,
+                        "POSIÇÃO RANKING": pos_str,
+                        "DIAS ÚTEIS": int(d_uteis),
+                        "DIAS META": int(d_meta),
+                        "DIAS TRAB.": int(d_trab),
+                        "INDICADOR": kpi,
+                        "REALIZADO": real_str,
+                        "VALOR GANHO (R$)": valor,
+                        "META ATINGIDA": faixa_meta
+                    })
+        
+        df_export = pd.DataFrame(df_auditoria)
+        
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df_export.to_excel(writer, index=False, sheet_name='Auditoria_Fechamento', header=False, startrow=1)
+            
+            workbook  = writer.book
+            worksheet = writer.sheets['Auditoria_Fechamento']
+            
+            formato_moeda = workbook.add_format({'num_format': 'R$ #,##0.00'})
+            formato_central = workbook.add_format({'align': 'center'})
+            
+            (max_row, max_col) = df_export.shape
+            
+            col_settings = [{'header': column} for column in df_export.columns]
+            worksheet.add_table(0, 0, max_row, max_col - 1, {
+                'columns': col_settings,
+                'style': 'Table Style Medium 2'
+            })
+            
+            worksheet.set_column('A:A', 10, formato_central) 
+            worksheet.set_column('B:B', 38)                  
+            worksheet.set_column('C:C', 12, formato_central) 
+            worksheet.set_column('D:D', 22)                  
+            worksheet.set_column('E:E', 18, formato_central) 
+            worksheet.set_column('F:H', 13, formato_central) 
+            worksheet.set_column('I:I', 25)                  
+            worksheet.set_column('J:J', 15, formato_central) 
+            worksheet.set_column('K:K', 20, formato_moeda)   
+            worksheet.set_column('L:L', 18, formato_central) 
+        
+        st.sidebar.download_button(
+            label="📥 Baixar Auditoria",
+            data=buffer.getvalue(),
+            file_name=f"Auditoria_Produtividade_Fechamento.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            type="primary"
+        )
+    else:
+        st.sidebar.button("🔒 Fechamento (Auditoria)", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
+
 st.sidebar.markdown("---")
 st.sidebar.title("🔍 Filtros do Painel")
 
@@ -286,135 +401,14 @@ if st.session_state["perfil"] == "Gerente":
 # 4. RENDERIZAÇÃO DA TELA
 # ==========================================
 try:
-    import io 
-    
     kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
 
     col_titulo, col_kpis = st.columns([1, 1.2])
     
     with col_titulo:
         st.title("📊 Monitor de Produtividade")
-        
-        # --- [BOTÃO DE AUDITORIA EXCLUSIVO E CONDICIONAL] ---
-        c_info, c_btn = st.columns([1.8, 1])
-        with c_info:
-            st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
-            
-        with c_btn:
-            # Checa se é o Guilherme ou o Nilo logado
-            if st.session_state.get("usuario") in ["guilherme", "nilo"]:
-                st.markdown("<br>", unsafe_allow_html=True)
-                # Regra de Fechamento: Começa dia 26 e termina dia 25
-                is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
-                
-                if is_fechado:
-                    df_auditoria = []
-                    for idx, row in df.iterrows():
-                        cod = row.get('CÓD.', '')
-                        nome = row.get('NOME', '')
-                        funcao = row.get('FUNÇÃO', '')
-                        turno = row.get('TURNO', '')
-                        
-                        # Puxa os dias apenas uma vez por colaborador
-                        d_uteis = float(row.get('Dias Uteis', 0))
-                        d_meta = float(row.get('Dias Meta', 0))
-                        d_trab = float(row.get('Dias Trabalhados', 0))
-                        
-                        for kpi in kpis_mapeados:
-                            meta2 = float(row.get(f"{kpi}_Meta2", 0))
-                            
-                            # --- REGRA DE OURO: Só cria a linha se o indicador fizer parte da meta da pessoa ---
-                            if meta2 > 0:
-                                real = float(row.get(kpi, 0))
-                                valor = float(row.get(f"{kpi}_Valor", 0))
-                                
-                                # Resgata as Metas 1 e 3 e o Racional para descobrir a faixa
-                                meta1 = float(row.get(f"{kpi}_Meta1", 0))
-                                meta3 = float(row.get(f"{kpi}_Meta3", 0))
-                                racional = float(row.get(f"{kpi}_Racional", 1))
-                                
-                                # Proteção caso a Meta 1 ou 3 não estejam cadastradas no Excel
-                                if meta1 <= 0: meta1 = meta2
-                                if meta3 <= 0: meta3 = meta2
-                                
-                                # --- CÁLCULO DA FAIXA ATINGIDA (0%, 50%, 100% ou 120%) ---
-                                if racional == 1: # Quanto MAIOR, Melhor (Ex: Itens)
-                                    if real < meta1: faixa_meta = "0%"
-                                    elif real < meta2: faixa_meta = "50%"
-                                    elif real < meta3: faixa_meta = "100%"
-                                    else: faixa_meta = "120%"
-                                else: # Quanto MENOR, Melhor (Ex: Avarias, Tempo)
-                                    if real > meta1: faixa_meta = "0%"
-                                    elif real > meta2: faixa_meta = "50%"
-                                    elif real > meta3: faixa_meta = "100%"
-                                    else: faixa_meta = "120%"
-                                
-                                # Função para aplicar % ou Horas conforme o tipo de Indicador
-                                def formata(v):
-                                    if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
-                                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%".replace('.', ',')
-                                    else: return f"{v:,.0f}".replace(',', '.')
-                                
-                                real_str = formata(real)
-                                
-                                df_auditoria.append({
-                                    "CÓD.": cod,
-                                    "NOME": nome,
-                                    "TURNO": turno,
-                                    "FUNÇÃO": funcao,
-                                    "DIAS ÚTEIS": int(d_uteis),
-                                    "DIAS META": int(d_meta),
-                                    "DIAS TRAB.": int(d_trab),
-                                    "INDICADOR": kpi,
-                                    "REALIZADO": real_str,
-                                    "VALOR GANHO (R$)": valor,
-                                    "META ATINGIDA": faixa_meta
-                                })
-                    
-                    df_export = pd.DataFrame(df_auditoria)
-                    
-                    # --- MOTOR DE CRIAÇÃO DO EXCEL FORMATADO ---
-                    buffer = io.BytesIO()
-                    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                        df_export.to_excel(writer, index=False, sheet_name='Auditoria_Fechamento', header=False, startrow=1)
-                        
-                        workbook  = writer.book
-                        worksheet = writer.sheets['Auditoria_Fechamento']
-                        
-                        formato_moeda = workbook.add_format({'num_format': 'R$ #,##0.00'})
-                        formato_central = workbook.add_format({'align': 'center'})
-                        
-                        (max_row, max_col) = df_export.shape
-                        
-                        # Tabela oficial do Excel com AutoFiltros ativados
-                        col_settings = [{'header': column} for column in df_export.columns]
-                        worksheet.add_table(0, 0, max_row, max_col - 1, {
-                            'columns': col_settings,
-                            'style': 'Table Style Medium 2'
-                        })
-                        
-                        # Ajustando as novas posições e larguras (Agora indo até a coluna K)
-                        worksheet.set_column('A:A', 10, formato_central) # CÓD.
-                        worksheet.set_column('B:B', 38)                  # NOME
-                        worksheet.set_column('C:C', 12, formato_central) # TURNO
-                        worksheet.set_column('D:D', 22)                  # FUNÇÃO
-                        worksheet.set_column('E:G', 13, formato_central) # DIAS (Uteis, Meta, Trab)
-                        worksheet.set_column('H:H', 25)                  # INDICADOR
-                        worksheet.set_column('I:I', 15, formato_central) # REALIZADO
-                        worksheet.set_column('J:J', 20, formato_moeda)   # VALOR GANHO
-                        worksheet.set_column('K:K', 18, formato_central) # META ATINGIDA
-                    
-                    st.download_button(
-                        label="📥 Baixar Auditoria",
-                        data=buffer.getvalue(),
-                        file_name=f"Auditoria_Produtividade_Fechamento.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        type="primary"
-                    )
-                else:
-                    st.button("🔒 Fechamento", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
-    
+        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
+
     with col_kpis:
         st.markdown("## 🎯 Visão Geral")
         kpi1, kpi2, kpi3 = st.columns(3)
@@ -507,18 +501,23 @@ try:
             
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
+            cargo_p = str(row.get('FUNÇÃO', '')).upper()
             
-            # --- [NOVO: EXIBE SOMENTE SE FOR TOP 3 (1, 2 ou 3) MESMO SE O CÁLCULO ESTIVER ZERADO] ---
-            if 1 <= pos <= 3:
-                cargo_p = row.get('FUNÇÃO', '')
-                total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == cargo_p)])
+            if pos > 0 and 'SEPARADOR' in cargo_p:
+                funcao_original = row.get('FUNÇÃO', '')
+                total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                 
                 if pos == 1: medalha, cor_rank = "🥇", "#ffd700"
                 elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0"
                 elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32"
+                else: medalha, cor_rank = "🏅", "#555555" 
                 
-                texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {cargo_p}{texto_premio_rank}</div>", unsafe_allow_html=True)
+                if val_rank > 0:
+                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
+                else:
+                    texto_premio_rank = ""
+                
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {funcao_original}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             cols_meta = st.columns(4)
             col_idx = 0
@@ -726,7 +725,6 @@ try:
     # 👥 VISÃO GERAL EQUIPE (MÉDIAS) E TABELAS
     # ==========================================
     else:
-        # A variável que checa se algum filtro principal foi ativado
         filtros_ativos = (turno_selecionado != "Todos") or (cargo_selecionado != "Todos")
 
         if not filtros_ativos:
@@ -736,7 +734,6 @@ try:
             st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Criando 3 colunas para o "Manual de Uso"
             c1, c2, c3 = st.columns(3)
             with c1:
                 st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos. O sistema calculará as médias automaticamente e indicará o atingimento das metas.</p></div>", unsafe_allow_html=True)
@@ -747,7 +744,6 @@ try:
             st.markdown("<br><br>", unsafe_allow_html=True)
 
         else:
-            # --- SÓ RENDERIZA OS CARDS DAS EQUIPES SE HOUVER FILTRO ---
             cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
             for cargo_atual in cargos_render:
@@ -826,7 +822,6 @@ try:
         # 🔥 TABELA GERENCIAL (SÓ APARECE SE FILTRAR)
         # ==========================================
         if filtros_ativos:
-            # Como a indentação mudou para cair dentro do 'else', checamos a variável 'cargos_render' de forma segura
             if 'cargos_render' in locals() and len(cargos_render) > 0: st.divider()
             
             st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
