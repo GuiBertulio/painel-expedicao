@@ -19,7 +19,6 @@ USUARIOS = {
     "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, # Acesso a múltiplos turnos
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
-    "luciano": {"senha": "Luciano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
     "wagner": {"senha": "Wagner@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
     "jorge": {"senha": "Jorge@26TAF", "perfil": "Líder", "turno_acesso": "T2"},
     "diego": {"senha": "Diego@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
