@@ -1034,12 +1034,13 @@ try:
                             
                         if df_kpi_valido.empty: continue
 
-                        # Calcula as médias do Turno
-                        meta2_med = df_kpi_valido[f"{kpi}_Meta2"].mean()
-                        if pd.isna(meta2_med) or meta2_med <= 0: continue
+                        # 🛡️ Calcula as médias do Turno (Ignorando os zerados para não afundar a meta da equipe)
+                        df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0]
+                        if df_com_meta.empty: continue
 
-                        meta1_med = df_kpi_valido[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_kpi_valido.columns else meta2_med
-                        meta3_med = df_kpi_valido[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_kpi_valido.columns else meta2_med
+                        meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
+                        meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
+                        meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
                         
                         real_med = df_kpi_valido[kpi].mean()
                         racional = racional_temp
