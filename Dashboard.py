@@ -163,13 +163,32 @@ def carregar_dados():
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
     # --- CONVERSÃO DE TEXTOS PARA NÚMEROS MATEMÁTICOS E TEMPO ---
-    colunas_texto = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Data Inicio', 'Data Fim']
+    colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
     for col in df.columns:
         if col not in colunas_texto:
-            # Se a coluna for de tempo, converte 00:00:00 para segundos.
-            if 'TEMPO' in col.upper() and not col.upper().endswith('_VALOR') and not col.upper().endswith('_RACIONAL'): 
-                texto_limpo = df[col].astype(str).str.split('.').str[0].str.strip()
-                df[col] = pd.to_timedelta(texto_limpo, errors='coerce').dt.total_seconds().fillna(0)
+            # BLINDAGEM: Converte o Tempo Médio E as suas respectivas Metas para segundos
+            if col in ["Tempo Médio", "Tempo Médio_Meta1", "Tempo Médio_Meta2", "Tempo Médio_Meta3"]:
+                texto_limpo = df[col].astype(str).str.split(".").str[0].str.strip()
+                df[col] = (
+                    pd.to_timedelta(texto_limpo, errors="coerce")
+                    .dt.total_seconds()
+                    .fillna(0)
+                )
+            else:
+                s = (
+                    df[col]
+                    .astype(str)
+                    .str.replace("R$", "", regex=False)
+                    .str.replace("%", "", regex=False)
+                    .str.strip()
+                )
+                mask_virgula = s.str.contains(",", regex=False)
+                s_br = s.str.replace(".", "", regex=False).str.replace(
+                    ",", ".", regex=False
+                )
+                df[col] = pd.to_numeric(
+                    s_br.where(mask_virgula, s), errors="coerce"
+                ).fillna(0)
             else:
                 # Remove o R$ e o % para o Excel conseguir fazer contas de soma e divisão
                 s = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.strip()
