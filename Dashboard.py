@@ -163,6 +163,7 @@ def carregar_dados():
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
     # --- CONVERSÃO DE TEXTOS PARA NÚMEROS MATEMÁTICOS E TEMPO ---
+    # --- CONVERSÃO DE TEXTOS PARA NÚMEROS MATEMÁTICOS E TEMPO ---
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
     for col in df.columns:
         if col not in colunas_texto:
@@ -175,6 +176,7 @@ def carregar_dados():
                     .fillna(0)
                 )
             else:
+                # Remove o R$ e o % para o Excel conseguir fazer contas de soma e divisão
                 s = (
                     df[col]
                     .astype(str)
@@ -189,12 +191,8 @@ def carregar_dados():
                 df[col] = pd.to_numeric(
                     s_br.where(mask_virgula, s), errors="coerce"
                 ).fillna(0)
-            else:
-                # Remove o R$ e o % para o Excel conseguir fazer contas de soma e divisão
-                s = df[col].astype(str).str.replace('R$', '', regex=False).str.replace('%', '', regex=False).str.strip()
-                mask_virgula = s.str.contains(',', regex=False)
-                s_br = s.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                df[col] = pd.to_numeric(s_br.where(mask_virgula, s), errors='coerce').fillna(0)
+                
+    # --- CÁLCULO DE RANKING (O Campeonato dos Separadores) ---
     
     # --- CÁLCULO DE RANKING (O Campeonato dos Separadores) ---
     df['Valor Ranking'] = 0.0
