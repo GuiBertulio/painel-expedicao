@@ -210,7 +210,9 @@ def carregar_dados():
             # REGRA 1: SEPARADORES (T2 e T3 competem por ITENS)
             # -------------------------------------------------------------
             if 'SEPARADOR' in cargo_str:
-                metrica_rank = next((k for k in kpis if 'ITENS SEP' in k.upper()), kpis[0])
+                # 🛡️ BLINDAGEM: Exige que a coluna seja exatamente "Itens" e ignora "Itens Rampa"
+                metrica_rank = next((k for k in kpis if k.upper().strip() == 'ITENS SEP'), 
+                                    next((k for k in kpis if 'ITENS SEP' in k.upper() and 'RAMPA' not in k.upper()), kpis[0]))
                 
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
                 ordem_cresc = False if racional == 1 else True
@@ -221,7 +223,7 @@ def carregar_dados():
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue # Pula quem tem 0 itens
                     df.at[idx, 'Posicao Ranking'] = pos
                     
-                    # Distribui o dinheiro (AQUI VOCÊ MUDA OS VALORES DOS PRÊMIOS DO PÓDIO SE O RH PEDIR)
+                    # Distribui o dinheiro 
                     if turno == 'T3':
                         if pos == 1: val_base = 250.0 
                         elif pos == 2: val_base = 200.0
