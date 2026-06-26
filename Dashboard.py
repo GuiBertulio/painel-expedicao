@@ -210,20 +210,25 @@ def carregar_dados():
             # REGRA 1: SEPARADORES (T2 e T3 competem por ITENS)
             # -------------------------------------------------------------
             if 'SEPARADOR' in cargo_str:
-                # 🛡️ BLINDAGEM: Exige que a coluna seja exatamente "Itens" e ignora "Itens Rampa"
-                metrica_rank = next((k for k in kpis if k.upper().strip() == 'ITENS SEP'), 
-                                    next((k for k in kpis if 'ITENS SEP' in k.upper() and 'RAMPA' not in k.upper()), kpis[0]))
+                # 🛡️ BLINDAGEM 1: Caça a coluna "Itens Separados" direto na planilha toda, mesmo que não tenha Metas configuradas para ela.
+                metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
+                                    next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
                 
-                racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
+                if not metrica_rank: continue
+                
+                col_racional = f"{metrica_rank}_Racional"
+                racional = df_eq[col_racional].mode()[0] if col_racional in df_eq.columns and not df_eq[col_racional].empty else 1
                 ordem_cresc = False if racional == 1 else True
+                
+                # 🛡️ BLINDAGEM 2: Força a coluna a ser um NÚMERO matemático, para não ordenar em "ordem alfabética"
+                df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
                 df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc)
                 
                 pos = 1
                 for idx, row_eq in df_eq.iterrows():
-                    if float(row_eq.get(metrica_rank, 0)) <= 0: continue # Pula quem tem 0 itens
+                    if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
                     df.at[idx, 'Posicao Ranking'] = pos
                     
-                    # Distribui o dinheiro 
                     if turno == 'T3':
                         if pos == 1: val_base = 250.0 
                         elif pos == 2: val_base = 200.0
@@ -1044,8 +1049,11 @@ try:
                             if pd.notna(m2) and m2 > 0:
                                 kpis_ativos_pessoa.append(k) # Só lista as métricas que a pessoa possui
 
+                        # 🛡️ BLINDAGEM 3: Força a métrica "Itens Separados" a aparecer na tabela, mesmo sem Meta
+                        extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
+
                         # Prepara a mini-tabela com Dias Úteis e Faltas
-                        col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_pessoa
+                        col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + kpis_ativos_pessoa
                         df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                         
                         if 'Tempo Médio' in df_tabela_mini.columns:
@@ -1181,7 +1189,10 @@ try:
                     if metas_validas.sum() > 0:
                         kpis_ativos_tabela.append(kpi)
 
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_tabela
+            # 🛡️ BLINDAGEM 4: Força a métrica "Itens Separados" a aparecer na tabela gigante
+            extras_geral = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
+
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_geral + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
             # 🛡️ BLINDAGEM VISUAL DO TEMPO MÉDIO NA TABELA: Converte os segundos (3417) de volta para Relógio
