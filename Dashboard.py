@@ -154,6 +154,7 @@ def carregar_dados():
         elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Uteis'})
         elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
         elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
+        elif "ERRO" in nome_limpo: df = df.rename(columns={c: 'ERROS'}) # Captura a coluna de Erros
 
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
@@ -191,6 +192,24 @@ def carregar_dados():
                     s_br.where(mask_virgula, s), errors="coerce"
                 ).fillna(0)
                 
+    # --- 🛡️ TEXTO DE PENALIDADE VISUAL (Apenas cria o texto, o Excel já fez a matemática!) ---
+    if 'ERROS' not in df.columns:
+        df['ERROS'] = 0
+        
+    df['Penalidade_Texto'] = ""
+
+    for idx, row in df.iterrows():
+        cargo_e = str(row.get('FUNÇÃO', '')).upper()
+        erros_e = float(row.get('ERROS', 0))
+        
+        if erros_e > 0:
+            if 'SEPARADOR' in cargo_e:
+                desc = erros_e * 50
+                df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Itens"
+            elif 'OPERADOR' in cargo_e:
+                desc = erros_e * 10
+                df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
+
     # =============================================================================
     # 🏆 CÁLCULO DE RANKING (O Campeonato das Equipes)
     # =============================================================================
@@ -210,15 +229,15 @@ def carregar_dados():
             # REGRA 1: SEPARADORES (T2 e T3 competem por ITENS)
             # -------------------------------------------------------------
             if 'SEPARADOR' in cargo_str:
-                # 🛡️ BLINDAGEM: Lê o indicador criado no Excel, mas ignora o "Itens Rampa" para focar na separação real
-                metrica_rank = next((k for k in kpis if k.upper().strip() == 'ITENS'), 
-                                    next((k for k in kpis if 'ITENS' in k.upper() and 'RAMPA' not in k.upper()), kpis[0]))
+                # Caça o indicador direto na planilha toda, mas ignora o "Itens Rampa"
+                metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
+                                    next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
                 
-                racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
+                if not metrica_rank: continue
                 
+                # Ocultamos a regra do Excel. Para produção, MAIS é sempre melhor (ascending=False)
                 df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
-                ordem_cresc = False if racional == 1 else True
-                df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc)
+                df_eq = df_eq.sort_values(by=metrica_rank, ascending=False)
                 
                 pos = 1
                 for idx, row_eq in df_eq.iterrows():
@@ -232,9 +251,9 @@ def carregar_dados():
                         elif pos == 3: val_base = 100.0
                         else: val_base = 0.0
                     elif turno == 'T2':
-                        if pos == 1: val_base = 150.0 
-                        elif pos == 2: val_base = 100.0 
-                        elif pos == 3: val_base = 80.0 
+                        if pos == 1: val_base = 100.0 
+                        elif pos == 2: val_base = 80.0 
+                        elif pos == 3: val_base = 50.0 
                         else: val_base = 0.0
                     else:
                         val_base = 0.0
@@ -732,7 +751,14 @@ try:
             cargo_p = str(row.get('FUNÇÃO', '')).upper()
             turno_p = str(row.get('TURNO', '')).upper()
             
-            # Mostra o troféu para Separadores (Todos os turnos) e para Conferentes/Operadores (Só T3)
+            erros_qtd = int(row.get('ERROS', 0))
+            penalidade_txt = str(row.get('Penalidade_Texto', ''))
+            
+            # 🛡️ Alerta de penalidade caso a pessoa tenha sofrido desconto no Ranking
+            if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
+                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram registrados <b>{erros_qtd} erro(s)</b>, resultando em um desconto de <b>{penalidade_txt}</b> no seu volume total.</div>", unsafe_allow_html=True)
+            
+            # Mostra o troféu para Separadores (Todos turnos) e para Conferentes/Operadores (Só T3)
             if pos > 0 and ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3')):
                 funcao_original = row.get('FUNÇÃO', '')
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
@@ -743,7 +769,7 @@ try:
                 elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" # Bronze
                 else: medalha, cor_rank = "🏅", "#555555"          # Cinza chumbo 
                 
-                # Se não ganhou prêmio (ex: Operador em 2º lugar), não exibe "R$ 0,00" para não desmotivar.
+                # Se não ganhou prêmio, não exibe "R$ 0,00" para não desmotivar.
                 if val_rank > 0:
                     texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
                 else:
@@ -808,10 +834,18 @@ try:
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
 
                 alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
+                
+                # 🛡️ Adiciona o desconto no rodapé do Cartão do Indicador descontado
+                aviso_erro = ""
+                if erros_qtd > 0:
+                    if 'SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper():
+                        aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
+                    elif 'OPERADOR' in cargo_p and 'MOV' in str(kpi).upper():
+                        aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
 
                 # Cria o Cartão (Card) da métrica injetando CSS dinamicamente
                 with cols_meta[col_idx % 4]:
-                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div>{aviso_erro}</div>", unsafe_allow_html=True)
                 col_idx += 1
 
             # --- SOMA FINAL (BARRA VERDE DE DINHEIRO) ---
@@ -1049,9 +1083,12 @@ try:
                             m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
                             if pd.notna(m2) and m2 > 0:
                                 kpis_ativos_pessoa.append(k) # Só lista as métricas que a pessoa possui
+                                
+                        # 🛡️ Inclui a coluna "Erros" na tabela individual para transparência
+                        extras_ind = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa]
 
                         # Prepara a mini-tabela com Dias Úteis e Faltas
-                        col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_pessoa
+                        col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + kpis_ativos_pessoa
                         df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                         
                         if 'Tempo Médio' in df_tabela_mini.columns:
@@ -1112,7 +1149,7 @@ try:
                             
                         if df_kpi_valido.empty: continue
 
-                        # 🛡️ Calcula as médias do Turno (Ignorando os zerados para não afundar a meta da equipe)
+                        # Calcula as médias do Turno (Ignorando os zerados para não afundar a meta da equipe)
                         df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0]
                         if df_com_meta.empty: continue
 
@@ -1187,10 +1224,13 @@ try:
                     if metas_validas.sum() > 0:
                         kpis_ativos_tabela.append(kpi)
 
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_tabela
+            # 🛡️ Inclui a coluna "Erros" na Tabela Gerencial para auditoria dos líderes
+            extras_geral = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela]
+
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_geral + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
-            # 🛡️ BLINDAGEM VISUAL DO TEMPO MÉDIO NA TABELA: Converte os segundos (3417) de volta para Relógio
+            # Converte os segundos (3417) de volta para Relógio
             if 'Tempo Médio' in df_tabela.columns:
                 df_tabela['Tempo Médio'] = pd.to_numeric(df_tabela['Tempo Médio'], errors='coerce').fillna(0)
                 df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(
