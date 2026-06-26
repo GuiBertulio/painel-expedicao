@@ -232,9 +232,9 @@ def carregar_dados():
                         elif pos == 3: val_base = 100.0
                         else: val_base = 0.0
                     elif turno == 'T2':
-                        if pos == 1: val_base = 100.0 
-                        elif pos == 2: val_base = 80.0 
-                        elif pos == 3: val_base = 50.0 
+                        if pos == 1: val_base = 150.0 
+                        elif pos == 2: val_base = 100.0 
+                        elif pos == 3: val_base = 80.0 
                         else: val_base = 0.0
                     else:
                         val_base = 0.0
