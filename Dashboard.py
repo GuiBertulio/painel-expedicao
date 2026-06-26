@@ -1197,7 +1197,7 @@ try:
             }
             
             for col in df_tabela.columns:
-                if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final', 'Itens Sep']: continue 
                 elif col in ['Avaria', 'Corte %', 'Dev. %']: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                 elif "Líq." in col: config[col] = st.column_config.NumberColumn(col, format="%d%%")
                 else: config[col] = st.column_config.NumberColumn(col, format="%d")
