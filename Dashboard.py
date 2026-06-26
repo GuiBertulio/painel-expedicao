@@ -210,7 +210,7 @@ def carregar_dados():
                 # --- DEFINIÇÃO DA REGRA DO JOGO POR TURNO ---
                 # Se for T2, o campeonato é medido pelo "RESSUP". Se for T3, é pelos "ITENS".
                 if turno == 'T2':
-                    metrica_rank = next((k for k in kpis if 'RESSUP' in k.upper()), kpis[0])
+                    metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
                 else:
                     metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
                 
