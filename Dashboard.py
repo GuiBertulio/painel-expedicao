@@ -210,7 +210,7 @@ def carregar_dados():
             # REGRA 1: SEPARADORES (T2 e T3 competem por ITENS)
             # -------------------------------------------------------------
             if 'SEPARADOR' in cargo_str:
-                metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
+                metrica_rank = next((k for k in kpis if 'ITENS SEP' in k.upper()), kpis[0])
                 
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
                 ordem_cresc = False if racional == 1 else True
