@@ -163,7 +163,6 @@ def carregar_dados():
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
     # --- CONVERSÃO DE TEXTOS PARA NÚMEROS MATEMÁTICOS E TEMPO ---
-    # --- CONVERSÃO DE TEXTOS PARA NÚMEROS MATEMÁTICOS E TEMPO ---
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
     for col in df.columns:
         if col not in colunas_texto:
@@ -192,62 +191,128 @@ def carregar_dados():
                     s_br.where(mask_virgula, s), errors="coerce"
                 ).fillna(0)
                 
-    # --- CÁLCULO DE RANKING (O Campeonato dos Separadores) ---
-    
-    # --- CÁLCULO DE RANKING (O Campeonato dos Separadores) ---
+    # =============================================================================
+    # 🏆 CÁLCULO DE RANKING (O Campeonato das Equipes)
+    # =============================================================================
     df['Valor Ranking'] = 0.0
     df['Posicao Ranking'] = 0
     
     for turno in ['T2', 'T3']:
         for cargo in df['FUNÇÃO'].unique():
-            if 'SEPARADOR' in str(cargo).upper():
-                df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
-                if df_eq.empty: continue
+            cargo_str = str(cargo).upper()
+            df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
+            if df_eq.empty: continue
+            
+            kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
+            if not kpis: continue
+            
+            # -------------------------------------------------------------
+            # REGRA 1: SEPARADORES (T2 e T3 competem por ITENS)
+            # -------------------------------------------------------------
+            if 'SEPARADOR' in cargo_str:
+                metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
                 
-                kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
-                if not kpis: continue
-                
-                # --- DEFINIÇÃO DA REGRA DO JOGO POR TURNO ---
-                # Se for T2, o campeonato é medido pelo "RESSUP". Se for T3, é pelos "ITENS".
-                if turno == 'T2':
-                    metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
-                else:
-                    metrica_rank = next((k for k in kpis if 'ITENS' in k.upper()), kpis[0])
-                
-                # Vê se a métrica é "quem faz mais ganha" (Racional 1) ou "quem faz menos ganha" (Racional 0)
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
                 ordem_cresc = False if racional == 1 else True
-                
-                # Ordena os caras do melhor para o pior
                 df_eq = df_eq.sort_values(by=metrica_rank, ascending=ordem_cresc)
                 
-                # Distribui o dinheiro (AQUI VOCÊ MUDA OS VALORES DOS PRÊMIOS DO PÓDIO SE O RH PEDIR)
                 pos = 1
                 for idx, row_eq in df_eq.iterrows():
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue # Pula quem tem 0 itens
-                    
                     df.at[idx, 'Posicao Ranking'] = pos
                     
+                    # Distribui o dinheiro (AQUI VOCÊ MUDA OS VALORES DOS PRÊMIOS DO PÓDIO SE O RH PEDIR)
                     if turno == 'T3':
-                        if pos == 1: val_base = 250.0  # Prêmio do 1º lugar do T3
-                        elif pos == 2: val_base = 200.0 # Prêmio do 2º lugar do T3
-                        elif pos == 3: val_base = 100.0 # Prêmio do 3º lugar do T3
+                        if pos == 1: val_base = 250.0 
+                        elif pos == 2: val_base = 200.0
+                        elif pos == 3: val_base = 100.0
                         else: val_base = 0.0
                     elif turno == 'T2':
-                        if pos == 1: val_base = 100.0   # Prêmio do 1º lugar do T2
-                        elif pos == 2: val_base = 80.0  # Prêmio do 2º lugar do T2
-                        elif pos == 3: val_base = 50.0  # Prêmio do 3º lugar do T2
+                        if pos == 1: val_base = 100.0 
+                        elif pos == 2: val_base = 80.0 
+                        elif pos == 3: val_base = 50.0 
                         else: val_base = 0.0
                     else:
                         val_base = 0.0
                     
-                    # Proporção de faltas (Desconta o prêmio se o cara faltou no mês)
                     if val_base > 0:
                         d_uteis = float(row_eq.get('Dias Uteis', 26))
                         d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
                         fator = d_trab / d_uteis if d_uteis > 0 else 1
-                        df.at[idx, 'Valor Ranking'] = val_base * fator
+                        df.at[idx, 'Valor Ranking'] += val_base * fator
+                    pos += 1
+
+            # -------------------------------------------------------------
+            # REGRA 2: CONFERENTES (Apenas T3) - 2 Campeonatos Separados
+            # -------------------------------------------------------------
+            elif 'CONFERENTE' in cargo_str and turno == 'T3':
+                # Procura as colunas de Fracionado e Grandeza dinamicamente
+                metrica_frac = next((k for k in kpis if 'FRAC' in k.upper() or 'ITENS CONF' in k.upper()), None)
+                metrica_grand = next((k for k in kpis if 'GRAND' in k.upper() or 'PALETS CONF' in k.upper()), None)
+                
+                # 🏆 CAMPEONATO 1: FRACIONADO (Apenas o 1º Lugar = R$ 200)
+                if metrica_frac:
+                    racional = df_eq[f"{metrica_frac}_Racional"].mode()[0] if not df_eq[f"{metrica_frac}_Racional"].empty else 1
+                    df_frac = df_eq.sort_values(by=metrica_frac, ascending=(racional != 1))
                     
+                    pos = 1
+                    for idx, row_eq in df_frac.iterrows():
+                        if float(row_eq.get(metrica_frac, 0)) <= 0: continue
+                        
+                        # Salva a melhor posição no perfil dele para mostrar a medalha na tela
+                        if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
+                            df.at[idx, 'Posicao Ranking'] = pos
+                            
+                        # Se for o 1º lugar do Fracionado, PAGA!
+                        if pos == 1:
+                            d_uteis = float(row_eq.get('Dias Uteis', 26))
+                            d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
+                            fator = d_trab / d_uteis if d_uteis > 0 else 1
+                            df.at[idx, 'Valor Ranking'] += 200.0 * fator
+                        pos += 1
+
+                # 🏆 CAMPEONATO 2: GRANDEZA (Apenas o 1º Lugar = R$ 200)
+                if metrica_grand:
+                    racional = df_eq[f"{metrica_grand}_Racional"].mode()[0] if not df_eq[f"{metrica_grand}_Racional"].empty else 1
+                    df_grand = df_eq.sort_values(by=metrica_grand, ascending=(racional != 1))
+                    
+                    pos = 1
+                    for idx, row_eq in df_grand.iterrows():
+                        if float(row_eq.get(metrica_grand, 0)) <= 0: continue
+                        
+                        # Atualiza a posição da medalha, caso ele tenha ido melhor na Grandeza
+                        if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
+                            df.at[idx, 'Posicao Ranking'] = pos
+                            
+                        # Se for o 1º lugar da Grandeza, PAGA!
+                        if pos == 1: 
+                            d_uteis = float(row_eq.get('Dias Uteis', 26))
+                            d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
+                            fator = d_trab / d_uteis if d_uteis > 0 else 1
+                            df.at[idx, 'Valor Ranking'] += 200.0 * fator
+                        pos += 1
+
+            # -------------------------------------------------------------
+            # REGRA 3: OPERADORES (Apenas T3) - 1º Lugar Ganha R$ 200
+            # -------------------------------------------------------------
+            elif 'OPERADOR' in cargo_str and turno == 'T3':
+                # Acha a métrica de Movimentação do operador
+                metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
+                
+                racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
+                df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
+                
+                pos = 1
+                for idx, row_eq in df_eq.iterrows():
+                    if float(row_eq.get(metrica_rank, 0)) <= 0: continue
+                    df.at[idx, 'Posicao Ranking'] = pos
+                    
+                    if pos == 1: # PAGA SÓ PARA O PRIMEIRO
+                        val_base = 200.0
+                        d_uteis = float(row_eq.get('Dias Uteis', 26))
+                        d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
+                        fator = d_trab / d_uteis if d_uteis > 0 else 1
+                        df.at[idx, 'Valor Ranking'] += val_base * fator
                     pos += 1
 
     # Soma todo o dinheiro final do colaborador (Métricas + Prêmio do Ranking)
@@ -386,26 +451,29 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                         "META ATINGIDA": faixa_meta
                     })
             
-            # --- 2. GERA A LINHA EXCLUSIVA DO RANKING (SÓ PARA SEPARADORES) ---
+            # --- 2. GERA A LINHA EXCLUSIVA DO RANKING NA AUDITORIA ---
             pos = int(row.get('Posicao Ranking', 0))
-            if pos > 0 and 'SEPARADOR' in str(funcao).upper():
+            funcao_upper = str(funcao).upper()
+            
+            # Trava: O ranking aparece para Separador (todos) e Conferente/Operador (só T3)
+            if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno == 'T3') or ('OPERADOR' in funcao_upper and turno == 'T3')):
                 val_rank = float(row.get('Valor Ranking', 0))
                 
-                if pos > 3: val_rank = 0.0 # Se não for Top 3, força R$ 0,00 na auditoria
-                
-                df_auditoria.append({
-                    "CÓD.": cod,
-                    "NOME": nome,
-                    "TURNO": turno,
-                    "FUNÇÃO": funcao,
-                    "DIAS ÚTEIS": int(d_uteis),
-                    "DIAS META": int(d_meta),
-                    "DIAS TRAB.": int(d_trab),
-                    "INDICADOR": "Ranking",
-                    "REALIZADO": f"{pos}º Lugar",
-                    "VALOR GANHO (R$)": val_rank,
-                    "META ATINGIDA": "-"
-                })
+                # Se não ganhou nada (ex: ficou em 4º), não precisa lançar zero na planilha do RH
+                if val_rank > 0: 
+                    df_auditoria.append({
+                        "CÓD.": cod,
+                        "NOME": nome,
+                        "TURNO": turno,
+                        "FUNÇÃO": funcao,
+                        "DIAS ÚTEIS": int(d_uteis),
+                        "DIAS META": int(d_meta),
+                        "DIAS TRAB.": int(d_trab),
+                        "INDICADOR": "Ranking",
+                        "REALIZADO": f"{pos}º Lugar",
+                        "VALOR GANHO (R$)": val_rank,
+                        "META ATINGIDA": "-"
+                    })
         
         # Converte a lista em uma Tabela do Pandas
         df_export = pd.DataFrame(df_auditoria)
@@ -654,8 +722,10 @@ try:
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
             cargo_p = str(row.get('FUNÇÃO', '')).upper()
+            turno_p = str(row.get('TURNO', '')).upper()
             
-            if pos > 0 and 'SEPARADOR' in cargo_p:
+            # Mostra o troféu para Separadores (Todos os turnos) e para Conferentes/Operadores (Só T3)
+            if pos > 0 and ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3')):
                 funcao_original = row.get('FUNÇÃO', '')
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                 
@@ -665,7 +735,7 @@ try:
                 elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" # Bronze
                 else: medalha, cor_rank = "🏅", "#555555"          # Cinza chumbo 
                 
-                # Se não ganhou prêmio (4º pra baixo), não exibe "R$ 0,00" para não desmotivar.
+                # Se não ganhou prêmio (ex: Operador em 2º lugar), não exibe "R$ 0,00" para não desmotivar.
                 if val_rank > 0:
                     texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
                 else:
@@ -1112,10 +1182,24 @@ try:
             colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
+            # 🛡️ BLINDAGEM VISUAL DO TEMPO MÉDIO NA TABELA: Converte os segundos (3417) de volta para Relógio
+            if 'Tempo Médio' in df_tabela.columns:
+                df_tabela['Tempo Médio'] = pd.to_numeric(df_tabela['Tempo Médio'], errors='coerce').fillna(0)
+                df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(
+                    lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if s > 0 else "00:00:00"
+                )
+
             # Formata a coluna financeira para ter R$ na tela
             config = {
                 'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")
             }
+            
+            for col in df_tabela.columns:
+                if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                elif col in ['Avaria', 'Corte %', 'Dev. %']: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                elif "Líq." in col: config[col] = st.column_config.NumberColumn(col, format="%d%%")
+                else: config[col] = st.column_config.NumberColumn(col, format="%d")
+
             # O height=600 controla a altura da tabela antes de criar barra de rolagem
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
