@@ -7,6 +7,7 @@ import datetime                 # Lida com o calendário (data de hoje, apuraç�
 import plotly.express as px     # Desenha os gráficos interativos
 import gspread                  # Conecta com a nuvem do Google Sheets
 import io                       # Cria arquivos direto na memória RAM (usado para gerar o Excel de Auditoria)
+import calendar                 # Ajuda a calcular o último dia do mês para o RH
 
 # =============================================================================
 # 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS (Seu Banco de Dados Interno)
@@ -15,8 +16,6 @@ import io                       # Cria arquivos direto na memória RAM (usado pa
 # O "turno_acesso" pode ser um texto único (ex: "T3") ou uma lista (ex: ["T1", "T2"])
 USUARIOS = {
     "diegoc": {"senha": "ger#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "rh": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "suelin": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, # Acesso a múltiplos turnos
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
@@ -624,14 +623,46 @@ if st.session_state["perfil"] == "Gerente":
         
         csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
         
+        # --- 🛡️ NOVO: LÓGICA DO ARQUIVO DO SISTEMA DE FOLHA (Sênior/Domínio) ---
+        try:
+            ultimo_dia = calendar.monthrange(data_apuracao.year, data_apuracao.month)[1]
+            data_fim_mes = f"{ultimo_dia:02d}/{data_apuracao.month:02d}/{data_apuracao.year}"
+        except:
+            data_fim_mes = dt_inicio.strftime('%d/%m/%Y') 
+            
+        df_rh_sistema = pd.DataFrame({
+            'A': df_rh['Matrícula'],
+            'B': 2601,
+            'C': 'Adicional Produtividade',
+            'D': 0,
+            'E': df_rh['Premiação (R$)'].apply(lambda x: f"{x:.2f}".replace('.', ',')),
+            'F': 11,
+            'G': data_fim_mes,
+            'H': data_fim_mes
+        })
+        
+        csv_sistema = df_rh_sistema.to_csv(index=False, header=False, sep=';').encode('utf-8-sig')
+
+        # Botões de Download Lado a Lado
+        st.sidebar.markdown("<p style='font-size: 14px; margin-bottom: 5px;'>1. Visualização Padrão</p>", unsafe_allow_html=True)
         st.sidebar.download_button(
-            label="📥 Baixar Planilha do RH",
+            label="📊 Baixar Planilha Visual (Excel)",
             data=csv_rh,
-            file_name=f"Fechamento_RH_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
+            file_name=f"Fechamento_RH_Visual_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="btn_rh_visual"
+        )
+        
+        st.sidebar.markdown("<p style='font-size: 14px; margin-bottom: 5px; margin-top: 10px;'>2. Importação do Sistema (Sênior/Folha)</p>", unsafe_allow_html=True)
+        st.sidebar.download_button(
+            label="⚙️ Baixar Arq. do Sistema",
+            data=csv_sistema,
+            file_name=f"Importacao_Sistema_Folha_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
             mime="text/csv",
             type="primary",
             use_container_width=True,
-            key="btn_rh_unico_download"
+            key="btn_rh_sistema"
         )
     else:
         st.sidebar.info("Nenhum dado processado.")
@@ -747,6 +778,11 @@ try:
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
             
+            # --- VARIÁVEIS BASE PARA PROJEÇÕES E GRÁFICOS ---
+            d_uteis_p = float(row.get('Dias Uteis', 26))
+            d_trab_p = float(row.get('Dias Trabalhados', d_uteis_p))
+            d_meta_p = float(row.get('Dias Meta', d_uteis_p))
+            
             # --- RENDERIZA O TROFÉU DE RANKING DO COLABORADOR ---
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
@@ -756,9 +792,9 @@ try:
             erros_qtd = int(row.get('ERROS', 0))
             penalidade_txt = str(row.get('Penalidade_Texto', ''))
             
-            # 🛡️ Alerta de penalidade caso a pessoa tenha sofrido desconto no Ranking
+            # 🛡️ Alerta de penalidade caso a pessoa tenha cometido erros (Visual)
             if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
-                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram registrados <b>{erros_qtd} erro(s)</b>, resultando em um desconto de <b>{penalidade_txt}</b> no seu volume total.</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
             
             # Mostra o troféu para Separadores (Todos turnos) e para Conferentes/Operadores (Só T3)
             if pos > 0 and ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3')):
@@ -771,14 +807,23 @@ try:
                 elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" # Bronze
                 else: medalha, cor_rank = "🏅", "#555555"          # Cinza chumbo 
                 
-                # Se não ganhou prêmio, não exibe "R$ 0,00" para não desmotivar.
+                # Se não ganhou prêmio, não exibe para não desmotivar. Se ganhou, faz a projeção.
                 if val_rank > 0:
-                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank:,.2f}</b></span>".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    
+                    if d_trab_p > 0 and d_trab_p < d_uteis_p:
+                        proj_rank = (val_rank / d_trab_p) * d_uteis_p
+                        proj_rank_str = f"{proj_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        txt_proj_rank = f" <span style='color: #888; font-size: 14px; font-weight: normal;'>(Proj: R$ {proj_rank_str})</span>"
+                    else:
+                        txt_proj_rank = ""
+                        
+                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>{txt_proj_rank}"
                 else:
                     texto_premio_rank = ""
                 
                 # Caixa visual do Ranking
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {funcao_original}{texto_premio_rank}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipa de {funcao_original}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
             cols_meta = st.columns(4) # Desenha de 4 em 4 colunas
@@ -822,7 +867,18 @@ try:
                 
                 # Guarda as infos para desenhar o gráfico de barras lá no final
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
-                html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {valor_reais:,.2f}</span>".replace(',', 'X').replace('.', ',').replace('X', '.') if valor_reais > 0 else ""
+                
+                # Formatação Inteligente de Dinheiro e Projeções no Cartão
+                html_dinheiro = ""
+                if valor_reais > 0:
+                    val_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    texto_proj = ""
+                    if d_trab_p > 0 and d_trab_p < d_uteis_p:
+                        proj = (valor_reais / d_trab_p) * d_uteis_p
+                        proj_str = f"{proj:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        texto_proj = f"<br><span style='color: #888; font-size: 14px; font-weight: normal;'>Proj. Fim Mês: R$ {proj_str}</span>"
+                    
+                    html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {val_str}</span>{texto_proj}"
 
                 # Mascara os textos dos cartões (Segundos viram Tempo e Decimais viram %)
                 if "Tempo" in str(kpi) or ":" in str(realizado):
@@ -837,7 +893,7 @@ try:
 
                 alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
                 
-                # 🛡️ Adiciona o desconto no rodapé do Cartão do Indicador descontado
+                # 🛡️ Adiciona o desconto no rodapé do Cartão do Indicador afetado (Visual)
                 aviso_erro = ""
                 if erros_qtd > 0:
                     if 'SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper():
@@ -850,11 +906,18 @@ try:
                     st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status} {html_dinheiro}</div>{aviso_erro}</div>", unsafe_allow_html=True)
                 col_idx += 1
 
-            # --- SOMA FINAL (BARRA VERDE DE DINHEIRO) ---
+            # --- SOMA FINAL (BARRA VERDE DE DINHEIRO COM PROJEÇÃO) ---
             valor_final_total = row.get('Valor Final', 0)
             if valor_final_total > 0:
+                val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                txt_proj_tot = ""
+                if d_trab_p > 0 and d_trab_p < d_uteis_p:
+                    proj_tot = (valor_final_total / d_trab_p) * d_uteis_p
+                    proj_tot_str = f"{proj_tot:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    txt_proj_tot = f" | 📈 Projeção Fim do Mês: R$ {proj_tot_str}"
+                    
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}{txt_proj_tot}")
 
             st.divider()
 
@@ -914,11 +977,33 @@ try:
                 fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                 fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                 
-                col_grafico, col_tabela = st.columns([1.2, 1])
-                with col_grafico:
-                    st.plotly_chart(fig, use_container_width=True) # Renderiza o Gráfico de Barras
+                # 🛡️ NOVO: GRÁFICO DE DIAS DA JORNADA
+                df_dias = pd.DataFrame({
+                    'Categoria': ['Dias Úteis', 'Dias Meta', 'Dias Trabalh.'],
+                    'Quantidade': [d_uteis_p, d_meta_p, d_trab_p]
+                })
+                fig_dias = px.bar(df_dias, x='Categoria', y='Quantidade', text='Quantidade', color='Categoria',
+                                  color_discrete_map={'Dias Úteis': '#3b82f6', 'Dias Meta': '#ffca28', 'Dias Trabalh.': '#2ecc71'})
+                fig_dias.update_layout(showlegend=False, title="<b>Frequência e Jornada (Dias)</b>", title_font=dict(color="lightgray", size=18), 
+                                       xaxis_title=None, yaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=300, margin=dict(t=50, b=0, l=0, r=0))
+                fig_dias.update_traces(textfont=dict(size=20, color="white"), marker_line_color='white', marker_line_width=1)
+                fig_dias.update_xaxes(tickfont=dict(size=14, color="lightgray", family="Arial Black"))
+                fig_dias.update_yaxes(visible=False)
+
+                # Organiza os gráficos em colunas
+                col_graf_kpi, col_graf_dias = st.columns([1.5, 1])
+                with col_graf_kpi:
+                    st.plotly_chart(fig, use_container_width=True) # Gráfico de KPIs
+                with col_graf_dias:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.plotly_chart(fig_dias, use_container_width=True) # Gráfico de Dias
                 
-                with col_tabela:
+                st.divider()
+                st.markdown("### 📅 Detalhamento Diário")
+                
+                col_diario, col_tabela = st.columns([1.2, 1])
+                
+                with col_diario:
                     cargo_p = str(row.get('FUNÇÃO', '')).upper()
                     turno_p = str(row.get('TURNO', '')).upper()
 
@@ -965,7 +1050,7 @@ try:
                                     col_tit_diario, col_data_diario = st.columns([1.6, 1])
                                     
                                     with col_tit_diario:
-                                        st.markdown("### 📅 Resultado Diário")
+                                        st.markdown("#### Diário")
                                         
                                     with col_data_diario:
                                         # Caixinha interativa para escolher qual dia olhar
@@ -1076,35 +1161,36 @@ try:
                             st.markdown("### 📅 Resultado Diário")
                             st.warning("⚠️ Não foi possível carregar os dados. A aba não foi encontrada na nuvem.")
 
+                with col_tabela:
                     # =============================================================================
                     # TABELA NORMAL INDIVIDUAL (Se NÃO for cargo com relatório diário)
                     # =============================================================================
-                    else:
-                        kpis_ativos_pessoa = []
-                        for k in kpis_mapeados:
-                            m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
-                            if pd.notna(m2) and m2 > 0:
-                                kpis_ativos_pessoa.append(k) # Só lista as métricas que a pessoa possui
-                                
-                        # 🛡️ Inclui a coluna "Erros" na tabela individual para transparência
-                        extras_ind = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa]
+                    kpis_ativos_pessoa = []
+                    for k in kpis_mapeados:
+                        m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
+                        if pd.notna(m2) and m2 > 0:
+                            kpis_ativos_pessoa.append(k) # Só lista as métricas que a pessoa possui
+                            
+                    # 🛡️ Inclui a coluna "Erros" na tabela individual para transparência
+                    extras_ind = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa]
 
-                        # Prepara a mini-tabela com Dias Úteis e Faltas
-                        col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + kpis_ativos_pessoa
-                        df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
-                        
-                        if 'Tempo Médio' in df_tabela_mini.columns:
-                            df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
-                        
-                        # Formata o visual da tabela na tela
-                        config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
-                        for col in df_tabela_mini.columns:
-                            if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
-                            elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                            elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
-                            else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
-                        
-                        st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
+                    # Prepara a mini-tabela com Dias Úteis e Faltas
+                    col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + kpis_ativos_pessoa
+                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
+                    
+                    if 'Tempo Médio' in df_tabela_mini.columns:
+                        df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
+                    
+                    # Formata o visual da tabela na tela
+                    config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
+                    for col in df_tabela_mini.columns:
+                        if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                        elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                        elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+                        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+                    
+                    st.markdown("#### Matriz")
+                    st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=350, column_config=config_colunas)
 
     # =============================================================================
     # 👥 VISÃO GERAL EQUIPE (A tela de Boas-Vindas ou os Blocos Coletivos)
