@@ -16,6 +16,8 @@ import calendar                 # Ajuda a calcular o último dia do mês para o 
 # O "turno_acesso" pode ser um texto único (ex: "T3") ou uma lista (ex: ["T1", "T2"])
 USUARIOS = {
     "diegoc": {"senha": "ger#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "suelin": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "rh": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, # Acesso a múltiplos turnos
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
