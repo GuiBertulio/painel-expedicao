@@ -847,79 +847,77 @@ try:
                 try: meta2_val = float(meta2)
                 except: meta2_val = 0
                 
-                # 🛡️ BLINDAGEM DA META ZERO ISOLADA POR FUNÇÃO
-                k_up = str(kpi).upper()
-                eh_producao = False
-                if 'SEPARADOR' in cargo_p and 'ITENS' in k_up and 'RAMPA' not in k_up: eh_producao = True
-                elif 'CONFERENTE' in cargo_p and ('FRAC' in k_up or 'GRAND' in k_up or 'ITENS CONF' in k_up or 'PALETS CONF' in k_up): eh_producao = True
-                elif 'OPERADOR' in cargo_p and 'MOV' in k_up: eh_producao = True
-                
-                if meta2_val <= 0 and not eh_producao: continue
+                # 🛡️ BLINDAGEM REVERTIDA: Só aparece o cartão se a pessoa tiver uma META válida para aquele indicador no Excel
+                if meta2_val <= 0: continue
 
                 realizado = float(row.get(kpi, 0))
-                meta1, meta2, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(meta2), float(row.get(f"{kpi}_Meta3", 0))
+                meta1, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(row.get(f"{kpi}_Meta3", 0))
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
-                # Se for métrica de produção sem meta, fixa 100% no gráfico e cartão azul
-                if meta2_val <= 0 and eh_producao:
-                    alvo_atual, nome_alvo = 0, "Livre"
-                    cor, icone, status = C_AZUL, "🏆", "Volume Total"
-                    real_perc = 100
-                else:
-                    # Lógica de Semáforo (Verde, Vermelho, Azul, Amarelo)
-                    if racional == 1: 
-                        perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
-                        if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                        elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                        elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                        else: alvo_atual, nome_alvo = meta3, "Meta Máx"
-                        
-                        if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                        elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                        elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                    else: 
-                        perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
-                        if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                        elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                        elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                        else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                # Lógica de Semáforo (Verde, Vermelho, Azul, Amarelo)
+                if racional == 1: 
+                    perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
+                    if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                    elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
+                    elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                    else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                    
+                    if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
+                    elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                    elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                else: 
+                    perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
+                    if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                    elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
+                    elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                    else: alvo_atual, nome_alvo = meta3, "Meta Máx"
 
-                        if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                        elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                        elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                    if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
+                    elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                    elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                    real_perc = perc_atingimento * 100
+                real_perc = perc_atingimento * 100
                 
                 # Guarda as infos para desenhar o gráfico de barras lá no final
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
                 
-                # Formatação Inteligente de Dinheiro e Projeções no Cartão
+                # 🛡️ PROJEÇÕES (Estimativa do Indicador e do Dinheiro)
+                texto_proj_ind = ""
+                texto_proj_dinheiro = ""
+                
+                if d_trab_p > 0 and d_trab_p < d_uteis_p:
+                    k_up = str(kpi).upper()
+                    # Só faz projeção linear do volume se não for percentual ou média/tempo
+                    if "%" not in k_up and "TEMPO" not in k_up and "MÉD" not in k_up and "AVARIA" not in k_up and "DEV" not in k_up and "CORTE" not in k_up:
+                        proj_ind = (realizado / d_trab_p) * d_uteis_p
+                        texto_proj_ind = f" | Proj: {proj_ind:,.0f}".replace(',', '.')
+                        
+                    if valor_reais > 0:
+                        proj_dinheiro = (valor_reais / d_trab_p) * d_uteis_p
+                        proj_dinheiro_str = f"{proj_dinheiro:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        texto_proj_dinheiro = f"<br><span style='color: #888; font-size: 14px; font-weight: normal;'>Proj. Fim Mês: R$ {proj_dinheiro_str}</span>"
+
+                # Formatação Inteligente de Dinheiro
                 html_dinheiro = ""
                 if valor_reais > 0:
                     val_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    texto_proj = ""
-                    if d_trab_p > 0 and d_trab_p < d_uteis_p:
-                        proj = (valor_reais / d_trab_p) * d_uteis_p
-                        proj_str = f"{proj:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        texto_proj = f"<br><span style='color: #888; font-size: 14px; font-weight: normal;'>Proj. Fim Mês: R$ {proj_str}</span>"
-                    
-                    html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {val_str}</span>{texto_proj}"
+                    html_dinheiro = f"<span style='color: {C_VERDE}; font-size: 20px; font-weight: 900; margin-left: 10px;'>💰 R$ {val_str}</span>{texto_proj_dinheiro}"
 
                 # Mascara os textos dos cartões (Segundos viram Tempo e Decimais viram %)
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
-                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}" if meta2_val > 0 else "-"
+                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
                 elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
                     val_tela = f"{realizado:.2f}%"
-                    alvo_tela = f"{alvo_atual:.2f}%" if meta2_val > 0 else "-"
+                    alvo_tela = f"{alvo_atual:.2f}%"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
-                    alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
+                    alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
 
-                alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
+                alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}{texto_proj_ind}</span>"
                 
                 # 🛡️ Adiciona o desconto no rodapé do Cartão do Indicador afetado (Visual)
                 aviso_erro = ""
@@ -992,12 +990,16 @@ try:
             st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
 
             # =============================================================================
-            # 🛡️ RETORNO DO LAYOUT CLÁSSICO LADO A LADO (KPIs na Esquerda | Tabelas na Direita)
+            # 🛡️ RETORNO DO LAYOUT CLÁSSICO LADO A LADO E CORREÇÃO DO DF_GRAFICO
             # =============================================================================
             col_grafico, col_tabelas_frequencia = st.columns([1.2, 1])
             
             with col_grafico:
                 if grafico_dados:
+                    df_grafico = pd.DataFrame(grafico_dados)
+                    df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
+                    df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(lambda color: "black" if color == C_AMARELO else "white")
+                    
                     # Monta a barra do gráfico Plotly dos KPIs
                     fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
                     fig.update_layout(showlegend=False, yaxis_title="<b>% da Meta Atingida</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
@@ -1006,6 +1008,8 @@ try:
                     fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                     fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                     st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("Nenhum indicador com meta estabelecida para gerar o gráfico de atingimento.")
             
             with col_tabelas_frequencia:
                 cargo_p = str(row.get('FUNÇÃO', '')).upper()
@@ -1111,17 +1115,14 @@ try:
                 kpis_ativos_pessoa = []
                 for k in kpis_mapeados:
                     m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
-                    k_up = str(k).upper()
-                    eh_producao = False
-                    if 'SEPARADOR' in cargo_p and 'ITENS' in k_up and 'RAMPA' not in k_up: eh_producao = True
-                    elif 'CONFERENTE' in cargo_p and ('FRAC' in k_up or 'GRAND' in k_up or 'ITENS CONF' in k_up or 'PALETS CONF' in k_up): eh_producao = True
-                    elif 'OPERADOR' in cargo_p and 'MOV' in k_up: eh_producao = True
-                    
-                    if (pd.notna(m2) and m2 > 0) or eh_producao:
+                    # A regra de ouro é mantida: só entra na matriz se tiver Meta configurada
+                    if pd.notna(m2) and m2 > 0:
                         if k not in kpis_ativos_pessoa: kpis_ativos_pessoa.append(k) 
 
+                # Inclusão forçada apenas para visibilidade gerencial das quantidades absolutas
                 extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
+                
                 col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
                 df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                 
@@ -1171,60 +1172,44 @@ try:
                         modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
                         racional_temp = modos.iloc[0] if not modos.empty else 1
                         
-                        # 🛡️ BLINDAGEM DA META ZERO ISOLADA POR FUNÇÃO
-                        k_up = str(kpi).upper()
-                        c_up = str(cargo_atual).upper()
-                        eh_producao = False
-                        if 'SEPARADOR' in c_up and 'ITENS' in k_up and 'RAMPA' not in k_up: eh_producao = True
-                        elif 'CONFERENTE' in c_up and ('FRAC' in k_up or 'GRAND' in k_up or 'ITENS CONF' in k_up or 'PALETS CONF' in k_up): eh_producao = True
-                        elif 'OPERADOR' in c_up and 'MOV' in k_up: eh_producao = True
-                        
-                        # 🛡️ FILTRO SEGURO: Evita estourar o erro se a coluna sumir ou o subgrupo estiver vazio
-                        if 'Dias Trabalhados' in df_cargo.columns:
-                            df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0] if not eh_producao else df_cargo[df_cargo[kpi] > 0]
-                        else:
-                            df_kpi_valido = df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo
+                        # 🛡️ FILTRO SEGURO E BLINDAGEM REVERTIDA DA META ZERO PARA EQUIPES
+                        if 'Dias Trabalhados' in df_cargo.columns: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0]
+                        else: df_kpi_valido = df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo
                             
                         if df_kpi_valido.empty: continue
 
                         df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0] if f"{kpi}_Meta2" in df_kpi_valido.columns else pd.DataFrame()
-                        if df_com_meta.empty and not eh_producao: continue
+                        if df_com_meta.empty: continue # Sem meta, sem cartão na Visão Geral
 
-                        if df_com_meta.empty and eh_producao:
-                            meta2_med, meta1_med, meta3_med = 0, 0, 0
-                        else:
-                            meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
-                            meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
-                            meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
+                        meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
+                        meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
+                        meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
                         
                         real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
                         soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
 
-                        if meta2_med <= 0 and eh_producao:
-                            alvo_atual_med, nome_alvo, cor, icone, status, real_perc, t_tela = 0, "Livre", C_AZUL, "🏆", "Volume Total", 100, "-"
-                        else:
-                            if racional_temp == 1: 
-                                if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                                elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                                elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                                else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                                perc = (real_med / meta2_med) if meta2_med > 0 else 0
-                            else: 
-                                if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                                elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                                elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                                else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                                perc = (meta2_med / real_med) if real_med > 0 else 1.2
+                        if racional_temp == 1: 
+                            if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                            elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                            elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                            else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                            perc = (real_med / meta2_med) if meta2_med > 0 else 0
+                        else: 
+                            if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                            elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                            elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                            else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                            perc = (meta2_med / real_med) if real_med > 0 else 1.2
 
-                            real_perc = perc * 100
-                            if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                            elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                            elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                            
-                            if "Tempo" in str(kpi): t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                            elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): t_tela = f"{alvo_atual_med:.2f}%"
-                            else: t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
+                        real_perc = perc * 100
+                        if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
+                        elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                        elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                        
+                        if "Tempo" in str(kpi): t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): t_tela = f"{alvo_atual_med:.2f}%"
+                        else: t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
                         metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
                         eh_global = any(g in str(kpi).upper() for g in metricas_globais)
@@ -1236,7 +1221,7 @@ try:
                         titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
                         alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
-                        # 🛡️ VALOR FINANCEIRO ESTIMADO COLETIVO NOS CARDS GERAIS
+                        # 🛡️ VALOR FINANCEIRO ESTIMADO COLETIVO NOS CARDS GERAIS (E Projeção Coletiva)
                         val_med = df_kpi_valido[f"{kpi}_Valor"].mean() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                         html_dinheiro_med = ""
                         if val_med > 0:
@@ -1263,14 +1248,16 @@ try:
             
             kpis_ativos_tabela = []
             for kpi in kpis_mapeados:
-                eh_producao = any(p in str(kpi).upper() for p in ['ITENS', 'FRAC', 'GRAND', 'MOV'])
                 if f"{kpi}_Meta2" in df_filtrado.columns:
                     metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
-                    if metas_validas.sum() > 0 or eh_producao:
+                    if metas_validas.sum() > 0:
                         if kpi not in kpis_ativos_tabela: kpis_ativos_tabela.append(kpi)
 
-            extras_geral = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela]
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_geral + kpis_ativos_tabela
+            # Puxa "Itens Separados" e "Erros" direto do cruzeiro também, para não ficar de fora da tabela do Líder
+            extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
+            extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
+
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
             if 'Tempo Médio' in df_tabela.columns:
