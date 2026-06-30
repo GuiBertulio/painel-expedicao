@@ -10,16 +10,88 @@ import io                       # Cria arquivos direto na memória RAM (usado pa
 import calendar                 # Ajuda a calcular matematicamente o último dia do mês para o RH
 
 # =============================================================================
+# 💰 DICIONÁRIO OFICIAL DE VALORES DO RH (Base 100%)
+# =============================================================================
+def obter_valor_100(turno, funcao, kpi):
+    t = str(turno).strip().upper()
+    f = str(funcao).strip().upper()
+    k = str(kpi).strip().upper()
+    
+    mapa = {
+        ("T1", "CONFERENTE", "PALETS CONF."): 300,
+        ("T1", "CONFERENTE", "TEMPO MÉDIO"): 100,
+        ("T1", "DESCARGA", "CARGA PALET."): 125,
+        ("T1", "DESCARGA", "TEMPO MÉDIO"): 125,
+        ("T1", "DESCARGA", "CARGA BAT."): 125,
+        ("T1", "DESCARGA", "CESTA"): 60,
+        ("T1", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T1", "LÍDER", "AVARIA"): 150,
+        ("T1", "LÍDER", "MÉD. PALETS CONF."): 300,
+        ("T1", "LÍDER", "TEMPO MÉDIO"): 300,
+        ("T1", "OPERADOR", "MOV. VERT."): 350,
+        ("T1", "OPERADOR", "TEMPO MÉDIO"): 100,
+        ("T1", "PUXA", "PALETS PX."): 200,
+        ("T1", "PUXA", "TEMPO MÉDIO"): 100,
+        
+        ("T2", "AVARIA", "AVARIA"): 150,
+        ("T2", "CONFERENTE", "ITENS CONF."): 300,
+        ("T2", "CONFERENTE", "DEV. %"): 150,
+        ("T2", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T2", "INVENTARIO", "CORTE %"): 200,
+        ("T2", "LÍDER", "AVARIA"): 150,
+        ("T2", "LÍDER", "RESSUP. EQ."): 240,
+        ("T2", "LÍDER", "DEV. %"): 240,
+        ("T2", "LÍDER", "ITENS/HORA EQ."): 240,
+        ("T2", "MESA", "RESSUP. EQ."): 220,
+        ("T2", "MESA", "DEV. %"): 220,
+        ("T2", "MESA", "ITENS/HORA EQ."): 220,
+        ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
+        ("T2", "OPERADOR", "AVARIA"): 100,
+        ("T2", "RAMPEIRO", "ITENS RAMPA"): 150,
+        ("T2", "RAMPEIRO", "DEV. %"): 150,
+        ("T2", "RAMPEIRO", "AVARIA"): 100,
+        ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
+        ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
+        ("T2", "SEPARADOR G", "ITENS SEP"): 150,
+        
+        ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
+        ("T3", "SEPARADOR F", "ITENS SEP"): 150,
+        ("T3", "SEPARADOR F", "ITENS/HORA"): 150,
+        ("T3", "SEPARADOR G", "JORNADA LÍQ."): 150,
+        ("T3", "SEPARADOR G", "ITENS SEP"): 150,
+        ("T3", "SEPARADOR G", "ITENS/HORA"): 150,
+        ("T3", "CONFERENTE", "ITENS CONF."): 350,
+        ("T3", "CONFERENTE", "DEV. %"): 150,
+        ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
+        ("T3", "OPERADOR", "AVARIA"): 100,
+        ("T3", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
+        ("T3", "CARREGAMENTO BOX", "DEV. %"): 150,
+        ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,
+        ("T3", "MESA", "JORNADA LÍQ. EQ."): 220,
+        ("T3", "MESA", "DEV. %"): 220,
+        ("T3", "MESA", "CORTE %"): 220,
+        ("T3", "MANOBRISTA", "ITENS MANOB."): 350,
+        ("T3", "MANOBRISTA", "DEV. %"): 150,
+        ("T3", "MANOBRISTA", "AVARIA"): 150,
+        ("T3", "LÍDER", "JORNADA LÍQ. EQ."): 240,
+        ("T3", "LÍDER", "AVARIA"): 150,
+        ("T3", "LÍDER", "DEV. %"): 240,
+        ("T3", "LÍDER", "ITENS/HORA EQ."): 240,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "ITENS/HORA"): 150,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "AVARIA"): 100,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "CHECKLIST MANUTENÇÃO"): 250,
+    }
+    return mapa.get((t, f, k), 0)
+
+# =============================================================================
 # 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS (Seu Banco de Dados Interno)
 # =============================================================================
-# Para adicionar alguém, basta copiar uma linha e mudar os dados. 
-# O "turno_acesso" pode ser um texto único (ex: "T3") ou uma lista (ex: ["T1", "T2"])
 USUARIOS = {
     "diegoc": {"senha": "ger#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "suelin": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "rh": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, # Acesso a múltiplos turnos
+    "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, 
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
     "luciano": {"senha": "Luciano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
@@ -28,22 +100,18 @@ USUARIOS = {
     "diego": {"senha": "Diego@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
     "carlos": {"senha": "Carlos@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
     "luis": {"senha": "Luis@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
-    "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T3"} # <-- Lembre-se: O último da lista NUNCA tem vírgula no final
+    "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T3"} 
 }
 
 # =============================================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (O CSS do site)
 # =============================================================================
-# Aqui você muda o título que fica na aba do navegador e o ícone
 st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
 
-# O bloco abaixo é o "CSS". É aqui que você altera tamanhos de letras, cores de fundo e bordas.
 st.markdown("""
     <style>
-    /* Diminui o espaço em branco no topo do site */
     .block-container { padding-top: 2rem !important; }
     
-    /* Configuração dos Cartões (Cards) das Métricas */
     .card-meta { 
         background-color: var(--background-color); 
         padding: 15px;                             
@@ -52,7 +120,6 @@ st.markdown("""
         margin-bottom: 15px;                       
     }
     
-    /* Configuração do Cartão Vermelho dos Detratores */
     .card-detrator { 
         background-color: rgba(239, 68, 68, 0.1);  
         border: 1px solid #ef4444;                 
@@ -61,7 +128,6 @@ st.markdown("""
         margin-bottom: 15px; 
     }
     
-    /* Tamanho do NÚMERO GIGANTE dentro dos cartões de métrica */
     .texto-card-principal { 
         font-size: 42px;                           
         color: var(--text-color); 
@@ -69,7 +135,6 @@ st.markdown("""
         line-height: 1.1; 
     }
     
-    /* Tamanho do TÍTULO do cartão */
     .texto-card-titulo { 
         font-size: 22px;                           
         color: var(--text-color); 
@@ -79,18 +144,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Cores oficiais do painel
 C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
 
 # =============================================================================
 # 🚪 TELA DE LOGIN (BARREIRA DE SEGURANÇA)
 # =============================================================================
-# Cria a memória de login. Se o cara não logou, prende ele nessa tela.
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 if not st.session_state["logado"]:
-    # Divide a tela em 3 colunas e bota o login na coluna do meio (para ficar centralizado)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<br><br><br>", unsafe_allow_html=True) 
@@ -112,7 +174,7 @@ if not st.session_state["logado"]:
     st.stop() 
 
 # =============================================================================
-# 🔗 CONEXÃO COM GOOGLE SHEETS (Para salvar feedbacks)
+# 🔗 CONEXÃO COM GOOGLE SHEETS E CARREGAMENTO
 # =============================================================================
 def conectar_planilha():
     cred_dict = dict(st.secrets["gcp_service_account"]) 
@@ -120,17 +182,13 @@ def conectar_planilha():
     planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
     return planilha
 
-# =============================================================================
-# 🧠 2. CARREGAMENTO E TRATAMENTO DOS DADOS (O "Cérebro" do Sistema)
-# =============================================================================
-@st.cache_data(ttl=60) # Guarda os dados na memória por 60 segundos
+@st.cache_data(ttl=60) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=0&single=true&output=csv"
     df = pd.read_csv(link_csv)
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
     
-    # --- TRATAMENTO DOS INDICADORES (Mágica do "_Racional") ---
     colunas = list(df.columns)
     for i, col in enumerate(colunas):
         if "RACIONAL" in col.upper():
@@ -146,7 +204,6 @@ def carregar_dados():
             except IndexError:
                 pass 
 
-    # --- PADRONIZAÇÃO DE NOMES DE COLUNAS ---
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
         if "TRAB" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
@@ -154,11 +211,10 @@ def carregar_dados():
         elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Uteis'})
         elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
         elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
-        elif "ERRO" in nome_limpo: df = df.rename(columns={c: 'ERROS'})
+        elif "ERRO" in nome_limpo: df = df.rename(columns={c: 'ERROS'}) 
 
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
-    # --- 🛡️ BLINDAGEM MESTRA CONTRA COLUNAS VAZIAS E NAN ---
     for col_dia in ['Dias Trabalhados', 'Dias Meta', 'Dias Uteis']:
         if col_dia in df.columns:
             df[col_dia] = pd.to_numeric(df[col_dia], errors='coerce').fillna(0).astype(int)
@@ -170,12 +226,10 @@ def carregar_dados():
     else:
         df['ERROS'] = 0
 
-    # --- LIMPEZA DE DADOS ---
     if 'NOME' in df.columns: df = df.dropna(subset=['NOME'])
     if 'FUNÇÃO' in df.columns: df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
-    # --- CONVERSÃO DE TEXTOS PARA NÚMEROS MATEMÁTICOS E TEMPO ---
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
     for col in df.columns:
         if col not in colunas_texto:
@@ -188,7 +242,6 @@ def carregar_dados():
                 s_br = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
                 df[col] = pd.to_numeric(s_br.where(mask_virgula, s), errors="coerce").fillna(0)
                 
-    # --- 🛡️ TEXTO DE PENALIDADE VISUAL (Apenas cria o texto, o Excel já fez a matemática!) ---
     df['Penalidade_Texto'] = ""
 
     for idx, row in df.iterrows():
@@ -203,9 +256,6 @@ def carregar_dados():
                 desc = erros_e * 10
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
 
-    # =============================================================================
-    # 🏆 CÁLCULO DE RANKING (O Campeonato das Equipes)
-    # =============================================================================
     df['Valor Ranking'] = 0.0
     df['Posicao Ranking'] = 0
     
@@ -218,9 +268,6 @@ def carregar_dados():
             kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
             if not kpis: continue
             
-            # -------------------------------------------------------------
-            # REGRA 1: SEPARADORES (T2 e T3 competem por ITENS)
-            # -------------------------------------------------------------
             if 'SEPARADOR' in cargo_str:
                 metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
                                     next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
@@ -255,9 +302,6 @@ def carregar_dados():
                         df.at[idx, 'Valor Ranking'] += val_base * fator
                     pos += 1
 
-            # -------------------------------------------------------------
-            # REGRA 2: CONFERENTES (Apenas T3) - 2 Campeonatos Separados
-            # -------------------------------------------------------------
             elif 'CONFERENTE' in cargo_str and turno == 'T3':
                 metrica_frac = next((k for k in kpis if 'FRAC' in k.upper() or 'ITENS CONF' in k.upper()), None)
                 metrica_grand = next((k for k in kpis if 'GRAND' in k.upper() or 'PALETS CONF' in k.upper()), None)
@@ -294,9 +338,6 @@ def carregar_dados():
                             df.at[idx, 'Valor Ranking'] += 200.0 * (d_trab / d_uteis if d_uteis > 0 else 1)
                         pos += 1
 
-            # -------------------------------------------------------------
-            # REGRA 3: OPERADORES (Apenas T3) - 1º Lugar Ganha R$ 200
-            # -------------------------------------------------------------
             elif 'OPERADOR' in cargo_str and turno == 'T3':
                 metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
                 racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
@@ -313,15 +354,11 @@ def carregar_dados():
                         df.at[idx, 'Valor Ranking'] += 200.0 * (d_trab / d_uteis if d_uteis > 0 else 1)
                     pos += 1
 
-    # Soma todo o dinheiro final do colaborador (Métricas + Prêmio do Ranking)
     colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
     df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
     return df
 
-# =============================================================================
-# 🗂️ 2.1 CARREGAMENTO DOS RELATÓRIOS DIÁRIOS
-# =============================================================================
 @st.cache_data(ttl=60)
 def carregar_diarios():
     dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame()}
@@ -343,12 +380,11 @@ def carregar_diarios():
         pass
     return dfs['sep'], dfs['op'], dfs['conf']
 
-# Dispara as funções
 df = carregar_dados()
 df_diario, df_operador, df_conferente = carregar_diarios()
 
 # =============================================================================
-# 📅 3. LÓGICA DE DATAS E BARRA LATERAL (Filtros de Menu)
+# 📅 3. LÓGICA DE DATAS E BARRA LATERAL
 # =============================================================================
 if 'Data Inicio' in df.columns and 'Data Fim' in df.columns and not df['Data Inicio'].dropna().empty:
     dt_inicio = pd.to_datetime(df['Data Inicio'].dropna().iloc[0]).date()
@@ -364,7 +400,7 @@ if st.sidebar.button("Sair / Logout", use_container_width=True):
     st.rerun()
 
 # =============================================================================
-# 📥 BOTÃO DE AUDITORIA (EXCLUSIVO PARA GESTÃO E DIAS DE FECHAMENTO)
+# 📥 BOTÃO DE AUDITORIA
 # =============================================================================
 if st.session_state.get("usuario") in ["guilherme", "nilo"]:
     is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
@@ -520,17 +556,17 @@ if st.session_state["perfil"] == "Gerente":
             ultimo_dia = calendar.monthrange(data_apuracao.year, data_apuracao.month)[1]
             data_fim_mes = f"{ultimo_dia:02d}/{data_apuracao.month:02d}/{data_apuracao.year}"
         except:
-            data_fim_mes = dt_inicio.strftime('%d/%m/%Y') 
+            data_fim_mes = dt_inicio.strftime('%d/%m/%Y')
             
         df_rh_sistema = pd.DataFrame({
-            'A': df_rh['Matrícula'],
-            'B': 2601,
-            'C': 'Adicional Produtividade',
-            'D': 0,
-            'E': df_rh['Premiação (R$)'].apply(lambda x: f"{x:.2f}".replace('.', ',')),
-            'F': 11,
-            'G': data_fim_mes,
-            'H': data_fim_mes
+            'CONTRATO': df_rh['Matrícula'],
+            'VDB': 2601,
+            'DESCRIÇÃO VDB': 'Adicional Produtividade',
+            'REFERENCIA FOLHA_1': 0,
+            'VALOR': df_rh['Premiação (R$)'].apply(lambda x: f"{x:.2f}".replace('.', ',')),
+            'REFERENCIA FOLHA_2': 11,
+            'ULTIMO DIA DO MÊS_1': data_fim_mes,
+            'ULTIMO DIA DO MÊS_2': data_fim_mes
         })
         csv_sistema = df_rh_sistema.to_csv(index=False, header=False, sep=';').encode('utf-8-sig')
 
@@ -540,9 +576,9 @@ if st.session_state["perfil"] == "Gerente":
             file_name=f"Fechamento_RH_Visual_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
             mime="text/csv", use_container_width=True, key="btn_rh_visual"
         )
-        st.sidebar.markdown("<p style='font-size: 14px; margin-bottom: 5px; margin-top: 10px;'>2. Importação do Sistema (Sênior/Folha)</p>", unsafe_allow_html=True)
+        st.sidebar.markdown("<p style='font-size: 14px; margin-bottom: 5px; margin-top: 10px;'>2. Importação do Sistema (Layout Folha)</p>", unsafe_allow_html=True)
         st.sidebar.download_button(
-            label="⚙️ Baixar Arq. do Sistema", data=csv_sistema,
+            label="⚙️ Baixar Arq. do Sistema (.CSV)", data=csv_sistema,
             file_name=f"Importacao_Sistema_Folha_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
             mime="text/csv", type="primary", use_container_width=True, key="btn_rh_sistema"
         )
@@ -605,6 +641,7 @@ try:
 
                 with st.container():
                     st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Lançados:</b> {d_trab} dias<br><br><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
+                    
                     col_feed, col_trein = st.columns(2)
                     with col_feed:
                         with st.expander(f"💬 Registrar Feedback: {nome_c}"):
@@ -675,7 +712,7 @@ try:
                     if d_trab_p > 0 and d_trab_p < d_uteis_p:
                         proj_rank = (val_rank / d_trab_p) * d_uteis_p
                         proj_rank_str = f"{proj_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        txt_proj_rank = f" <span style='color: #888; font-size: 14px; font-weight: normal;'>(Proj: R$ {proj_rank_str})</span>"
+                        txt_proj_rank = f" <span style='color: #888; font-size: 14px; font-weight: normal;'>(Mês Cheio: R$ {proj_rank_str})</span>"
                     else:
                         txt_proj_rank = ""
                     texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>{txt_proj_rank}"
@@ -694,7 +731,7 @@ try:
                 try: meta2_val = float(meta2)
                 except: meta2_val = 0
                 
-                # 🛡️ SÓ APARECE O QUE TEM META NO EXCEL (Mantém a tela limpa e focada no cargo)
+                # 🛡️ SÓ APARECE O QUE TEM META NO EXCEL
                 if meta2_val <= 0: continue
 
                 realizado = float(row.get(kpi, 0))
@@ -728,18 +765,42 @@ try:
                 real_perc = perc_atingimento * 100
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
                 
-                # 🛡️ LÓGICA DE DINHEIRO: Adquirido e Estimado
+                # 🛡️ LÓGICA DE DINHEIRO: Adquirido Proporcional x Estimado Final do Mês
                 html_dinheiro = ""
-                if valor_reais > 0:
+                
+                v_100_tabela = obter_valor_100(turno_p, cargo_p, kpi)
+                if v_100_tabela > 0:
+                    v_100 = v_100_tabela
+                else:
+                    if valor_reais > 0 and d_trab_p > 0:
+                        fator = d_trab_p / d_uteis_p if d_uteis_p > 0 else 1
+                        valor_cheio = valor_reais / fator
+                        if status == "Parcial": v_100 = valor_cheio * 2
+                        elif status == "Superou": v_100 = valor_cheio / 1.2
+                        else: v_100 = valor_cheio
+                    else:
+                        v_100 = 0
+
+                if v_100 > 0 or valor_reais > 0:
                     val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     
-                    if d_trab_p > 0 and d_trab_p < d_uteis_p:
-                        val_estimado = (valor_reais / d_trab_p) * d_uteis_p
-                        val_estimado_str = f"{val_estimado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        
-                        html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Adquirido: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #ffca28; font-size: 16px;'>📈 Estimado: <b>R$ {val_estimado_str}</b></span></div>"
+                    if v_100 > 0:
+                        if status == "Abaixo":
+                            estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERMELHO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #888; font-size: 14px;'>🎯 Alcance a Meta 1 para estimar <b>R$ {estimado_cheio_str}</b></span></div>"
+                        elif status == "Parcial":
+                            estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            prox_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AMARELO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (50%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (100%): <b>R$ {prox_str}</b></span></div>"
+                        elif status == "Atingiu":
+                            estimado_cheio_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            prox_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (100%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (120%): <b>R$ {prox_str}</b></span></div>"
+                        elif status == "Superou":
+                            estimado_cheio_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AZUL}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #3b82f6; font-size: 14px;'>🏆 Mês Cheio (120% Máx): <b>R$ {estimado_cheio_str}</b></span></div>"
                     else:
-                        html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Adquirido: <b>R$ {val_adquirido_str}</b></span></div>"
+                        html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span></div>"
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
@@ -764,7 +825,7 @@ try:
                     st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
                 col_idx += 1
 
-            # --- SOMA FINAL (BARRA VERDE DE DINHEIRO COM PROJEÇÃO) ---
+            # --- SOMA FINAL ---
             valor_final_total = row.get('Valor Final', 0)
             if valor_final_total > 0:
                 val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -772,7 +833,7 @@ try:
                 if d_trab_p > 0 and d_trab_p < d_uteis_p:
                     proj_tot = (valor_final_total / d_trab_p) * d_uteis_p
                     proj_tot_str = f"{proj_tot:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    txt_proj_tot = f" | 📈 Estimado Final: R$ {proj_tot_str}"
+                    txt_proj_tot = f" | 📈 Estimado Final (Mês Cheio): R$ {proj_tot_str}"
                     
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}{txt_proj_tot}")
@@ -822,7 +883,6 @@ try:
             col_grafico, col_tabelas_frequencia = st.columns([1.2, 1])
             
             with col_grafico:
-                # 🛡️ BLINDAGEM DO GRÁFICO (Protege contra pessoas sem KPIs válidos)
                 if grafico_dados:
                     df_grafico = pd.DataFrame(grafico_dados)
                     df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
@@ -937,6 +997,7 @@ try:
                                 with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
                                 with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
+                # --- 📋 MATRIZ DE DIAS E ADICIONAIS ---
                 kpis_ativos_pessoa = []
                 for k in kpis_mapeados:
                     m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
@@ -1001,8 +1062,7 @@ try:
 
                         df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0] if f"{kpi}_Meta2" in df_kpi_valido.columns else pd.DataFrame()
                         
-                        # 🛡️ SÓ MOSTRA O CARTÃO SE TIVER META CONFIGURADA NO EXCEL
-                        if df_com_meta.empty: continue
+                        if df_com_meta.empty: continue 
 
                         meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
                         meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
@@ -1030,16 +1090,18 @@ try:
                         elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                         else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
-                        if "Tempo" in str(kpi): t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): t_tela = f"{alvo_atual_med:.2f}%"
-                        else: t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
-
                         metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
                         eh_global = any(g in str(kpi).upper() for g in metricas_globais)
                         
-                        if "Tempo" in str(kpi): v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): v_tela = f"{real_med:.2f}%"
-                        else: v_tela = f"{real_med:,.0f}".replace(',', '.')
+                        if "Tempo" in str(kpi):
+                            v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                            t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                            v_tela = f"{real_med:.2f}%"
+                            t_tela = f"{alvo_atual_med:.2f}%"
+                        else:
+                            v_tela = f"{real_med:,.0f}".replace(',', '.')
+                            t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
                         titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
                         alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
@@ -1048,15 +1110,7 @@ try:
                         html_dinheiro_med = ""
                         if val_med > 0:
                             val_med_str = f"{val_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            d_trab_med = df_kpi_valido['Dias Trabalhados'].mean() if 'Dias Trabalhados' in df_kpi_valido.columns else 26
-                            d_uteis_med = df_kpi_valido['Dias Uteis'].mean() if 'Dias Uteis' in df_kpi_valido.columns else 26
-                            
-                            if d_trab_med > 0 and d_trab_med < d_uteis_med:
-                                proj_med = (val_med / d_trab_med) * d_uteis_med
-                                proj_med_str = f"{proj_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Média Adquirida: <b>R$ {val_med_str}</b></span><br><span style='color: #ffca28; font-size: 16px;'>📈 Média Estimada: <b>R$ {proj_med_str}</b></span></div>"
-                            else:
-                                html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Média Adquirida: <b>R$ {val_med_str}</b></span></div>"
+                            html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Média Adquirida: <b>R$ {val_med_str}</b></span></div>"
 
                         with cols_eq[col_idx % 4]:
                             st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro_med}</div>", unsafe_allow_html=True)
