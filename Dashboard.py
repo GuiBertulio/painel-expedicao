@@ -1398,3 +1398,9 @@ try:
             
             for col in df_tabela.columns:
                 if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue
+                    # O height=600 controla a altura da tabela antes de criar barra de rolagem
+            st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
+
+except Exception as e:
+    # Se bater algum erro não previsto, o site não trava a tela preta, mas escreve essa mensagem com o motivo
+    st.error(f"⚠️ Erro ao renderizar painel: {e}")
