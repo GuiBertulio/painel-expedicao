@@ -635,7 +635,7 @@ if st.session_state["perfil"] == "Gerente":
         
         csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
         
-        # --- 🛡️ EXTRAÇÃO DO LAYOUT DO SISTEMA DE FOLHA (Exigido pelo RH) ---
+        # --- 🛡️ NOVO: LÓGICA DO ARQUIVO DO SISTEMA DE FOLHA (Sênior/Domínio) ---
         try:
             ultimo_dia = calendar.monthrange(data_apuracao.year, data_apuracao.month)[1]
             data_fim_mes = f"{ultimo_dia:02d}/{data_apuracao.month:02d}/{data_apuracao.year}"
@@ -804,7 +804,7 @@ try:
             erros_qtd = int(row.get('ERROS', 0))
             penalidade_txt = str(row.get('Penalidade_Texto', ''))
             
-            # 🛡| Alerta de penalidade caso a pessoa tenha cometido erros (Visual)
+            # 🛡️ Alerta de penalidade caso a pessoa tenha cometido erros (Visual)
             if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
                 st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
             
@@ -847,13 +847,17 @@ try:
                 try: meta2_val = float(meta2)
                 except: meta2_val = 0
                 
-                # BLINDAGEM DA META ZERO: Deixa passar as métricas de produção mesmo se a meta 2 estiver zerada
-                eh_producao = any(p in str(kpi).upper() for p in ['ITENS', 'FRAC', 'GRAND', 'MOV'])
+                # 🛡️ BLINDAGEM DA META ZERO ISOLADA POR FUNÇÃO
+                k_up = str(kpi).upper()
+                eh_producao = False
+                if 'SEPARADOR' in cargo_p and 'ITENS' in k_up and 'RAMPA' not in k_up: eh_producao = True
+                elif 'CONFERENTE' in cargo_p and ('FRAC' in k_up or 'GRAND' in k_up or 'ITENS CONF' in k_up or 'PALETS CONF' in k_up): eh_producao = True
+                elif 'OPERADOR' in cargo_p and 'MOV' in k_up: eh_producao = True
+                
                 if meta2_val <= 0 and not eh_producao: continue
 
                 realizado = float(row.get(kpi, 0))
-                meta1 = float(row.get(f"{kpi}_Meta1", 0))
-                meta3 = float(row.get(f"{kpi}_Meta3", 0))
+                meta1, meta2, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(meta2), float(row.get(f"{kpi}_Meta3", 0))
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
@@ -1103,8 +1107,20 @@ try:
                                 with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
                                 with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
-                # --- 📋 MATRIZ DE DIAS E ADICIONAIS (Deixada puramente aqui como você solicitou) ---
-                extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pess] if 'kpis_ativos_pess' in locals() else []
+                # --- 📋 MATRIZ DE DIAS E ADICIONAIS ---
+                kpis_ativos_pessoa = []
+                for k in kpis_mapeados:
+                    m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
+                    k_up = str(k).upper()
+                    eh_producao = False
+                    if 'SEPARADOR' in cargo_p and 'ITENS' in k_up and 'RAMPA' not in k_up: eh_producao = True
+                    elif 'CONFERENTE' in cargo_p and ('FRAC' in k_up or 'GRAND' in k_up or 'ITENS CONF' in k_up or 'PALETS CONF' in k_up): eh_producao = True
+                    elif 'OPERADOR' in cargo_p and 'MOV' in k_up: eh_producao = True
+                    
+                    if (pd.notna(m2) and m2 > 0) or eh_producao:
+                        if k not in kpis_ativos_pessoa: kpis_ativos_pessoa.append(k) 
+
+                extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
                 col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
                 df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
@@ -1155,7 +1171,13 @@ try:
                         modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
                         racional_temp = modos.iloc[0] if not modos.empty else 1
                         
-                        eh_producao = any(p in str(kpi).upper() for p in ['ITENS', 'FRAC', 'GRAND', 'MOV'])
+                        # 🛡️ BLINDAGEM DA META ZERO ISOLADA POR FUNÇÃO
+                        k_up = str(kpi).upper()
+                        c_up = str(cargo_atual).upper()
+                        eh_producao = False
+                        if 'SEPARADOR' in c_up and 'ITENS' in k_up and 'RAMPA' not in k_up: eh_producao = True
+                        elif 'CONFERENTE' in c_up and ('FRAC' in k_up or 'GRAND' in k_up or 'ITENS CONF' in k_up or 'PALETS CONF' in k_up): eh_producao = True
+                        elif 'OPERADOR' in c_up and 'MOV' in k_up: eh_producao = True
                         
                         # 🛡️ FILTRO SEGURO: Evita estourar o erro se a coluna sumir ou o subgrupo estiver vazio
                         if 'Dias Trabalhados' in df_cargo.columns:
