@@ -764,8 +764,8 @@ try:
                 real_perc = perc_atingimento * 100
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
                 
-                # 🛡️ BLINDAGEM DO SEPARADOR G T2 (Não exibir parte financeira do Itens Separados)
-                is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper())
+                # 🛡️ BLINDAGEM CIRÚRGICA DO SEPARADOR G T2 (Não exibir dinheiro no Itens Separados, mas mostra no Itens/Hora)
+                is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
                 
                 html_dinheiro = ""
                 if not is_itens_t2_sepg:
@@ -1090,9 +1090,6 @@ try:
                         elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                         else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
-                        metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
-                        eh_global = any(g in str(kpi).upper() for g in metricas_globais)
-                        
                         if "Tempo" in str(kpi):
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                             t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
@@ -1103,6 +1100,9 @@ try:
                             v_tela = f"{real_med:,.0f}".replace(',', '.')
                             t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
+                        metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
+                        eh_global = any(g in str(kpi).upper() for g in metricas_globais)
+                        
                         titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
                         alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
@@ -1111,7 +1111,7 @@ try:
                         
                         # 🛡️ BLINDAGEM DO SEPARADOR G T2 PARA EQUIPE (Não exibir dinheiro)
                         turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
-                        is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper())
+                        is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
                         
                         if not is_itens_t2_sepg and val_med > 0:
                             val_med_str = f"{val_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
