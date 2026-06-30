@@ -52,7 +52,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "RAMPEIRO", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 150,
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
         
         ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
         ("T3", "SEPARADOR F", "ITENS SEP"): 150,
@@ -641,7 +641,6 @@ try:
 
                 with st.container():
                     st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Lançados:</b> {d_trab} dias<br><br><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
-                    
                     col_feed, col_trein = st.columns(2)
                     with col_feed:
                         with st.expander(f"💬 Registrar Feedback: {nome_c}"):
@@ -765,42 +764,44 @@ try:
                 real_perc = perc_atingimento * 100
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
                 
-                # 🛡️ LÓGICA DE DINHEIRO: Adquirido Proporcional x Estimado Final do Mês
-                html_dinheiro = ""
+                # 🛡️ BLINDAGEM DO SEPARADOR G T2 (Não exibir parte financeira do Itens Separados)
+                is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper())
                 
-                v_100_tabela = obter_valor_100(turno_p, cargo_p, kpi)
-                if v_100_tabela > 0:
-                    v_100 = v_100_tabela
-                else:
-                    if valor_reais > 0 and d_trab_p > 0:
-                        fator = d_trab_p / d_uteis_p if d_uteis_p > 0 else 1
-                        valor_cheio = valor_reais / fator
-                        if status == "Parcial": v_100 = valor_cheio * 2
-                        elif status == "Superou": v_100 = valor_cheio / 1.2
-                        else: v_100 = valor_cheio
+                html_dinheiro = ""
+                if not is_itens_t2_sepg:
+                    v_100_tabela = obter_valor_100(turno_p, cargo_p, kpi)
+                    if v_100_tabela > 0:
+                        v_100 = v_100_tabela
                     else:
-                        v_100 = 0
+                        if valor_reais > 0 and d_trab_p > 0:
+                            fator = d_trab_p / d_uteis_p if d_uteis_p > 0 else 1
+                            valor_cheio = valor_reais / fator
+                            if status == "Parcial": v_100 = valor_cheio * 2
+                            elif status == "Superou": v_100 = valor_cheio / 1.2
+                            else: v_100 = valor_cheio
+                        else:
+                            v_100 = 0
 
-                if v_100 > 0 or valor_reais > 0:
-                    val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    
-                    if v_100 > 0:
-                        if status == "Abaixo":
-                            estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERMELHO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #888; font-size: 14px;'>🎯 Alcance a Meta 1 para estimar <b>R$ {estimado_cheio_str}</b></span></div>"
-                        elif status == "Parcial":
-                            estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            prox_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AMARELO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (50%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (100%): <b>R$ {prox_str}</b></span></div>"
-                        elif status == "Atingiu":
-                            estimado_cheio_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            prox_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (100%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (120%): <b>R$ {prox_str}</b></span></div>"
-                        elif status == "Superou":
-                            estimado_cheio_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AZUL}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #3b82f6; font-size: 14px;'>🏆 Mês Cheio (120% Máx): <b>R$ {estimado_cheio_str}</b></span></div>"
-                    else:
-                        html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span></div>"
+                    if v_100 > 0 or valor_reais > 0:
+                        val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        
+                        if v_100 > 0:
+                            if status == "Abaixo":
+                                estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERMELHO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #888; font-size: 14px;'>🎯 Alcance a Meta 1 para estimar <b>R$ {estimado_cheio_str}</b></span></div>"
+                            elif status == "Parcial":
+                                estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                prox_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AMARELO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (50%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (100%): <b>R$ {prox_str}</b></span></div>"
+                            elif status == "Atingiu":
+                                estimado_cheio_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                prox_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (100%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (120%): <b>R$ {prox_str}</b></span></div>"
+                            elif status == "Superou":
+                                estimado_cheio_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AZUL}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #3b82f6; font-size: 14px;'>🏆 Mês Cheio (120% Máx): <b>R$ {estimado_cheio_str}</b></span></div>"
+                        else:
+                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span></div>"
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
@@ -997,7 +998,6 @@ try:
                                 with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
                                 with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
-                # --- 📋 MATRIZ DE DIAS E ADICIONAIS ---
                 kpis_ativos_pessoa = []
                 for k in kpis_mapeados:
                     m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
@@ -1108,7 +1108,12 @@ try:
 
                         val_med = df_kpi_valido[f"{kpi}_Valor"].mean() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                         html_dinheiro_med = ""
-                        if val_med > 0:
+                        
+                        # 🛡️ BLINDAGEM DO SEPARADOR G T2 PARA EQUIPE (Não exibir dinheiro)
+                        turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
+                        is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper())
+                        
+                        if not is_itens_t2_sepg and val_med > 0:
                             val_med_str = f"{val_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                             html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Média Adquirida: <b>R$ {val_med_str}</b></span></div>"
 
