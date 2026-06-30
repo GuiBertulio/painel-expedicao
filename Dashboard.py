@@ -161,8 +161,7 @@ def carregar_dados():
 
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
-    # --- 🛡️ BLINDAGEM MESTRA CONTRA COLUNAS VAZIAS E NAN ---
-    # Garante que as colunas de dias e erros sejam números matemáticos, trocando vazios por 0
+    # 🛡️ BLINDAGEM MESTRA CONTRA COLUNAS VAZIAS E NAN (Zera os NaNs das novas colunas de controle de dias)
     for col_dia in ['Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'ERROS']:
         if col_dia in df.columns:
             df[col_dia] = pd.to_numeric(df[col_dia], errors='coerce').fillna(0).astype(int)
@@ -630,7 +629,7 @@ if st.session_state["perfil"] == "Gerente":
         
         csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
         
-        # --- 🛡️ NOVO: LÓGICA DO ARQUIVO DO SISTEMA DE FOLHA (Sênior/Domínio) ---
+        # --- 🛡️ EXTRAÇÃO DO LAYOUT DO SISTEMA DE FOLHA (Exigido pelo RH) ---
         try:
             ultimo_dia = calendar.monthrange(data_apuracao.year, data_apuracao.month)[1]
             data_fim_mes = f"{ultimo_dia:02d}/{data_apuracao.month:02d}/{data_apuracao.year}"
@@ -1076,13 +1075,10 @@ try:
                                     # Puxa os dados brutos de forma blindada (Se a planilha faltar coluna, ele coloca '0')
                                     try: val_1 = str(pessoa_d_row.iloc[col_index]).strip()
                                     except: val_1 = "0"
-                                    
                                     try: val_2 = str(pessoa_d_row.iloc[col_index + 1]).strip()
                                     except: val_2 = "0"
-                                    
                                     try: val_3 = str(pessoa_d_row.iloc[col_index + 2]).strip()
                                     except: val_3 = "0"
-                                    
                                     try: val_4 = str(pessoa_d_row.iloc[col_index + 3]).strip()
                                     except: val_4 = "0"
                                     
@@ -1107,7 +1103,6 @@ try:
                                             
                                         try: v_itens = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
                                         except: v_itens = "0"
-                                        
                                         try: v_veloc = f"{int(round(float(val_3.replace(',', '.'))))}"
                                         except: v_veloc = "0"
 
@@ -1121,13 +1116,10 @@ try:
                                         except:
                                             v_horas = "00:00:00"
 
-                                        # Constrói o visual das métricas diárias (O clássico do Separador)
                                         c1, c2, c3 = st.columns(3)
                                         c1.metric("⏱️ Horas", v_horas)
                                         c2.metric("⚡ Itens/Hora", v_veloc)
                                         c3.metric("🎯 JL", jl_display)
-                                        
-                                        # Banner Gigante em Azul para os Itens Separados (A principal métrica)
                                         st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
                                         
                                     elif "CONFERENTE" in cargo_p:
@@ -1136,7 +1128,6 @@ try:
                                         try: v_grand = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
                                         except: v_grand = "0"
 
-                                        # Banners bonitos lado a lado ao invés das métricas pequenas!
                                         st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
                                         c1, c2 = st.columns(2)
                                         with c1:
@@ -1150,7 +1141,6 @@ try:
                                         try: v_vert = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
                                         except: v_vert = "0"
 
-                                        # Banners bonitos lado a lado ao invés das métricas pequenas!
                                         st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
                                         c1, c2 = st.columns(2)
                                         with c1:
@@ -1170,25 +1160,22 @@ try:
 
                 with col_tabela:
                     # =============================================================================
-                    # TABELA NORMAL INDIVIDUAL (Se NÃO for cargo com relatório diário)
+                    # TABELA NORMAL INDIVIDUAL 
                     # =============================================================================
                     kpis_ativos_pessoa = []
                     for k in kpis_mapeados:
                         m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
                         if pd.notna(m2) and m2 > 0:
-                            kpis_ativos_pessoa.append(k) # Só lista as métricas que a pessoa possui
+                            kpis_ativos_pessoa.append(k) 
                             
-                    # 🛡️ Inclui a coluna "Erros" na tabela individual para transparência
                     extras_ind = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa]
 
-                    # Prepara a mini-tabela com Dias Úteis e Faltas
                     col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + kpis_ativos_pessoa
                     df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                     
                     if 'Tempo Médio' in df_tabela_mini.columns:
                         df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
                     
-                    # Formata o visual da tabela na tela
                     config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
                     for col in df_tabela_mini.columns:
                         if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
@@ -1203,11 +1190,9 @@ try:
     # 👥 VISÃO GERAL EQUIPE (A tela de Boas-Vindas ou os Blocos Coletivos)
     # =============================================================================
     else:
-        # Testa se a caixa da barra lateral mudou de posição para saber se aplica os filtros ou deixa o Manual
         filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
 
         if not filtros_ativos:
-            # --- 🚀 TELA DE BOAS-VINDAS (LANDING PAGE COM O MANUAL DE USO) ---
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.markdown("<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
@@ -1236,7 +1221,10 @@ try:
 
                 for kpi in kpis_mapeados:
                     if f"{kpi}_Meta2" in df_cargo.columns:
-                        racional_temp = df_cargo[f"{kpi}_Racional"].mode()[0] if not df_cargo[f"{kpi}_Racional"].empty else 1
+                        col_rac = f"{kpi}_Racional"
+                        # 🛡️ BLINDAGEM CONTRA MODOS VAZIOS: Filtra os nulos antes de calcular a moda para evitar travar subgrupos sem KPI ativo
+                        modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
+                        racional_temp = modos.iloc[0] if not modos.empty else 1
                         
                         # Retira os zerados da Média Geral (senão a média da equipe desaba se alguém tirou folga)
                         if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0]
@@ -1299,8 +1287,22 @@ try:
                             
                         alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
+                        # 🛡️ NOVO: VALOR FINANCEIRO ESTIMADO GERAL E PROJEÇÃO COLETIVA COESAS NOS CARDS DE EQUIPE
+                        val_med = df_kpi_valido[f"{kpi}_Valor"].mean() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
+                        html_dinheiro_med = ""
+                        if val_med > 0:
+                            val_med_str = f"{val_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            d_trab_med = df_kpi_valido['Dias Trabalhados'].mean() if 'Dias Trabalhados' in df_kpi_valido.columns else 26
+                            d_uteis_med = df_kpi_valido['Dias Uteis'].mean() if 'Dias Uteis' in df_kpi_valido.columns else 26
+                            if d_trab_med > 0 and d_trab_med < d_uteis_med:
+                                proj_med = (val_med / d_trab_med) * d_uteis_med
+                                proj_med_str = f"{proj_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                html_dinheiro_med = f"<div style='color: #2ecc71; font-size: 16px; margin-top: 5px; font-weight: bold;'>💰 Média R$: {val_med_str} <span style='color: #888; font-size: 14px; font-weight: normal;'>(Proj: R$ {proj_med_str})</span></div>"
+                            else:
+                                html_dinheiro_med = f"<div style='color: #2ecc71; font-size: 16px; margin-top: 5px; font-weight: bold;'>💰 Média R$: {val_med_str}</div>"
+
                         with cols_eq[col_idx % 4]:
-                            st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro_med}</div>", unsafe_allow_html=True)
                         col_idx += 1
 
         # =============================================================================
@@ -1319,7 +1321,7 @@ try:
                     if metas_validas.sum() > 0:
                         kpis_ativos_tabela.append(kpi)
 
-            # 🛡️ Inclui a coluna "Erros" na Tabela Gerencial para auditoria dos líderes
+            # Inclui a coluna "Erros" na Tabela Gerencial para auditoria dos líderes
             extras_geral = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela]
 
             colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_geral + kpis_ativos_tabela
@@ -1343,7 +1345,6 @@ try:
                 elif "Líq." in col: config[col] = st.column_config.NumberColumn(col, format="%d%%")
                 else: config[col] = st.column_config.NumberColumn(col, format="%d")
 
-            # O height=600 controla a altura da tabela antes de criar barra de rolagem
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
 except Exception as e:
