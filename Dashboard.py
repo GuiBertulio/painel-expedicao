@@ -283,14 +283,14 @@ def carregar_dados():
                     df.at[idx, 'Posicao Ranking'] = pos
                     
                     if turno == 'T3':
-                        if pos == 1: val_base = 250.0 
+                        if pos == 1: val_base = 250.0
                         elif pos == 2: val_base = 200.0
                         elif pos == 3: val_base = 100.0
                         else: val_base = 0.0
                     elif turno == 'T2':
-                        if pos == 1: val_base = 100.0 
-                        elif pos == 2: val_base = 80.0 
-                        elif pos == 3: val_base = 50.0 
+                        if pos == 1: val_base = 150.0
+                        elif pos == 2: val_base = 100.0
+                        elif pos == 3: val_base = 80.0
                         else: val_base = 0.0
                     else:
                         val_base = 0.0
@@ -299,7 +299,7 @@ def carregar_dados():
                         d_uteis = float(row_eq.get('Dias Uteis', 26))
                         d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
                         fator = d_trab / d_uteis if d_uteis > 0 else 1
-                        df.at[idx, 'Valor Ranking'] += val_base * fator
+                        df.at[idx, 'Valor Ranking'] == val_base
                     pos += 1
 
             elif 'CONFERENTE' in cargo_str and turno == 'T3':
