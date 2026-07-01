@@ -296,10 +296,7 @@ def carregar_dados():
                         val_base = 0.0
                     
                     if val_base > 0:
-                        d_uteis = float(row_eq.get('Dias Uteis', 26))
-                        d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
-                        fator = d_trab / d_uteis if d_uteis > 0 else 1
-                        df.at[idx, 'Valor Ranking'] == val_base
+                        df.at[idx, 'Valor Ranking'] += val_base
                     pos += 1
 
             elif 'CONFERENTE' in cargo_str and turno == 'T3':
@@ -317,9 +314,7 @@ def carregar_dados():
                         if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
                             df.at[idx, 'Posicao Ranking'] = pos
                         if pos == 1:
-                            d_uteis = float(row_eq.get('Dias Uteis', 26))
-                            d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
-                            df.at[idx, 'Valor Ranking'] += 200.0 * (d_trab / d_uteis if d_uteis > 0 else 1)
+                            df.at[idx, 'Valor Ranking'] += 200.0 
                         pos += 1
 
                 if metrica_grand:
@@ -333,9 +328,7 @@ def carregar_dados():
                         if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
                             df.at[idx, 'Posicao Ranking'] = pos
                         if pos == 1: 
-                            d_uteis = float(row_eq.get('Dias Uteis', 26))
-                            d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
-                            df.at[idx, 'Valor Ranking'] += 200.0 * (d_trab / d_uteis if d_uteis > 0 else 1)
+                            df.at[idx, 'Valor Ranking'] += 200.0 
                         pos += 1
 
             elif 'OPERADOR' in cargo_str and turno == 'T3':
@@ -349,9 +342,7 @@ def carregar_dados():
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue
                     df.at[idx, 'Posicao Ranking'] = pos
                     if pos == 1: 
-                        d_uteis = float(row_eq.get('Dias Uteis', 26))
-                        d_trab = float(row_eq.get('Dias Trabalhados', d_uteis))
-                        df.at[idx, 'Valor Ranking'] += 200.0 * (d_trab / d_uteis if d_uteis > 0 else 1)
+                        df.at[idx, 'Valor Ranking'] += 200.0 
                     pos += 1
 
     colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
@@ -708,13 +699,7 @@ try:
                 
                 if val_rank > 0:
                     val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    if d_trab_p > 0 and d_trab_p < d_uteis_p:
-                        proj_rank = (val_rank / d_trab_p) * d_uteis_p
-                        proj_rank_str = f"{proj_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        txt_proj_rank = f" <span style='color: #888; font-size: 14px; font-weight: normal;'>(Mês Cheio: R$ {proj_rank_str})</span>"
-                    else:
-                        txt_proj_rank = ""
-                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>{txt_proj_rank}"
+                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>"
                 else:
                     texto_premio_rank = ""
                 
