@@ -47,9 +47,9 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "MESA", "ITENS/HORA EQ."): 220,
         ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
         ("T2", "OPERADOR", "AVARIA"): 100,
-        ("T2", "RAMPEIRO", "ITENS RAMPA"): 150,
-        ("T2", "RAMPEIRO", "DEV. %"): 150,
-        ("T2", "RAMPEIRO", "AVARIA"): 100,
+        ("T2", ""CARREGAMENTO BOX"", "ITENS RAMPA"): 150,
+        ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
+        ("T2", ""CARREGAMENTO BOX"", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
         ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
