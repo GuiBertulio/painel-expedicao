@@ -758,14 +758,7 @@ try:
                     if v_100_tabela > 0:
                         v_100 = v_100_tabela
                     else:
-                        if valor_reais > 0 and d_trab_p > 0:
-                            fator = d_trab_p / d_uteis_p if d_uteis_p > 0 else 1
-                            valor_cheio = valor_reais / fator
-                            if status == "Parcial": v_100 = valor_cheio * 2
-                            elif status == "Superou": v_100 = valor_cheio / 1.2
-                            else: v_100 = valor_cheio
-                        else:
-                            v_100 = 0
+                        v_100 = 0  # <--- FIM DA "ADIVINHAÇÃO"!
 
                     if v_100 > 0 or valor_reais > 0:
                         val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
