@@ -1,13 +1,13 @@
 # =============================================================================
 # 📦 IMPORTAÇÃO DE BIBLIOTECAS (O que o Python precisa para funcionar)
 # =============================================================================
-import streamlit as st          # O motor principal do site (cria botões, telas, textos)
-import pandas as pd             # O "Excel" do Python (manipula as tabelas de dados)
-import datetime                 # Lida com o calendário (data de hoje, apuração, etc)
-import plotly.express as px     # Desenha os gráficos interativos
-import gspread                  # Conecta com a nuvem do Google Sheets
-import io                       # Cria arquivos direto na memória RAM (usado para gerar o Excel de Auditoria)
-import calendar                 # Ajuda a calcular matematicamente o último dia do mês para o RH
+import streamlit as st          
+import pandas as pd             
+import datetime                 
+import plotly.express as px     
+import gspread                  
+import io                       
+import calendar                 
 
 # =============================================================================
 # 💰 DICIONÁRIO OFICIAL DE VALORES DO RH (Base 100%)
@@ -52,7 +52,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, 
         
         ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
         ("T3", "SEPARADOR F", "ITENS SEP"): 150,
@@ -255,6 +255,39 @@ def carregar_dados():
             elif 'OPERADOR' in cargo_e:
                 desc = erros_e * 10
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
+
+    # 💰 OVERRIDE FINANCEIRO: Remove Proporcionalidade de Dias e crava o Valor Total Imediato!
+    kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c]
+    for idx, row in df.iterrows():
+        turno_e = str(row.get('TURNO', '')).upper()
+        funcao_e = str(row.get('FUNÇÃO', '')).upper()
+
+        for kpi in kpis_para_recalcular:
+            if f"{kpi}_Valor" in df.columns:
+                meta2 = row.get(f"{kpi}_Meta2", 0)
+                try: meta2_val = float(meta2)
+                except: meta2_val = 0
+
+                if meta2_val > 0:
+                    realizado = float(row.get(kpi, 0))
+                    meta1 = float(row.get(f"{kpi}_Meta1", meta2_val))
+                    meta3 = float(row.get(f"{kpi}_Meta3", meta2_val))
+                    racional = float(row.get(f"{kpi}_Racional", 1))
+
+                    if racional == 1:
+                        if realizado >= meta3: fator_p = 1.2
+                        elif realizado >= meta2_val: fator_p = 1.0
+                        elif realizado >= meta1: fator_p = 0.5
+                        else: fator_p = 0.0
+                    else:
+                        if realizado <= meta3: fator_p = 1.2
+                        elif realizado <= meta2_val: fator_p = 1.0
+                        elif realizado <= meta1: fator_p = 0.5
+                        else: fator_p = 0.0
+
+                    v_100_base = obter_valor_100(turno_e, funcao_e, kpi)
+                    if v_100_base > 0:
+                        df.at[idx, f"{kpi}_Valor"] = v_100_base * fator_p
 
     df['Valor Ranking'] = 0.0
     df['Posicao Ranking'] = 0
@@ -753,33 +786,9 @@ try:
                 is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
                 
                 html_dinheiro = ""
-                if not is_itens_t2_sepg:
-                    v_100_tabela = obter_valor_100(turno_p, cargo_p, kpi)
-                    if v_100_tabela > 0:
-                        v_100 = v_100_tabela
-                    else:
-                        v_100 = 0  # <--- FIM DA "ADIVINHAÇÃO"!
-
-                    if v_100 > 0 or valor_reais > 0:
-                        val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        
-                        if v_100 > 0:
-                            if status == "Abaixo":
-                                estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERMELHO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #888; font-size: 14px;'>🎯 Alcance a Meta 1 para estimar <b>R$ {estimado_cheio_str}</b></span></div>"
-                            elif status == "Parcial":
-                                estimado_cheio_str = f"{v_100 * 0.5:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                prox_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AMARELO}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (50%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (100%): <b>R$ {prox_str}</b></span></div>"
-                            elif status == "Atingiu":
-                                estimado_cheio_str = f"{v_100:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                prox_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #2ecc71; font-size: 14px;'>🎯 Mês Cheio (100%): <b>R$ {estimado_cheio_str}</b></span> <span style='color: #888; font-size: 14px;'>| 🚀 Próxima (120%): <b>R$ {prox_str}</b></span></div>"
-                            elif status == "Superou":
-                                estimado_cheio_str = f"{v_100 * 1.2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_AZUL}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span><br><span style='color: #3b82f6; font-size: 14px;'>🏆 Mês Cheio (120% Máx): <b>R$ {estimado_cheio_str}</b></span></div>"
-                        else:
-                            html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 15px;'>💰 Adquirido até hoje: <b>R$ {val_adquirido_str}</b></span></div>"
+                if not is_itens_t2_sepg and valor_reais > 0:
+                    val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💰 Total Adquirido: <b>R$ {val_adquirido_str}</b></span></div>"
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                      val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
@@ -808,14 +817,8 @@ try:
             valor_final_total = row.get('Valor Final', 0)
             if valor_final_total > 0:
                 val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                txt_proj_tot = ""
-                if d_trab_p > 0 and d_trab_p < d_uteis_p:
-                    proj_tot = (valor_final_total / d_trab_p) * d_uteis_p
-                    proj_tot_str = f"{proj_tot:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    txt_proj_tot = f" | 📈 Estimado Final (Mês Cheio): R$ {proj_tot_str}"
-                    
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}{txt_proj_tot}")
+                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}")
 
             st.divider()
 
@@ -1084,16 +1087,16 @@ try:
                         titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
                         alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
-                        val_med = df_kpi_valido[f"{kpi}_Valor"].mean() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
+                        val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                         html_dinheiro_med = ""
                         
                         # 🛡️ BLINDAGEM DO SEPARADOR G T2 PARA EQUIPE (Não exibir dinheiro)
                         turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
                         is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
                         
-                        if not is_itens_t2_sepg and val_med > 0:
-                            val_med_str = f"{val_med:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: {C_VERDE}; font-size: 16px;'>💰 Média Adquirida: <b>R$ {val_med_str}</b></span></div>"
+                        if not is_itens_t2_sepg and val_tot_equipe > 0:
+                            val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 16px;'>💰 Total Adquirido (Equipe): <b>R$ {val_tot_eq_str}</b></span></div>"
 
                         with cols_eq[col_idx % 4]:
                             st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro_med}</div>", unsafe_allow_html=True)
