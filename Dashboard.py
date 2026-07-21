@@ -47,12 +47,12 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "MESA", "ITENS/HORA EQ."): 220,
         ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
         ("T2", "OPERADOR", "AVARIA"): 100,
-        ("T2", "RAMPEIRO", "ITENS RAMPA"): 150,
-        ("T2", "RAMPEIRO", "DEV. %"): 150,
-        ("T2", "RAMPEIRO", "AVARIA"): 100,
+        ("T2", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
+        ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
+        ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 0, 
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
         
         ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
         ("T3", "SEPARADOR F", "ITENS SEP"): 150,
@@ -67,9 +67,9 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
         ("T3", "CARREGAMENTO BOX", "DEV. %"): 150,
         ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,
-        ("T3", "RAMPEIRO", "ITENS RAMPA"): 150, # <-- Adicionado para garantir que o T3 puxe os Rampeiros
-        ("T3", "RAMPEIRO", "DEV. %"): 150,      # <-- Adicionado 
-        ("T3", "RAMPEIRO", "AVARIA"): 100,      # <-- Adicionado 
+        ("T3", "RAMPEIRO", "ITENS RAMPA"): 150, 
+        ("T3", "RAMPEIRO", "DEV. %"): 150,      
+        ("T3", "RAMPEIRO", "AVARIA"): 100,      
         ("T3", "MESA", "JORNADA LÍQ. EQ."): 220,
         ("T3", "MESA", "DEV. %"): 220,
         ("T3", "MESA", "CORTE %"): 220,
@@ -234,16 +234,19 @@ def carregar_dados():
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
+    
+    # 👇 A CORREÇÃO DE FORMATAÇÃO DE STRINGS ESTÁ AQUI
     for col in df.columns:
         if col not in colunas_texto:
             if col in ["Tempo Médio", "Tempo Médio_Meta1", "Tempo Médio_Meta2", "Tempo Médio_Meta3"]:
                 texto_limpo = df[col].astype(str).str.split(".").str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors="coerce").dt.total_seconds().fillna(0)
             else:
+                # Retiramos os "R$" e os "%" 
                 s = df[col].astype(str).str.replace("R$", "", regex=False).str.replace("%", "", regex=False).str.strip()
-                mask_virgula = s.str.contains(",", regex=False)
-                s_br = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-                df[col] = pd.to_numeric(s_br.where(mask_virgula, s), errors="coerce").fillna(0)
+                # A nova regra blindada: Remove TODO ponto (pois no Brasil ponto é separador de milhar) e troca a vírgula por ponto (pro Python ler o decimal)
+                s_numerico = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+                df[col] = pd.to_numeric(s_numerico, errors="coerce").fillna(0)
                 
     df['Penalidade_Texto'] = ""
 
@@ -262,51 +265,44 @@ def carregar_dados():
     # =============================================================================
     # 💰 OVERRIDE FINANCEIRO: MOTOR DE CÁLCULO DIRETO (SEM ERROS DO EXCEL)
     # =============================================================================
-    kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] # Mapeia todos os indicadores
+    kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] 
     
     for idx, row in df.iterrows():
-        turno_e = str(row.get('TURNO', '')).upper()   # Pega o turno do colaborador
-        funcao_e = str(row.get('FUNÇÃO', '')).upper() # Pega a função dele
+        turno_e = str(row.get('TURNO', '')).upper()   
+        funcao_e = str(row.get('FUNÇÃO', '')).upper() 
 
         for kpi in kpis_para_recalcular:
-            # Verifica se o indicador atual tem uma coluna de "Valor"
             if f"{kpi}_Valor" in df.columns:
                 
-                # 👇 PASSO 1: A FAXINA (Isso que faltava!)
-                # Nós apagamos o que veio do Excel para esse indicador. 
-                # Se não fizermos isso, o lixo/cálculo errado da planilha fica grudado e entra na soma gerando o '316'.
+                # PASSO 1: A FAXINA (Garante que começa zerado)
                 df.at[idx, f"{kpi}_Valor"] = 0.0
 
-                # 👇 PASSO 2: PEGAR AS METAS
-                meta2 = row.get(f"{kpi}_Meta2", 0) # Pega o Alvo 100% (Meta 2)
+                meta2 = row.get(f"{kpi}_Meta2", 0) 
                 try: meta2_val = float(meta2)
                 except: meta2_val = 0
 
-                # Só calcula o dinheiro se o cara tiver uma meta estabelecida (>0)
                 if meta2_val > 0:
-                    realizado = float(row.get(kpi, 0)) # Quanto ele fez no mês?
-                    meta1 = float(row.get(f"{kpi}_Meta1", meta2_val)) # Alvo 50%
-                    meta3 = float(row.get(f"{kpi}_Meta3", meta2_val)) # Alvo 120%
-                    racional = float(row.get(f"{kpi}_Racional", 1))   # É indicador positivo (1) ou negativo (0)?
+                    realizado = float(row.get(kpi, 0)) 
+                    meta1 = float(row.get(f"{kpi}_Meta1", meta2_val)) 
+                    meta3 = float(row.get(f"{kpi}_Meta3", meta2_val)) 
+                    racional = float(row.get(f"{kpi}_Racional", 1))   
 
-                    # 👇 PASSO 3: DESCOBRIR A PORCENTAGEM DO PRÊMIO (fator_p)
-                    if racional == 1: # Ex: Movimentação (Quanto mais, melhor)
-                        if realizado >= meta3: fator_p = 1.2       # Superou o máximo!
-                        elif realizado >= meta2_val: fator_p = 1.0 # Bateu na risca!
-                        elif realizado >= meta1: fator_p = 0.5     # Bateu o mínimo!
-                        else: fator_p = 0.0                        # Não bateu nada.
-                    else: # Ex: Avaria (Quanto menos erros, melhor)
+                    # PASSO 3: DESCOBRIR A PORCENTAGEM DO PRÊMIO
+                    if racional == 1: 
+                        if realizado >= meta3: fator_p = 1.2       
+                        elif realizado >= meta2_val: fator_p = 1.0 
+                        elif realizado >= meta1: fator_p = 0.5     
+                        else: fator_p = 0.0                        
+                    else: 
                         if realizado <= meta3: fator_p = 1.2
                         elif realizado <= meta2_val: fator_p = 1.0
                         elif realizado <= meta1: fator_p = 0.5
                         else: fator_p = 0.0
 
-                    # 👇 PASSO 4: CALCULAR O VALOR FINAL NA MOEDA
-                    v_100_base = obter_valor_100(turno_e, funcao_e, kpi) # Consulta a tabela lá de cima (100%)
+                    # PASSO 4: CALCULAR O VALOR FINAL NA MOEDA
+                    v_100_base = obter_valor_100(turno_e, funcao_e, kpi) 
                     
                     if v_100_base > 0:
-                        # Multiplica o valor do prêmio pela % que ele atingiu. 
-                        # Ex: Se ele ganha 200, mas bateu só 50%, ele escreve 100 reais na coluna certinho!
                         df.at[idx, f"{kpi}_Valor"] = v_100_base * fator_p
 
     # =============================================================================
@@ -401,7 +397,7 @@ def carregar_dados():
                         df.at[idx, 'Valor Ranking'] += 200.0 
                     pos += 1
 
-    # 👇 PASSO 5: A SOMA GERAL (Agora com as colunas limpas, sem lixo de centavos)
+    # PASSO 5: A SOMA GERAL 
     colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
     df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
