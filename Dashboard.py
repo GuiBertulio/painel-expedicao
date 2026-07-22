@@ -10,83 +10,6 @@ import io
 import calendar                 
 
 # =============================================================================
-# 💰 DICIONÁRIO OFICIAL DE VALORES DO RH (Base 100%)
-# =============================================================================
-def obter_valor_100(turno, funcao, kpi):
-    t = str(turno).strip().upper()
-    f = str(funcao).strip().upper()
-    k = str(kpi).strip().upper()
-    
-    mapa = {
-        ("T1", "CONFERENTE", "PALETS CONF."): 300,
-        ("T1", "CONFERENTE", "TEMPO MÉDIO"): 100,
-        ("T1", "DESCARGA", "CARGA PALET."): 125,
-        ("T1", "DESCARGA", "TEMPO MÉDIO"): 125,
-        ("T1", "DESCARGA", "CARGA BAT."): 125,
-        ("T1", "DESCARGA", "CESTA"): 60,
-        ("T1", "DEVOLUÇÃO", "DEV. %"): 150,
-        ("T1", "LÍDER", "AVARIA"): 150,
-        ("T1", "LÍDER", "MÉD. PALETS CONF."): 300,
-        ("T1", "LÍDER", "TEMPO MÉDIO"): 300,
-        ("T1", "OPERADOR", "MOV. VERT."): 350,
-        ("T1", "OPERADOR", "TEMPO MÉDIO"): 100,
-        ("T1", "PUXA", "PALETS PX."): 200,
-        ("T1", "PUXA", "TEMPO MÉDIO"): 100,
-        
-        ("T2", "AVARIA", "AVARIA"): 150,
-        ("T2", "CONFERENTE", "ITENS CONF."): 300,
-        ("T2", "CONFERENTE", "DEV. %"): 150,
-        ("T2", "DEVOLUÇÃO", "DEV. %"): 150,
-        ("T2", "INVENTARIO", "CORTE %"): 200,
-        ("T2", "LÍDER", "AVARIA"): 150,
-        ("T2", "LÍDER", "RESSUP. EQ."): 240,
-        ("T2", "LÍDER", "DEV. %"): 240,
-        ("T2", "LÍDER", "ITENS/HORA EQ."): 240,
-        ("T2", "MESA", "RESSUP. EQ."): 220,
-        ("T2", "MESA", "DEV. %"): 220,
-        ("T2", "MESA", "ITENS/HORA EQ."): 220,
-        ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
-        ("T2", "OPERADOR", "AVARIA"): 100,
-        ("T2", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
-        ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
-        ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
-        ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
-        ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
-        
-        ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
-        ("T3", "SEPARADOR F", "ITENS SEP"): 150,
-        ("T3", "SEPARADOR F", "ITENS/HORA"): 150,
-        ("T3", "SEPARADOR G", "JORNADA LÍQ."): 150,
-        ("T3", "SEPARADOR G", "ITENS SEP"): 150,
-        ("T3", "SEPARADOR G", "ITENS/HORA"): 150,
-        ("T3", "CONFERENTE", "ITENS CONF."): 350,
-        ("T3", "CONFERENTE", "DEV. %"): 150,
-        ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
-        ("T3", "OPERADOR", "AVARIA"): 100,
-        ("T3", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
-        ("T3", "CARREGAMENTO BOX", "DEV. %"): 150,
-        ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,
-        ("T3", "CARREGAMENTO BOX", "ITENS RAMPA"): 150, 
-        ("T3", "CARREGAMENTO BOX", "DEV. %"): 150,      
-        ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,      
-        ("T3", "MESA", "JORNADA LÍQ. EQ."): 220,
-        ("T3", "MESA", "DEV. %"): 220,
-        ("T3", "MESA", "CORTE %"): 220,
-        ("T3", "MANOBRISTA", "ITENS MANOB."): 350,
-        ("T3", "MANOBRISTA", "DEV. %"): 150,
-        ("T3", "MANOBRISTA", "AVARIA"): 150,
-        ("T3", "LÍDER", "JORNADA LÍQ. EQ."): 240,
-        ("T3", "LÍDER", "AVARIA"): 150,
-        ("T3", "LÍDER", "DEV. %"): 240,
-        ("T3", "LÍDER", "ITENS/HORA EQ."): 240,
-        ("T3", "RESPONSAVEL SALA BATERIAS", "ITENS/HORA"): 150,
-        ("T3", "RESPONSAVEL SALA BATERIAS", "AVARIA"): 100,
-        ("T3", "RESPONSAVEL SALA BATERIAS", "CHECKLIST MANUTENÇÃO"): 250,
-    }
-    return mapa.get((t, f, k), 0)
-
-# =============================================================================
 # 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS (Seu Banco de Dados Interno)
 # =============================================================================
 USUARIOS = {
@@ -208,12 +131,10 @@ def carregar_dados():
                 pass 
 
     # =============================================================================
-    # 🕵️ RADAR REVERSO BLINDADO: Puxando sempre do final da planilha (FA, FB, FC)
+    # 🕵️ RADAR REVERSO BLINDADO: Puxando sempre do final da planilha
     # =============================================================================
     colunas_atuais = list(df.columns)
     
-    # Ele procura a palavra-chave lendo a planilha de trás pra frente (reversed). 
-    # Assim, ignora colunas vazias esquecidas lá no começo.
     col_trab = next((c for c in reversed(colunas_atuais) if "DIAS TRAB" in " ".join(str(c).upper().split())), None)
     col_meta = next((c for c in reversed(colunas_atuais) if "DIAS META" in " ".join(str(c).upper().split())), None)
     
@@ -221,7 +142,6 @@ def carregar_dados():
     col_fim = next((c for c in reversed(colunas_atuais) if "DATA" in str(c).upper() and ("FIM" in str(c).upper() or "APURA" in str(c).upper())), None)
     col_erros = next((c for c in reversed(colunas_atuais) if "ERRO" in str(c).upper()), None)
     
-    # Cria as colunas oficiais injetando o dado puro e exato que achou lá do final
     if col_trab: df['Dias Trabalhados'] = pd.to_numeric(df[col_trab], errors='coerce').fillna(0).astype(int)
     else: df['Dias Trabalhados'] = 0
         
@@ -234,7 +154,6 @@ def carregar_dados():
     if col_erros: df['ERROS'] = pd.to_numeric(df[col_erros], errors='coerce').fillna(0).astype(int)
     else: df['ERROS'] = 0
 
-    # Só AGORA removemos as duplicatas, com os nossos dados já salvos no cofre!
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
     if 'NOME' in df.columns: df = df.dropna(subset=['NOME'])
@@ -243,7 +162,6 @@ def carregar_dados():
     
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
     
-    # Limpeza e formatação cravada
     for col in df.columns:
         if col not in colunas_texto:
             if col in ["Tempo Médio", "Tempo Médio_Meta1", "Tempo Médio_Meta2", "Tempo Médio_Meta3"]:
@@ -267,49 +185,6 @@ def carregar_dados():
             elif 'OPERADOR' in cargo_e:
                 desc = erros_e * 10
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
-
-    # =============================================================================
-    # 💰 OVERRIDE FINANCEIRO: MOTOR DE CÁLCULO DIRETO (SEM ERROS DO EXCEL)
-    # =============================================================================
-    kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] 
-    
-    for idx, row in df.iterrows():
-        turno_e = str(row.get('TURNO', '')).upper()   
-        funcao_e = str(row.get('FUNÇÃO', '')).upper() 
-
-        for kpi in kpis_para_recalcular:
-            if f"{kpi}_Valor" in df.columns:
-                
-                # PASSO 1: A FAXINA (Garante que começa zerado)
-                df.at[idx, f"{kpi}_Valor"] = 0.0
-
-                meta2 = row.get(f"{kpi}_Meta2", 0) 
-                try: meta2_val = float(meta2)
-                except: meta2_val = 0
-
-                if meta2_val > 0:
-                    realizado = float(row.get(kpi, 0)) 
-                    meta1 = float(row.get(f"{kpi}_Meta1", meta2_val)) 
-                    meta3 = float(row.get(f"{kpi}_Meta3", meta2_val)) 
-                    racional = float(row.get(f"{kpi}_Racional", 1))   
-
-                    # PASSO 3: DESCOBRIR A PORCENTAGEM DO PRÊMIO
-                    if racional == 1: 
-                        if realizado >= meta3: fator_p = 1.2       
-                        elif realizado >= meta2_val: fator_p = 1.0 
-                        elif realizado >= meta1: fator_p = 0.5     
-                        else: fator_p = 0.0                        
-                    else: 
-                        if realizado <= meta3: fator_p = 1.2
-                        elif realizado <= meta2_val: fator_p = 1.0
-                        elif realizado <= meta1: fator_p = 0.5
-                        else: fator_p = 0.0
-
-                    # PASSO 4: CALCULAR O VALOR FINAL NA MOEDA
-                    v_100_base = obter_valor_100(turno_e, funcao_e, kpi) 
-                    
-                    if v_100_base > 0:
-                        df.at[idx, f"{kpi}_Valor"] = v_100_base * fator_p
 
     # =============================================================================
     # 🏆 CÁLCULO DO RANKING
@@ -403,7 +278,7 @@ def carregar_dados():
                         df.at[idx, 'Valor Ranking'] += 200.0 
                     pos += 1
 
-    # PASSO 5: A SOMA GERAL 
+    # PASSO 5: A SOMA GERAL (Sem "adivinhar" o valor, apenas confia no que veio do Sheets + O Ranking ganho)
     colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
     df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
