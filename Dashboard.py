@@ -17,7 +17,7 @@ USUARIOS = {
     "suelin": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "rh": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "andreus": {"senha": "anal#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "andreus": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, 
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
