@@ -916,12 +916,11 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             turno = row.get('TURNO', '')
 
             
+            d_trab = float(row.get('Dias Trabalhados', 0))
 
             d_uteis = float(row.get('Dias Uteis', 0))
 
             d_meta = float(row.get('Dias Meta', 0))
-
-            d_trab = float(row.get('Dias Trabalhados', 0))
 
             
 
