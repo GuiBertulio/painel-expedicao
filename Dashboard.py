@@ -209,20 +209,22 @@ def carregar_dados():
 
     for c in list(df.columns):
         nome_limpo = c.strip().upper()
-        if "TRAB" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
-        elif "META" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Meta'})
-        elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Uteis'})
+        # 👇 MUDANÇA 1: Radar de colunas inteligente (basta a palavra-chave)
+        if "TRAB" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
+        elif "META" in nome_limpo: df = df.rename(columns={c: 'Dias Meta'})
+        elif "UT" in nome_limpo or "ÚT" in nome_limpo: df = df.rename(columns={c: 'Dias Uteis'})
         elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
         elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
         elif "ERRO" in nome_limpo: df = df.rename(columns={c: 'ERROS'}) 
 
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
+    # 👇 MUDANÇA 2: Sem plano B de inventar "26". Pega o número que vier ou assume 0 se a coluna não existir.
     for col_dia in ['Dias Trabalhados', 'Dias Meta', 'Dias Uteis']:
         if col_dia in df.columns:
             df[col_dia] = pd.to_numeric(df[col_dia], errors='coerce').fillna(0).astype(int)
         else:
-            df[col_dia] = 26 
+            df[col_dia] = 0 
 
     if 'ERROS' in df.columns:
         df['ERROS'] = pd.to_numeric(df['ERROS'], errors='coerce').fillna(0).astype(int)
@@ -235,7 +237,7 @@ def carregar_dados():
     
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
     
-    # 👇 A CORREÇÃO DE FORMATAÇÃO DE STRINGS ESTÁ AQUI
+    # A CORREÇÃO DE FORMATAÇÃO DE STRINGS ESTÁ AQUI
     for col in df.columns:
         if col not in colunas_texto:
             if col in ["Tempo Médio", "Tempo Médio_Meta1", "Tempo Médio_Meta2", "Tempo Médio_Meta3"]:
@@ -726,9 +728,10 @@ try:
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
             
-            d_uteis_p = float(row.get('Dias Uteis', 26))
-            d_trab_p = float(row.get('Dias Trabalhados', d_uteis_p))
-            d_meta_p = float(row.get('Dias Meta', d_uteis_p))
+            # 👇 MUDANÇA 3: Sem plano B de usar 26. Puxa zero e fica vazio se a planilha não mandar nada.
+            d_uteis_p = float(row.get('Dias Uteis', 0))
+            d_trab_p = float(row.get('Dias Trabalhados', 0))
+            d_meta_p = float(row.get('Dias Meta', 0))
             
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
