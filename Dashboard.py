@@ -416,21 +416,22 @@ def carregar_dados():
 
 
 
-    for c in list(df.columns):
+    # MUDANÇA: Dicionário de mapeamento blindado. Remove espaços invisíveis e 
+    # garante que as colunas do final da planilha (FA, FB, FC) sejam as escolhidas.
+    mapa_colunas = {}
+    for c in df.columns:
+        # Tira espaços duplos invisíveis que o Google Sheets costuma exportar
+        nome_limpo = " ".join(str(c).strip().upper().split()) 
+        
+        if "DIAS TRAB" in nome_limpo: mapa_colunas[c] = 'Dias Trabalhados'
+        elif "DIAS META" in nome_limpo: mapa_colunas[c] = 'Dias Meta'
+        elif "DIAS UT" in nome_limpo or "DIAS ÚT" in nome_limpo: mapa_colunas[c] = 'Dias Uteis'
+        elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo): mapa_colunas[c] = 'Data Inicio'
+        elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "APURA" in nome_limpo): mapa_colunas[c] = 'Data Fim'
+        elif "ERRO" in nome_limpo: mapa_colunas[c] = 'ERROS'
 
-        nome_limpo = c.strip().upper()
-
-        if "TRAB" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Trabalhados'})
-
-        elif "META" in nome_limpo and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Meta'})
-
-        elif ("UT" in nome_limpo or "ÚT" in nome_limpo) and "DIAS" in nome_limpo: df = df.rename(columns={c: 'Dias Uteis'})
-
-        elif "DATA" in nome_limpo and ("INICIO" in nome_limpo or "INÍCIO" in nome_limpo or "INICIAL" in nome_limpo): df = df.rename(columns={c: 'Data Inicio'})
-
-        elif "DATA" in nome_limpo and ("FIM" in nome_limpo or "FINAL" in nome_limpo or "APURA" in nome_limpo): df = df.rename(columns={c: 'Data Fim'})
-
-        elif "ERRO" in nome_limpo: df = df.rename(columns={c: 'ERROS'}) 
+    # Aplica os nomes corretos de uma vez só
+    df = df.rename(columns=mapa_colunas) 
 
 
 
