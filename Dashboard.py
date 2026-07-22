@@ -216,7 +216,6 @@ def carregar_dados():
     # Assim, ignora colunas vazias esquecidas lá no começo.
     col_trab = next((c for c in reversed(colunas_atuais) if "DIAS TRAB" in " ".join(str(c).upper().split())), None)
     col_meta = next((c for c in reversed(colunas_atuais) if "DIAS META" in " ".join(str(c).upper().split())), None)
-    col_uteis = next((c for c in reversed(colunas_atuais) if "DIAS UT" in " ".join(str(c).upper().split()) or "DIAS ÚT" in " ".join(str(c).upper().split())), None)
     
     col_inicio = next((c for c in reversed(colunas_atuais) if "DATA" in str(c).upper() and ("INICI" in str(c).upper() or "INÍCI" in str(c).upper())), None)
     col_fim = next((c for c in reversed(colunas_atuais) if "DATA" in str(c).upper() and ("FIM" in str(c).upper() or "APURA" in str(c).upper())), None)
@@ -228,9 +227,6 @@ def carregar_dados():
         
     if col_meta: df['Dias Meta'] = pd.to_numeric(df[col_meta], errors='coerce').fillna(0).astype(int)
     else: df['Dias Meta'] = 0
-        
-    if col_uteis: df['Dias Uteis'] = pd.to_numeric(df[col_uteis], errors='coerce').fillna(0).astype(int)
-    else: df['Dias Uteis'] = 0
         
     if col_inicio: df['Data Inicio'] = df[col_inicio]
     if col_fim: df['Data Fim'] = df[col_fim]
@@ -469,7 +465,6 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             funcao = row.get('FUNÇÃO', '')
             turno = row.get('TURNO', '')
             
-            d_uteis = float(row.get('Dias Uteis', 0))
             d_meta = float(row.get('Dias Meta', 0))
             d_trab = float(row.get('Dias Trabalhados', 0))
             
@@ -503,7 +498,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     df_auditoria.append({
                         "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
-                        "DIAS ÚTEIS": int(d_uteis), "DIAS META": int(d_meta), "DIAS TRAB.": int(d_trab),
+                        "DIAS META": int(d_meta), "DIAS TRAB.": int(d_trab),
                         "INDICADOR": kpi, "REALIZADO": formata(real), "VALOR GANHO (R$)": valor, "META ATINGIDA": faixa_meta
                     })
             
@@ -515,7 +510,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                 if val_rank > 0: 
                     df_auditoria.append({
                         "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
-                        "DIAS ÚTEIS": int(d_uteis), "DIAS META": int(d_meta), "DIAS TRAB.": int(d_trab),
+                        "DIAS META": int(d_meta), "DIAS TRAB.": int(d_trab),
                         "INDICADOR": "Ranking", "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-"
                     })
         
@@ -736,7 +731,6 @@ try:
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
             
-            d_uteis_p = float(row.get('Dias Uteis', 0))
             d_trab_p = float(row.get('Dias Trabalhados', 0))
             d_meta_p = float(row.get('Dias Meta', 0))
             
@@ -1017,7 +1011,7 @@ try:
 
                 extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
-                col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
+                col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
                 df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                 
                 if 'Tempo Médio' in df_tabela_mini.columns:
@@ -1149,7 +1143,7 @@ try:
             extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
             extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
 
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Dias Uteis', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
             if 'Tempo Médio' in df_tabela.columns:
