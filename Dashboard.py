@@ -1452,9 +1452,9 @@ try:
             
 
             # Alterado para puxar exatamente da planilha, sem forçar 26
-            d_trab_p = float(row.get('Dias Trabalhados'))
-            d_meta_p = float(row.get('Dias Meta'))
-            d_uteis_p = float(row.get('Dias Uteis'))
+            d_trab_p = float(row.get('Dias Trabalhados', 0))
+            d_meta_p = float(row.get('Dias Meta', 0))
+            d_uteis_p = float(row.get('Dias Uteis', 0))
 
             
 
