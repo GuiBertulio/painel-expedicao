@@ -438,15 +438,12 @@ def carregar_dados():
 
 
 
+   # Alterado para 0: Impede que o robô invente 26 dias caso falte informação
     for col_dia in ['Dias Trabalhados', 'Dias Meta', 'Dias Uteis']:
-
         if col_dia in df.columns:
-
             df[col_dia] = pd.to_numeric(df[col_dia], errors='coerce').fillna(0).astype(int)
-
         else:
-
-            df[col_dia] = 26 
+            df[col_dia] = 0 
 
 
 
@@ -1454,11 +1451,10 @@ try:
 
             
 
-            d_uteis_p = float(row.get('Dias Uteis', 26))
-
-            d_trab_p = float(row.get('Dias Trabalhados', d_uteis_p))
-
-            d_meta_p = float(row.get('Dias Meta', d_uteis_p))
+            # Alterado para puxar exatamente da planilha, sem forçar 26
+            d_uteis_p = float(row.get('Dias Uteis', 0))
+            d_trab_p = float(row.get('Dias Trabalhados', 0))
+            d_meta_p = float(row.get('Dias Meta', 0))
 
             
 
