@@ -52,7 +52,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, 
         
         ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
         ("T3", "SEPARADOR F", "ITENS SEP"): 150,
@@ -220,7 +220,6 @@ def carregar_dados():
                 return c
         return None
 
-    # Mapeamento estrito incluindo a nova coluna "Dias Corridos"
     c_corr = achar_ultima_coluna(["DIAS CORR"])
     c_trab = achar_ultima_coluna(["DIAS TRAB"])
     c_meta = achar_ultima_coluna(["DIAS META"])
@@ -284,7 +283,7 @@ def carregar_dados():
         turno_e = str(row.get('TURNO', '')).upper()   
         funcao_e = str(row.get('FUNÇÃO', '')).upper() 
 
-        # ⚖️ TRAVA DE PROPORCIONALIDADE (DIAS CORRIDOS VS TRABALHADOS)
+        # ⚖️ TRAVA DE PROPORCIONALIDADE
         dias_corridos = float(row.get('Dias Corridos', 0))
         dias_trabalhados = float(row.get('Dias Trabalhados', 0))
         
@@ -292,12 +291,11 @@ def carregar_dados():
         if dias_corridos > 0:
             proporcao_dias = dias_trabalhados / dias_corridos
             if proporcao_dias > 1.0: 
-                proporcao_dias = 1.0 # Limite de segurança: nunca paga mais que 100% por erro de dias
+                proporcao_dias = 1.0
 
         for kpi in kpis_para_recalcular:
             if f"{kpi}_Valor" in df.columns:
                 
-                # Faxina inicial
                 df.at[idx, f"{kpi}_Valor"] = 0.0
 
                 meta2 = row.get(f"{kpi}_Meta2", 0) 
@@ -310,7 +308,6 @@ def carregar_dados():
                     meta3 = float(row.get(f"{kpi}_Meta3", meta2_val)) 
                     racional = float(row.get(f"{kpi}_Racional", 1))   
 
-                    # Acha a faixa de prêmio que a pessoa bateu
                     if racional == 1: 
                         if realizado >= meta3: fator_p = 1.2       
                         elif realizado >= meta2_val: fator_p = 1.0 
@@ -325,11 +322,10 @@ def carregar_dados():
                     v_100_base = obter_valor_100(turno_e, funcao_e, kpi) 
                     
                     if v_100_base > 0:
-                        # O GOLPE DE MESTRE DO GERENTE: Multiplica pela proporção de dias do mês!
                         df.at[idx, f"{kpi}_Valor"] = (v_100_base * fator_p) * proporcao_dias
 
     # =============================================================================
-    # 🏆 CÁLCULO DO RANKING (Também entra na Proporção!)
+    # 🏆 CÁLCULO DO RANKING
     # =============================================================================
     df['Valor Ranking'] = 0.0
     df['Posicao Ranking'] = 0
@@ -357,7 +353,6 @@ def carregar_dados():
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
                     df.at[idx, 'Posicao Ranking'] = pos
                     
-                    # Calcula proporção do Ranking para a pessoa
                     d_corr_rank = float(row_eq.get('Dias Corridos', 0))
                     d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
                     prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
@@ -848,7 +843,6 @@ try:
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
                 real_perc = perc_atingimento * 100
-                # MUDANÇA: Injetamos a variável 'cor' (que já sabe se ele bateu a Meta 1, 2 ou 3) direto pro gráfico
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
                 
                 # 🛡️ BLINDAGEM CIRÚRGICA DO SEPARADOR G T2 (Não exibir dinheiro no Itens Separados, mas mostra no Itens/Hora)
@@ -860,11 +854,11 @@ try:
                     html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💰 Total Adquirido: <b>R$ {val_adquirido_str}</b></span></div>"
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
-                     val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
-                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
-                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                    val_tela = f"{realizado:.2f}%"
-                    alvo_tela = f"{alvo_atual:.2f}%"
+                    val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
+                    alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
+                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "LÍQ" in str(kpi).upper():
+                    val_tela = f"{realizado:.1f}%"
+                    alvo_tela = f"{alvo_atual:.1f}%"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
@@ -937,14 +931,12 @@ try:
                 if grafico_dados:
                     df_grafico = pd.DataFrame(grafico_dados)
                     
-                    # MUDANÇA: Agora ele puxa a cor real que o Card decidiu (Abaixo = Vermelho, Parcial = Amarelo, etc)
                     df_grafico['Texto_Cor'] = df_grafico['Cor_Barra'].apply(lambda color: "black" if color == C_AMARELO else "white")
                     
                     fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
                     fig.update_layout(showlegend=False, yaxis_title="<b>% do Volume Total</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
                     fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
                     
-                    # MUDANÇA: Usa a 'Cor_Barra' no 'marker'
                     fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor_Barra'].tolist(), line=dict(color='white', width=1)))
                     fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                     fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
@@ -1147,8 +1139,8 @@ try:
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                             t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                         elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "LÍQ" in str(kpi).upper():
-                    val_tela = f"{realizado:.1f}%"
-                    alvo_tela = f"{alvo_atual:.1f}%"
+                            v_tela = f"{real_med:.1f}%"
+                            t_tela = f"{alvo_atual_med:.1f}%"
                         else:
                             v_tela = f"{real_med:,.0f}".replace(',', '.')
                             t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
