@@ -10,6 +10,83 @@ import io
 import calendar                 
 
 # =============================================================================
+# 💰 DICIONÁRIO OFICIAL DE VALORES DO RH (Base 100%)
+# =============================================================================
+def obter_valor_100(turno, funcao, kpi):
+    t = str(turno).strip().upper()
+    f = str(funcao).strip().upper()
+    k = str(kpi).strip().upper()
+    
+    mapa = {
+        ("T1", "CONFERENTE", "PALETS CONF."): 300,
+        ("T1", "CONFERENTE", "TEMPO MÉDIO"): 100,
+        ("T1", "DESCARGA", "CARGA PALET."): 125,
+        ("T1", "DESCARGA", "TEMPO MÉDIO"): 125,
+        ("T1", "DESCARGA", "CARGA BAT."): 125,
+        ("T1", "DESCARGA", "CESTA"): 60,
+        ("T1", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T1", "LÍDER", "AVARIA"): 150,
+        ("T1", "LÍDER", "MÉD. PALETS CONF."): 300,
+        ("T1", "LÍDER", "TEMPO MÉDIO"): 300,
+        ("T1", "OPERADOR", "MOV. VERT."): 350,
+        ("T1", "OPERADOR", "TEMPO MÉDIO"): 100,
+        ("T1", "PUXA", "PALETS PX."): 200,
+        ("T1", "PUXA", "TEMPO MÉDIO"): 100,
+        
+        ("T2", "AVARIA", "AVARIA"): 150,
+        ("T2", "CONFERENTE", "ITENS CONF."): 300,
+        ("T2", "CONFERENTE", "DEV. %"): 150,
+        ("T2", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T2", "INVENTARIO", "CORTE %"): 200,
+        ("T2", "LÍDER", "AVARIA"): 150,
+        ("T2", "LÍDER", "RESSUP. EQ."): 240,
+        ("T2", "LÍDER", "DEV. %"): 240,
+        ("T2", "LÍDER", "ITENS/HORA EQ."): 240,
+        ("T2", "MESA", "RESSUP. EQ."): 220,
+        ("T2", "MESA", "DEV. %"): 220,
+        ("T2", "MESA", "ITENS/HORA EQ."): 220,
+        ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
+        ("T2", "OPERADOR", "AVARIA"): 100,
+        ("T2", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
+        ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
+        ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
+        ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
+        ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
+        
+        ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
+        ("T3", "SEPARADOR F", "ITENS SEP"): 150,
+        ("T3", "SEPARADOR F", "ITENS/HORA"): 150,
+        ("T3", "SEPARADOR G", "JORNADA LÍQ."): 150,
+        ("T3", "SEPARADOR G", "ITENS SEP"): 150,
+        ("T3", "SEPARADOR G", "ITENS/HORA"): 150,
+        ("T3", "CONFERENTE", "ITENS CONF."): 350,
+        ("T3", "CONFERENTE", "DEV. %"): 150,
+        ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
+        ("T3", "OPERADOR", "AVARIA"): 100,
+        ("T3", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
+        ("T3", "CARREGAMENTO BOX", "DEV. %"): 150,
+        ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,
+        ("T3", "RAMPEIRO", "ITENS RAMPA"): 150, 
+        ("T3", "RAMPEIRO", "DEV. %"): 150,      
+        ("T3", "RAMPEIRO", "AVARIA"): 100,      
+        ("T3", "MESA", "JORNADA LÍQ. EQ."): 220,
+        ("T3", "MESA", "DEV. %"): 220,
+        ("T3", "MESA", "CORTE %"): 220,
+        ("T3", "MANOBRISTA", "ITENS MANOB."): 350,
+        ("T3", "MANOBRISTA", "DEV. %"): 150,
+        ("T3", "MANOBRISTA", "AVARIA"): 150,
+        ("T3", "LÍDER", "JORNADA LÍQ. EQ."): 240,
+        ("T3", "LÍDER", "AVARIA"): 150,
+        ("T3", "LÍDER", "DEV. %"): 240,
+        ("T3", "LÍDER", "ITENS/HORA EQ."): 240,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "ITENS/HORA"): 150,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "AVARIA"): 100,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "CHECKLIST MANUTENÇÃO"): 250,
+    }
+    return mapa.get((t, f, k), 0)
+
+# =============================================================================
 # 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS (Seu Banco de Dados Interno)
 # =============================================================================
 USUARIOS = {
@@ -136,23 +213,34 @@ def carregar_dados():
     # =============================================================================
     colunas_atuais = list(df.columns)
     
-    col_trab = next((c for c in reversed(colunas_atuais) if "DIAS TRAB" in " ".join(str(c).upper().split())), None)
-    col_meta = next((c for c in reversed(colunas_atuais) if "DIAS META" in " ".join(str(c).upper().split())), None)
-    
-    col_inicio = next((c for c in reversed(colunas_atuais) if "DATA" in str(c).upper() and ("INICI" in str(c).upper() or "INÍCI" in str(c).upper())), None)
-    col_fim = next((c for c in reversed(colunas_atuais) if "DATA" in str(c).upper() and ("FIM" in str(c).upper() or "APURA" in str(c).upper())), None)
-    col_erros = next((c for c in reversed(colunas_atuais) if "ERRO" in str(c).upper()), None)
-    
-    if col_trab: df['Dias Trabalhados'] = pd.to_numeric(df[col_trab], errors='coerce').fillna(0).astype(int)
+    def achar_ultima_coluna(palavras_chave):
+        for c in reversed(colunas_atuais):
+            nome_limpo = " ".join(str(c).upper().split())
+            if any(p in nome_limpo for p in palavras_chave):
+                return c
+        return None
+
+    # Mapeamento estrito incluindo a nova coluna "Dias Corridos"
+    c_corr = achar_ultima_coluna(["DIAS CORR"])
+    c_trab = achar_ultima_coluna(["DIAS TRAB"])
+    c_meta = achar_ultima_coluna(["DIAS META"])
+    c_ini = achar_ultima_coluna(["DATA INIC", "DATA INÍC"])
+    c_fim = achar_ultima_coluna(["DATA FIM", "DATA APURA"])
+    c_erro = achar_ultima_coluna(["ERRO"])
+
+    if c_corr: df['Dias Corridos'] = pd.to_numeric(df[c_corr], errors='coerce').fillna(0).astype(int)
+    else: df['Dias Corridos'] = 0
+
+    if c_trab: df['Dias Trabalhados'] = pd.to_numeric(df[c_trab], errors='coerce').fillna(0).astype(int)
     else: df['Dias Trabalhados'] = 0
         
-    if col_meta: df['Dias Meta'] = pd.to_numeric(df[col_meta], errors='coerce').fillna(0).astype(int)
+    if c_meta: df['Dias Meta'] = pd.to_numeric(df[c_meta], errors='coerce').fillna(0).astype(int)
     else: df['Dias Meta'] = 0
         
-    if col_inicio: df['Data Inicio'] = df[col_inicio]
-    if col_fim: df['Data Fim'] = df[col_fim]
+    if c_ini: df['Data Inicio'] = df[c_ini]
+    if c_fim: df['Data Fim'] = df[c_fim]
         
-    if col_erros: df['ERROS'] = pd.to_numeric(df[col_erros], errors='coerce').fillna(0).astype(int)
+    if c_erro: df['ERROS'] = pd.to_numeric(df[c_erro], errors='coerce').fillna(0).astype(int)
     else: df['ERROS'] = 0
 
     df = df.loc[:, ~df.columns.duplicated()].copy()
@@ -188,7 +276,60 @@ def carregar_dados():
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
 
     # =============================================================================
-    # 🏆 CÁLCULO DO RANKING
+    # 💰 OVERRIDE FINANCEIRO: MOTOR DE CÁLCULO PROPORCIONAL (FÉRIAS/ATESTADOS)
+    # =============================================================================
+    kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] 
+    
+    for idx, row in df.iterrows():
+        turno_e = str(row.get('TURNO', '')).upper()   
+        funcao_e = str(row.get('FUNÇÃO', '')).upper() 
+
+        # ⚖️ TRAVA DE PROPORCIONALIDADE (DIAS CORRIDOS VS TRABALHADOS)
+        dias_corridos = float(row.get('Dias Corridos', 0))
+        dias_trabalhados = float(row.get('Dias Trabalhados', 0))
+        
+        proporcao_dias = 1.0 
+        if dias_corridos > 0:
+            proporcao_dias = dias_trabalhados / dias_corridos
+            if proporcao_dias > 1.0: 
+                proporcao_dias = 1.0 # Limite de segurança: nunca paga mais que 100% por erro de dias
+
+        for kpi in kpis_para_recalcular:
+            if f"{kpi}_Valor" in df.columns:
+                
+                # Faxina inicial
+                df.at[idx, f"{kpi}_Valor"] = 0.0
+
+                meta2 = row.get(f"{kpi}_Meta2", 0) 
+                try: meta2_val = float(meta2)
+                except: meta2_val = 0
+
+                if meta2_val > 0:
+                    realizado = float(row.get(kpi, 0)) 
+                    meta1 = float(row.get(f"{kpi}_Meta1", meta2_val)) 
+                    meta3 = float(row.get(f"{kpi}_Meta3", meta2_val)) 
+                    racional = float(row.get(f"{kpi}_Racional", 1))   
+
+                    # Acha a faixa de prêmio que a pessoa bateu
+                    if racional == 1: 
+                        if realizado >= meta3: fator_p = 1.2       
+                        elif realizado >= meta2_val: fator_p = 1.0 
+                        elif realizado >= meta1: fator_p = 0.5     
+                        else: fator_p = 0.0                        
+                    else: 
+                        if realizado <= meta3: fator_p = 1.2
+                        elif realizado <= meta2_val: fator_p = 1.0
+                        elif realizado <= meta1: fator_p = 0.5
+                        else: fator_p = 0.0
+
+                    v_100_base = obter_valor_100(turno_e, funcao_e, kpi) 
+                    
+                    if v_100_base > 0:
+                        # O GOLPE DE MESTRE DO GERENTE: Multiplica pela proporção de dias do mês!
+                        df.at[idx, f"{kpi}_Valor"] = (v_100_base * fator_p) * proporcao_dias
+
+    # =============================================================================
+    # 🏆 CÁLCULO DO RANKING (Também entra na Proporção!)
     # =============================================================================
     df['Valor Ranking'] = 0.0
     df['Posicao Ranking'] = 0
@@ -216,6 +357,11 @@ def carregar_dados():
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
                     df.at[idx, 'Posicao Ranking'] = pos
                     
+                    # Calcula proporção do Ranking para a pessoa
+                    d_corr_rank = float(row_eq.get('Dias Corridos', 0))
+                    d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
+                    prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
+
                     if turno == 'T3':
                         if pos == 1: val_base = 250.0
                         elif pos == 2: val_base = 200.0
@@ -230,7 +376,7 @@ def carregar_dados():
                         val_base = 0.0
                     
                     if val_base > 0:
-                        df.at[idx, 'Valor Ranking'] += val_base
+                        df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
                     pos += 1
 
             elif 'CONFERENTE' in cargo_str and turno == 'T3':
@@ -247,8 +393,13 @@ def carregar_dados():
                         if float(row_eq.get(metrica_frac, 0)) <= 0: continue
                         if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
                             df.at[idx, 'Posicao Ranking'] = pos
+                        
+                        d_corr_rank = float(row_eq.get('Dias Corridos', 0))
+                        d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
+                        prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
+
                         if pos == 1:
-                            df.at[idx, 'Valor Ranking'] += 200.0 
+                            df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                         pos += 1
 
                 if metrica_grand:
@@ -261,8 +412,13 @@ def carregar_dados():
                         if float(row_eq.get(metrica_grand, 0)) <= 0: continue
                         if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
                             df.at[idx, 'Posicao Ranking'] = pos
+                            
+                        d_corr_rank = float(row_eq.get('Dias Corridos', 0))
+                        d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
+                        prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
+
                         if pos == 1: 
-                            df.at[idx, 'Valor Ranking'] += 200.0 
+                            df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                         pos += 1
 
             elif 'OPERADOR' in cargo_str and turno == 'T3':
@@ -275,11 +431,16 @@ def carregar_dados():
                 for idx, row_eq in df_eq.iterrows():
                     if float(row_eq.get(metrica_rank, 0)) <= 0: continue
                     df.at[idx, 'Posicao Ranking'] = pos
+                    
+                    d_corr_rank = float(row_eq.get('Dias Corridos', 0))
+                    d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
+                    prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
+
                     if pos == 1: 
-                        df.at[idx, 'Valor Ranking'] += 200.0 
+                        df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                     pos += 1
 
-    # PASSO 5: A SOMA GERAL (Sem "adivinhar" o valor, apenas confia no que veio do Sheets + O Ranking ganho)
+    # PASSO 5: A SOMA GERAL 
     colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
     df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
@@ -341,8 +502,9 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             funcao = row.get('FUNÇÃO', '')
             turno = row.get('TURNO', '')
             
-            d_meta = float(row.get('Dias Meta', 0))
+            d_corridos = float(row.get('Dias Corridos', 0))
             d_trab = float(row.get('Dias Trabalhados', 0))
+            d_meta = float(row.get('Dias Meta', 0))
             
             for kpi in kpis_gerais:
                 meta2 = float(row.get(f"{kpi}_Meta2", 0))
@@ -374,7 +536,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     df_auditoria.append({
                         "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
-                        "DIAS META": int(d_meta), "DIAS TRAB.": int(d_trab),
+                        "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
                         "INDICADOR": kpi, "REALIZADO": formata(real), "VALOR GANHO (R$)": valor, "META ATINGIDA": faixa_meta
                     })
             
@@ -386,7 +548,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                 if val_rank > 0: 
                     df_auditoria.append({
                         "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
-                        "DIAS META": int(d_meta), "DIAS TRAB.": int(d_trab),
+                        "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
                         "INDICADOR": "Ranking", "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-"
                     })
         
@@ -408,11 +570,11 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             worksheet.set_column('B:B', 38)                  
             worksheet.set_column('C:C', 12, formato_central) 
             worksheet.set_column('D:D', 22)                  
-            worksheet.set_column('E:G', 13, formato_central) 
-            worksheet.set_column('H:H', 25)                  
-            worksheet.set_column('I:I', 15, formato_central) 
-            worksheet.set_column('J:J', 20, formato_moeda)   
-            worksheet.set_column('K:K', 18, formato_central) 
+            worksheet.set_column('E:H', 13, formato_central) 
+            worksheet.set_column('I:I', 25)                  
+            worksheet.set_column('J:J', 15, formato_central) 
+            worksheet.set_column('K:K', 20, formato_moeda)   
+            worksheet.set_column('L:L', 18, formato_central) 
         
         st.sidebar.download_button(
             label="📥 Baixar Auditoria", data=buffer.getvalue(), file_name=f"Auditoria_Produtividade_Fechamento.xlsx",
@@ -607,13 +769,19 @@ try:
         if not dados_pessoa.empty:
             row = dados_pessoa.iloc[0]
             
-            d_trab_p = float(row.get('Dias Trabalhados', 0))
-            d_meta_p = float(row.get('Dias Meta', 0))
+            d_corridos_p = int(row.get('Dias Corridos', 0))
+            d_trab_p = int(row.get('Dias Trabalhados', 0))
+            d_meta_p = int(row.get('Dias Meta', 0))
             
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
             cargo_p = str(row.get('FUNÇÃO', '')).upper()
             turno_p = str(row.get('TURNO', '')).upper()
+            
+            # Alerta visual de férias/proporcionalidade se os dias forem diferentes
+            if d_trab_p < d_corridos_p and d_corridos_p > 0:
+                proporcao_tela = (d_trab_p / d_corridos_p) * 100
+                st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
             
             erros_qtd = int(row.get('ERROS', 0))
             penalidade_txt = str(row.get('Penalidade_Texto', ''))
@@ -887,7 +1055,7 @@ try:
 
                 extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
-                col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
+                col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
                 df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
                 
                 if 'Tempo Médio' in df_tabela_mini.columns:
@@ -1019,7 +1187,7 @@ try:
             extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
             extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
 
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
+            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
             df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
             if 'Tempo Médio' in df_tabela.columns:
