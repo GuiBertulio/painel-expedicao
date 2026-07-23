@@ -848,7 +848,8 @@ try:
                     else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
                 real_perc = perc_atingimento * 100
-                grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc})
+                # MUDANÇA: Injetamos a variável 'cor' (que já sabe se ele bateu a Meta 1, 2 ou 3) direto pro gráfico
+                grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
                 
                 # 🛡️ BLINDAGEM CIRÚRGICA DO SEPARADOR G T2 (Não exibir dinheiro no Itens Separados, mas mostra no Itens/Hora)
                 is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
@@ -935,13 +936,16 @@ try:
             with col_grafico:
                 if grafico_dados:
                     df_grafico = pd.DataFrame(grafico_dados)
-                    df_grafico['Cor'] = df_grafico['Real'].apply(lambda x: C_AZUL if x >= 120 else (C_VERDE if x >= 100 else (C_AMARELO if x >= 50 else C_VERMELHO)))
-                    df_grafico['Texto_Cor'] = df_grafico['Cor'].apply(lambda color: "black" if color == C_AMARELO else "white")
+                    
+                    # MUDANÇA: Agora ele puxa a cor real que o Card decidiu (Abaixo = Vermelho, Parcial = Amarelo, etc)
+                    df_grafico['Texto_Cor'] = df_grafico['Cor_Barra'].apply(lambda color: "black" if color == C_AMARELO else "white")
                     
                     fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
-                    fig.update_layout(showlegend=False, yaxis_title="<b>% da Meta Atingida</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
+                    fig.update_layout(showlegend=False, yaxis_title="<b>% do Volume Total</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
                     fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
-                    fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor'].tolist(), line=dict(color='white', width=1)))
+                    
+                    # MUDANÇA: Usa a 'Cor_Barra' no 'marker'
+                    fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor_Barra'].tolist(), line=dict(color='white', width=1)))
                     fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                     fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                     st.plotly_chart(fig, use_container_width=True)
@@ -1142,9 +1146,9 @@ try:
                         if "Tempo" in str(kpi):
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                             t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                            v_tela = f"{real_med:.2f}%"
-                            t_tela = f"{alvo_atual_med:.2f}%"
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "LÍQ" in str(kpi).upper():
+                    val_tela = f"{realizado:.1f}%"
+                    alvo_tela = f"{alvo_atual:.1f}%"
                         else:
                             v_tela = f"{real_med:,.0f}".replace(',', '.')
                             t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
