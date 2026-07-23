@@ -52,7 +52,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 0, 
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
         
         ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
         ("T3", "SEPARADOR F", "ITENS SEP"): 150,
@@ -856,9 +856,12 @@ try:
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                     val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}"
-                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "LÍQ" in str(kpi).upper():
+                elif "LÍQ" in str(kpi).upper():
                     val_tela = f"{realizado:.1f}%"
                     alvo_tela = f"{alvo_atual:.1f}%"
+                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                    val_tela = f"{realizado:.2f}%"
+                    alvo_tela = f"{alvo_atual:.2f}%"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.')
@@ -1138,9 +1141,12 @@ try:
                         if "Tempo" in str(kpi):
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                             t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "LÍQ" in str(kpi).upper():
+                        elif "LÍQ" in str(kpi).upper():
                             v_tela = f"{real_med:.1f}%"
                             t_tela = f"{alvo_atual_med:.1f}%"
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                            v_tela = f"{real_med:.2f}%"
+                            t_tela = f"{alvo_atual_med:.2f}%"
                         else:
                             v_tela = f"{real_med:,.0f}".replace(',', '.')
                             t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
