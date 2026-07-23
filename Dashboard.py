@@ -279,6 +279,11 @@ def carregar_dados():
     # =============================================================================
     kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] 
     
+    # 👇 MUDANÇA AQUI: Força a coluna a ser 'float' (aceitar centavos) antes de injetar os valores!
+    for kpi in kpis_para_recalcular:
+        if f"{kpi}_Valor" in df.columns:
+            df[f"{kpi}_Valor"] = df[f"{kpi}_Valor"].astype(float)
+    
     for idx, row in df.iterrows():
         turno_e = str(row.get('TURNO', '')).upper()   
         funcao_e = str(row.get('FUNÇÃO', '')).upper() 
