@@ -447,7 +447,7 @@ def carregar_dados():
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
         try:
@@ -462,12 +462,25 @@ def carregar_diarios():
             aba_conf = planilha.worksheet("Relatorio Diario Conferente").get_all_values()
             if aba_conf: dfs['conf'] = pd.DataFrame(aba_conf[1:], columns=aba_conf[0]).rename(columns=lambda x: str(x).strip())
         except: pass
+        
+        # 👇 NOVO: Buscando a aba de Auxiliar de Ausências (Aux JL)
+        try:
+            aba_aux = planilha.worksheet("Aux JL").get_all_values()
+            if aba_aux:
+                header_idx = 0
+                for i, row_vals in enumerate(aba_aux):
+                    if "NOME" in [str(cell).strip().upper() for cell in row_vals]:
+                        header_idx = i
+                        break
+                dfs['aux'] = pd.DataFrame(aba_aux[header_idx+1:], columns=aba_aux[header_idx]).rename(columns=lambda x: str(x).strip())
+        except: pass
+
     except Exception:
         pass
-    return dfs['sep'], dfs['op'], dfs['conf']
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 df = carregar_dados()
-df_diario, df_operador, df_conferente = carregar_diarios()
+df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
 
 # =============================================================================
 # 📅 3. LÓGICA DE DATAS E BARRA LATERAL
@@ -781,6 +794,29 @@ try:
             if d_trab_p < d_corridos_p and d_corridos_p > 0:
                 proporcao_tela = (d_trab_p / d_corridos_p) * 100
                 st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
+                
+                # 👇 NOVO: Buscando detalhamento na aba Aux JL
+                ocorrencias_texto = []
+                if not df_aux.empty and 'NOME' in df_aux.columns:
+                    dados_aux = df_aux[df_aux['NOME'] == pessoa_selecionada]
+                    if not dados_aux.empty:
+                        linha_aux = dados_aux.iloc[0]
+                        valores_aux = [str(v).strip().upper() for v in linha_aux.values]
+                        
+                        qtd_fe = valores_aux.count('FE')
+                        qtd_fi = valores_aux.count('F.I')
+                        qtd_ad = valores_aux.count('A.D')
+                        qtd_at = valores_aux.count('AT')
+                        
+                        if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (F.I)")
+                        if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (A.D)")
+                        if qtd_at > 0:
+                            alerta_atestado = " <span style='color:#ef4444; font-weight:bold;'>(Penalidade de -0.5 aplicada por passar de 3 dias)</span>" if qtd_at > 3 else ""
+                            ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT){alerta_atestado}")
+                        if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
+                
+                if ocorrencias_texto:
+                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Detalhamento de Ocorrências no Mês:</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
             
             erros_qtd = int(row.get('ERROS', 0))
             penalidade_txt = str(row.get('Penalidade_Texto', ''))
@@ -852,7 +888,6 @@ try:
                 # 🛡️ BLINDAGEM CIRÚRGICA DO SEPARADOR G T2 (Não exibir dinheiro no Itens Separados, mas mostra no Itens/Hora)
                 is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
                 
-                # 👇 A MAGIA DO GERENTE: A Tabela Integral embutida dentro de cada Card
                 html_tabela_premios = ""
                 v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
                 
@@ -1116,7 +1151,7 @@ try:
             c1, c2, c3 = st.columns(3)
             with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>", unsafe_allow_html=True)
             with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
-            with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identify gargalos.</p></div>", unsafe_allow_html=True)
+            with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identificar gargalos.</p></div>", unsafe_allow_html=True)
         else:
             cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
