@@ -52,7 +52,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
-        ("T2", "SEPARADOR G", "ITENS SEP"): 0, # T2 Sep G só entra no Ranking, valor financeiro do indicador é 0!
+        ("T2", "SEPARADOR G", "ITENS SEP"): 0, 
         
         ("T3", "SEPARADOR F", "JORNADA LÍQ."): 150,
         ("T3", "SEPARADOR F", "ITENS SEP"): 150,
@@ -279,7 +279,6 @@ def carregar_dados():
     # =============================================================================
     kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] 
     
-    # 👇 MUDANÇA AQUI: Força a coluna a ser 'float' (aceitar centavos) antes de injetar os valores!
     for kpi in kpis_para_recalcular:
         if f"{kpi}_Valor" in df.columns:
             df[f"{kpi}_Valor"] = df[f"{kpi}_Valor"].astype(float)
@@ -853,10 +852,39 @@ try:
                 # 🛡️ BLINDAGEM CIRÚRGICA DO SEPARADOR G T2 (Não exibir dinheiro no Itens Separados, mas mostra no Itens/Hora)
                 is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
                 
+                # 👇 A MAGIA DO GERENTE: A Tabela Integral embutida dentro de cada Card
+                html_tabela_premios = ""
+                v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
+                
+                if v_100_base > 0 and not is_itens_t2_sepg:
+                    v_m1 = v_100_base * 0.5
+                    v_m2 = v_100_base * 1.0
+                    v_m3 = v_100_base * 1.2
+                    
+                    v_m1_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    
+                    html_tabela_premios = f"""
+                    <div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
+                        <div style='margin-bottom: 8px; color: #aaa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;'><b>💰 Tabela da Métrica (Mês Integral)</b></div>
+                        <div style='display: flex; justify-content: space-between; font-size: 13px; color: #ddd;'>
+                            <div style='text-align: center;'>Meta 1<br><b style='color: white;'>R$ {v_m1_str}</b></div>
+                            <div style='text-align: center;'>Meta 2<br><b style='color: white;'>R$ {v_m2_str}</b></div>
+                            <div style='text-align: center;'>Meta Máx<br><b style='color: white;'>R$ {v_m3_str}</b></div>
+                        </div>
+                    </div>
+                    """
+                
                 html_dinheiro = ""
-                if not is_itens_t2_sepg and valor_reais > 0:
+                if not is_itens_t2_sepg:
                     val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    html_dinheiro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💰 Total Adquirido: <b>R$ {val_adquirido_str}</b></span></div>"
+                    txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
+                    
+                    if valor_reais > 0:
+                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
+                    elif v_100_base > 0:
+                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                     val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
@@ -881,7 +909,7 @@ try:
                         aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
 
                 with cols_meta[col_idx % 4]:
-                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios}{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
                 col_idx += 1
 
             # --- SOMA FINAL ---
@@ -1090,7 +1118,7 @@ try:
             c1, c2, c3 = st.columns(3)
             with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>", unsafe_allow_html=True)
             with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
-            with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identificar gargalos.</p></div>", unsafe_allow_html=True)
+            with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identify gargalos.</p></div>", unsafe_allow_html=True)
         else:
             cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
