@@ -46,6 +46,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "MESA", "DEV. %"): 220,
         ("T2", "MESA", "ITENS/HORA EQ."): 220,
         ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
+        ("T2", "OPERADOR", "MOV. VERT."): 450,
         ("T2", "OPERADOR", "AVARIA"): 100,
         ("T2", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
         ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
