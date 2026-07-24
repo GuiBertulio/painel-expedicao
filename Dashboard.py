@@ -865,35 +865,14 @@ try:
                     v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     
-                    html_tabela_premios = f"""
-                    <div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
-                        
-                        <!-- ✏️ AQUI VOCÊ EDITA O TÍTULO -->
-                        <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>
-                            💰 Tabela da Métrica (Mês Integral)
-                        </div>
-                        
-                        <!-- ✏️ AQUI VOCÊ EDITA OS TEXTOS (Meta 1, Meta 2...) -->
-                        <div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
-                            
-                            <!-- ✏️ AQUI VOCÊ EDITA O VALOR DA META 1 -->
-                            <div style='text-align: center;'>Meta 1<br>
-                                <span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span>
-                            </div>
-                            
-                            <!-- ✏️ AQUI VOCÊ EDITA O VALOR DA META 2 -->
-                            <div style='text-align: center;'>Meta 2<br>
-                                <span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span>
-                            </div>
-                            
-                            <!-- ✏️ AQUI VOCÊ EDITA O VALOR DA META MÁXIMA -->
-                            <div style='text-align: center;'>Meta Máx<br>
-                                <span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span>
-                            </div>
-                            
-                        </div>
-                    </div>
-                    """
+                    # HTML SEM ESPAÇOS ANTES PARA O STREAMLIT NÃO ACHAR QUE É CÓDIGO
+                    html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
+<div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
+<div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
+<div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div>
+<div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div>
+<div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div>
+</div></div>"""
                 
                 html_dinheiro = ""
                 if not is_itens_t2_sepg:
