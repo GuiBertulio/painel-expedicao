@@ -46,7 +46,6 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "MESA", "DEV. %"): 220,
         ("T2", "MESA", "ITENS/HORA EQ."): 220,
         ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
-        ("T2", "OPERADOR", "MOV. VERT."): 450,
         ("T2", "OPERADOR", "AVARIA"): 100,
         ("T2", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
         ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
@@ -210,23 +209,30 @@ def carregar_dados():
                 pass 
 
     # =============================================================================
-    # 🕵️ RADAR REVERSO BLINDADO: Puxando sempre do final da planilha
+    # 🕵️ RADAR BLINDADO: Puxando as colunas com Exatidão
     # =============================================================================
     colunas_atuais = list(df.columns)
     
-    def achar_ultima_coluna(palavras_chave):
+    def achar_coluna(nome_exato, palavras_chave):
+        # 1. Tenta achar pelo nome EXATO primeiro
+        for c in colunas_atuais:
+            if str(c).strip().upper() == nome_exato.upper():
+                return c
+        
+        # 2. Se não achar, usa o radar reverso como plano B
         for c in reversed(colunas_atuais):
             nome_limpo = " ".join(str(c).upper().split())
             if any(p in nome_limpo for p in palavras_chave):
                 return c
         return None
 
-    c_corr = achar_ultima_coluna(["DIAS CORR"])
-    c_trab = achar_ultima_coluna(["DIAS TRAB"])
-    c_meta = achar_ultima_coluna(["DIAS META"])
-    c_ini = achar_ultima_coluna(["DATA INIC", "DATA INÍC"])
-    c_fim = achar_ultima_coluna(["DATA FIM", "DATA APURA"])
-    c_erro = achar_ultima_coluna(["ERRO"])
+    # Mapeamento com prioridade total para os nomes corretos
+    c_corr = achar_coluna("DIAS CORRIDOS", ["DIAS CORR"])
+    c_trab = achar_coluna("DIAS TRABALHADOS", ["DIAS TRAB"])
+    c_meta = achar_coluna("DIAS META", ["DIAS META"])
+    c_ini = achar_coluna("DATA INICIO", ["DATA INIC", "DATA INÍC"])
+    c_fim = achar_coluna("DATA FIM", ["DATA FIM", "DATA APURA"])
+    c_erro = achar_coluna("ERROS", ["ERRO"])
 
     if c_corr: df['Dias Corridos'] = pd.to_numeric(df[c_corr], errors='coerce').fillna(0).astype(int)
     else: df['Dias Corridos'] = 0
@@ -463,8 +469,6 @@ def carregar_diarios():
             aba_conf = planilha.worksheet("Relatorio Diario Conferente").get_all_values()
             if aba_conf: dfs['conf'] = pd.DataFrame(aba_conf[1:], columns=aba_conf[0]).rename(columns=lambda x: str(x).strip())
         except: pass
-        
-        # 👇 NOVO: Buscando a aba de Auxiliar de Ausências (Aux JL)
         try:
             aba_aux = planilha.worksheet("Aux JL").get_all_values()
             if aba_aux:
@@ -791,12 +795,10 @@ try:
             cargo_p = str(row.get('FUNÇÃO', '')).upper()
             turno_p = str(row.get('TURNO', '')).upper()
             
-            # Alerta visual de férias/proporcionalidade se os dias forem diferentes
             if d_trab_p < d_corridos_p and d_corridos_p > 0:
                 proporcao_tela = (d_trab_p / d_corridos_p) * 100
                 st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
                 
-                # 👇 NOVO: Buscando detalhamento na aba Aux JL
                 ocorrencias_texto = []
                 if not df_aux.empty and 'NOME' in df_aux.columns:
                     dados_aux = df_aux[df_aux['NOME'] == pessoa_selecionada]
@@ -852,7 +854,6 @@ try:
                 try: meta2_val = float(meta2)
                 except: meta2_val = 0
                 
-                # 🛡️ SÓ APARECE O QUE TEM META NO EXCEL
                 if meta2_val <= 0: continue
 
                 realizado = float(row.get(kpi, 0))
@@ -886,7 +887,6 @@ try:
                 real_perc = perc_atingimento * 100
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
                 
-                # 🛡️ BLINDAGEM CIRÚRGICA DO SEPARADOR G T2 (Não exibir dinheiro no Itens Separados, mas mostra no Itens/Hora)
                 is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
                 
                 html_tabela_premios = ""
@@ -901,7 +901,6 @@ try:
                     v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     
-                    # HTML SEM ESPAÇOS ANTES PARA O STREAMLIT NÃO ACHAR QUE É CÓDIGO
                     html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
 <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
 <div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
