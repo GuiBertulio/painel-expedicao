@@ -214,19 +214,16 @@ def carregar_dados():
     colunas_atuais = list(df.columns)
     
     def achar_coluna(nome_exato, palavras_chave):
-        # 1. Tenta achar pelo nome EXATO primeiro
         for c in colunas_atuais:
             if str(c).strip().upper() == nome_exato.upper():
                 return c
         
-        # 2. Se não achar, usa o radar reverso como plano B
         for c in reversed(colunas_atuais):
             nome_limpo = " ".join(str(c).upper().split())
             if any(p in nome_limpo for p in palavras_chave):
                 return c
         return None
 
-    # Mapeamento com prioridade total para os nomes corretos
     c_corr = achar_coluna("DIAS CORRIDOS", ["DIAS CORR"])
     c_trab = achar_coluna("DIAS TRABALHADOS", ["DIAS TRAB"])
     c_meta = achar_coluna("DIAS META", ["DIAS META"])
@@ -609,23 +606,25 @@ st.sidebar.title("🔍 Filtros do Painel")
 turno_logado = st.session_state["turno_acesso"]
 
 if turno_logado == "Todos":
-    lista_turnos = sorted(df['TURNO'].dropna().unique().tolist())
-    turnos_selecionados = st.sidebar.multiselect("1. Turno(s):", lista_turnos, default=lista_turnos)
-    df_filtrado = df[df['TURNO'].isin(turnos_selecionados)].copy()
+    lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
+    turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+    df_filtrado = df[df['TURNO'] == turno_selecionado].copy() if turno_selecionado != "Todos" else df.copy()
 elif isinstance(turno_logado, list):
     st.sidebar.info(f"🔒 Acesso restrito aos Turnos: **{', '.join(turno_logado)}**")
-    lista_turnos = turno_logado
-    turnos_selecionados = st.sidebar.multiselect("1. Turno(s):", lista_turnos, default=lista_turnos)
-    df_filtrado = df[df['TURNO'].isin(turnos_selecionados)].copy()
+    lista_turnos = ["Todos Permitidos"] + turno_logado
+    turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
+    if turno_selecionado == "Todos Permitidos":
+        df_filtrado = df[df['TURNO'].isin(turno_logado)].copy()
+    else:
+        df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
 else:
-    turnos_selecionados = [turno_logado]
-    lista_turnos = [turno_logado]
-    st.sidebar.info(f"🔒 Acesso restrito ao Turno: **{turno_logado}**")
-    df_filtrado = df[df['TURNO'].isin(turnos_selecionados)].copy()
+    turno_selecionado = turno_logado
+    st.sidebar.info(f"🔒 Acesso restrito ao Turno: **{turno_selecionado}**")
+    df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
 
-lista_cargos = sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
-cargos_selecionados = st.sidebar.multiselect("2. Cargo/Função:", lista_cargos, default=lista_cargos)
-df_filtrado = df_filtrado[df_filtrado['FUNÇÃO'].isin(cargos_selecionados)]
+lista_cargos = ["Todos"] + sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
+cargo_selecionado = st.sidebar.selectbox("2. Cargo/Função:", lista_cargos)
+if cargo_selecionado != "Todos": df_filtrado = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_selecionado]
 
 lista_pessoas = ["Nenhum"] + sorted(df_filtrado['NOME'].dropna().unique().tolist())
 pessoa_selecionada = st.sidebar.selectbox("🎯 Ver Metas do Colaborador:", lista_pessoas)
@@ -1138,10 +1137,7 @@ try:
     # 👥 VISÃO GERAL EQUIPE
     # =============================================================================
     else:
-        # Verifica se todos os turnos e todos os cargos permitidos estão selecionados
-        todos_turnos = len(turnos_selecionados) == len(lista_turnos)
-        todos_cargos = len(cargos_selecionados) == len(lista_cargos)
-        filtros_ativos = not (todos_turnos and todos_cargos)
+        filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
 
         if not filtros_ativos:
             st.markdown("<br><br>", unsafe_allow_html=True)
@@ -1154,7 +1150,7 @@ try:
             with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
             with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identificar gargalos.</p></div>", unsafe_allow_html=True)
         else:
-            cargos_render = cargos_selecionados
+            cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
             for cargo_atual in cargos_render:
                 df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
