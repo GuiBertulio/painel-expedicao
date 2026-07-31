@@ -367,14 +367,14 @@ def carregar_diarios():
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 # =============================================================================
-# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (TRANSPARENTE PARA TODOS)
 # =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
-df['Ranking_Categoria'] = "" # 🎯 Nova memória para gravar a categoria da vitória
+df['Ranking_Categoria'] = "" 
 
 for turno in ['T2', 'T3']:
     for cargo in df['FUNÇÃO'].unique():
@@ -421,6 +421,7 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
+            # 🎯 NOVO MOTOR DE RANKING COMPLETO: RANQUEIA TODOS OS CONFERENTES T3
             col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
             col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
             
@@ -432,43 +433,59 @@ for turno in ['T2', 'T3']:
                     df_conf_t3[col_frac] = pd.to_numeric(df_conf_t3[col_frac], errors='coerce').fillna(0)
                     df_conf_t3[col_grand] = pd.to_numeric(df_conf_t3[col_grand], errors='coerce').fillna(0)
 
-                    # 1. Campeão do Fracionado (Primeiro Lugar Leva Tudo)
-                    if df_conf_t3[col_frac].sum() > 0:
-                        maior_frac_idx = df_conf_t3[col_frac].idxmax()
-                        maior_frac_nome = df_conf_t3.loc[maior_frac_idx, 'NOME']
-                        maior_frac_val = df_conf_t3[col_frac].max()
-                        
-                        if maior_frac_val > 0:
-                            idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == str(maior_frac_nome).upper().strip())].index
-                            for idx_c in idx_camp:
-                                d_corr = float(df.at[idx_c, 'Dias Corridos'])
-                                d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
-                                prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
-                                
-                                df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
-                                df.at[idx_c, 'Posicao Ranking'] = 1  
-                                df.at[idx_c, 'Ranking_Categoria'] = "Fracionado"
+                    # 1. Ranquear FRACIONADO para TODOS
+                    df_conf_frac = df_conf_t3.sort_values(by=col_frac, ascending=False).reset_index(drop=True)
+                    dict_pos_frac = {}
+                    dict_val_frac = {}
+                    for pos_f, r_f in df_conf_frac.iterrows():
+                        nome_f = str(r_f.get('NOME', '')).strip().upper()
+                        if nome_f:
+                            dict_pos_frac[nome_f] = pos_f + 1
+                            dict_val_frac[nome_f] = float(r_f[col_frac])
 
-                    # 2. Campeão da Grandeza (Primeiro Lugar Leva Tudo)
-                    if df_conf_t3[col_grand].sum() > 0:
-                        maior_grand_idx = df_conf_t3[col_grand].idxmax()
-                        maior_grand_nome = df_conf_t3.loc[maior_grand_idx, 'NOME']
-                        maior_grand_val = df_conf_t3[col_grand].max()
+                    # 2. Ranquear GRANDEZA para TODOS
+                    df_conf_grand = df_conf_t3.sort_values(by=col_grand, ascending=False).reset_index(drop=True)
+                    dict_pos_grand = {}
+                    dict_val_grand = {}
+                    for pos_g, r_g in df_conf_grand.iterrows():
+                        nome_g = str(r_g.get('NOME', '')).strip().upper()
+                        if nome_g:
+                            dict_pos_grand[nome_g] = pos_g + 1
+                            dict_val_grand[nome_g] = float(r_g[col_grand])
+
+                    # 3. Mapear para TODOS os Conferentes do T3
+                    idx_conferentes_t3 = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE')].index
+                    for idx_c in idx_conferentes_t3:
+                        nome_c = str(df.at[idx_c, 'NOME']).strip().upper()
                         
-                        if maior_grand_val > 0:
-                            idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == str(maior_grand_nome).upper().strip())].index
-                            for idx_c in idx_camp:
-                                d_corr = float(df.at[idx_c, 'Dias Corridos'])
-                                d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
-                                prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
-                                
-                                df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
-                                df.at[idx_c, 'Posicao Ranking'] = 1  
-                                cat_atual = df.at[idx_c, 'Ranking_Categoria']
-                                if cat_atual == "Fracionado":
-                                    df.at[idx_c, 'Ranking_Categoria'] = "Fracionado e Grandeza"
-                                else:
-                                    df.at[idx_c, 'Ranking_Categoria'] = "Grandeza"
+                        p_frac = dict_pos_frac.get(nome_c, 0)
+                        v_frac = dict_val_frac.get(nome_c, 0.0)
+                        p_grand = dict_pos_grand.get(nome_c, 0)
+                        v_grand = dict_val_grand.get(nome_c, 0.0)
+                        
+                        d_corr = float(df.at[idx_c, 'Dias Corridos'])
+                        d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
+                        prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
+
+                        # A Posição do Ranking passa a ser a melhor posição entre as duas modalidades
+                        posicoes_validas = [p for p in [p_frac, p_grand] if p > 0]
+                        melhor_pos = min(posicoes_validas) if posicoes_validas else 0
+                        df.at[idx_c, 'Posicao Ranking'] = melhor_pos
+                        
+                        # Atribuição de prêmios (apenas para o 1º Lugar)
+                        valor_rank_tot = 0.0
+                        if p_frac == 1 and v_frac > 0:
+                            valor_rank_tot += (200.0 * prop)
+                        if p_grand == 1 and v_grand > 0:
+                            valor_rank_tot += (200.0 * prop)
+                            
+                        df.at[idx_c, 'Valor Ranking'] += valor_rank_tot
+                        
+                        # Texto detalhado do Desempenho Acumulado para justificativa do gestor
+                        txt_frac_desc = f"{p_frac}º Fracionado ({v_frac:,.0f})".replace(',', '.') if p_frac > 0 else "Fracionado: 0"
+                        txt_grand_desc = f"{p_grand}º Grandeza ({v_grand:,.0f})".replace(',', '.') if p_grand > 0 else "Grandeza: 0"
+                        
+                        df.at[idx_c, 'Ranking_Categoria'] = f"{txt_frac_desc} | {txt_grand_desc}"
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
             metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
@@ -492,7 +509,6 @@ for turno in ['T2', 'T3']:
 # FINALIZAÇÃO DA SOMA
 colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
 df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
-
 
 # =============================================================================
 # 📅 3. LÓGICA DE DATAS E BARRA LATERAL
@@ -571,16 +587,15 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                 val_rank = float(row.get('Valor Ranking', 0))
                 cat_rank = row.get('Ranking_Categoria', '')
                 
-                if val_rank > 0: 
-                    txt_indicador = "Ranking"
-                    if 'CONFERENTE' in funcao_upper and cat_rank:
-                        txt_indicador = f"Ranking ({cat_rank})"
-                        
-                    df_auditoria.append({
-                        "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
-                        "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
-                        "INDICADOR": txt_indicador, "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-"
-                    })
+                txt_indicador = "Ranking"
+                if 'CONFERENTE' in funcao_upper and cat_rank:
+                    txt_indicador = f"Ranking ({cat_rank})"
+                    
+                df_auditoria.append({
+                    "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
+                    "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
+                    "INDICADOR": txt_indicador, "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-" if val_rank > 0 else "0%"
+                })
         
         df_export = pd.DataFrame(df_auditoria)
         buffer = io.BytesIO()
@@ -844,10 +859,9 @@ try:
                 funcao_original = row.get('FUNÇÃO', '')
                 cat_rank = str(row.get('Ranking_Categoria', '')).strip()
                 
-                # 🎯 NOVO: Se for Conferente com prêmio, mostra qual ranking ganhou
                 texto_funcao_rank = funcao_original
                 if cat_rank and 'CONFERENTE' in cargo_p:
-                    texto_funcao_rank = f"{funcao_original} ({cat_rank})"
+                    texto_funcao_rank = f"{funcao_original} [{cat_rank}]"
                     
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                 
@@ -860,9 +874,9 @@ try:
                     val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>"
                 else:
-                    texto_premio_rank = ""
+                    texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00 (Fora do 1º Lugar)</b></span>"
                 
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipa de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
             cols_meta = st.columns(4) 
