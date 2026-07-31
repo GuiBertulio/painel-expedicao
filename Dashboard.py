@@ -10,8 +10,14 @@ import io
 import calendar                 
 
 # =============================================================================
-# 💰 DICIONÁRIO OFICIAL DE VALORES DO RH (Base 100%)
+# 🧰 FUNÇÕES DE APOIO E LIMPEZA DE DADOS
 # =============================================================================
+def extrair_inteiro(val):
+    v_str = str(val).split(',')[0].replace('.', '').strip()
+    if v_str.lower() in ['nan', 'none', '', '-']: return 0
+    try: return int(v_str)
+    except: return 0
+
 def obter_valor_100(turno, funcao, kpi):
     t = str(turno).strip().upper()
     f = str(funcao).strip().upper()
@@ -208,9 +214,6 @@ def carregar_dados():
             except IndexError:
                 pass 
 
-    # =============================================================================
-    # 🕵️ RADAR BLINDADO: Puxando as colunas com Exatidão
-    # =============================================================================
     colunas_atuais = list(df.columns)
     
     def achar_coluna(nome_exato, palavras_chave):
@@ -291,7 +294,6 @@ def carregar_dados():
         turno_e = str(row.get('TURNO', '')).upper()   
         funcao_e = str(row.get('FUNÇÃO', '')).upper() 
 
-        # ⚖️ TRAVA DE PROPORCIONALIDADE
         dias_corridos = float(row.get('Dias Corridos', 0))
         dias_trabalhados = float(row.get('Dias Trabalhados', 0))
         
@@ -303,7 +305,6 @@ def carregar_dados():
 
         for kpi in kpis_para_recalcular:
             if f"{kpi}_Valor" in df.columns:
-                
                 df.at[idx, f"{kpi}_Valor"] = 0.0
 
                 meta2 = row.get(f"{kpi}_Meta2", 0) 
@@ -328,7 +329,6 @@ def carregar_dados():
                         else: fator_p = 0.0
 
                     v_100_base = obter_valor_100(turno_e, funcao_e, kpi) 
-                    
                     if v_100_base > 0:
                         df.at[idx, f"{kpi}_Valor"] = (v_100_base * fator_p) * proporcao_dias
 
@@ -388,7 +388,6 @@ for turno in ['T2', 'T3']:
         if 'SEPARADOR' in cargo_str:
             metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
                                 next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
-            
             if not metrica_rank: continue
             
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
@@ -421,7 +420,7 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR DE RANKING COMPLETO: RANQUEIA TODOS OS CONFERENTES T3
+            # 🎯 NOVO MOTOR DE RANKING COMPLETO (COM LIMPEZA DE PONTOS)
             col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
             col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
             
@@ -430,62 +429,55 @@ for turno in ['T2', 'T3']:
                                            (df_conferente['FUNÇÃO'].astype(str).str.strip().str.upper() == 'CONFERENTE')].copy()
                 
                 if not df_conf_t3.empty:
-                    df_conf_t3[col_frac] = pd.to_numeric(df_conf_t3[col_frac], errors='coerce').fillna(0)
-                    df_conf_t3[col_grand] = pd.to_numeric(df_conf_t3[col_grand], errors='coerce').fillna(0)
+                    df_conf_t3[col_frac] = df_conf_t3[col_frac].apply(extrair_inteiro)
+                    df_conf_t3[col_grand] = df_conf_t3[col_grand].apply(extrair_inteiro)
 
-                    # 1. Ranquear FRACIONADO para TODOS
+                    # Ranquear FRACIONADO (Somente quem tem valor é classificado)
                     df_conf_frac = df_conf_t3.sort_values(by=col_frac, ascending=False).reset_index(drop=True)
-                    dict_pos_frac = {}
-                    dict_val_frac = {}
+                    dict_pos_frac, dict_val_frac = {}, {}
                     for pos_f, r_f in df_conf_frac.iterrows():
                         nome_f = str(r_f.get('NOME', '')).strip().upper()
                         if nome_f:
                             dict_pos_frac[nome_f] = pos_f + 1
-                            dict_val_frac[nome_f] = float(r_f[col_frac])
+                            dict_val_frac[nome_f] = r_f[col_frac]
 
-                    # 2. Ranquear GRANDEZA para TODOS
+                    # Ranquear GRANDEZA (Somente quem tem valor é classificado)
                     df_conf_grand = df_conf_t3.sort_values(by=col_grand, ascending=False).reset_index(drop=True)
-                    dict_pos_grand = {}
-                    dict_val_grand = {}
+                    dict_pos_grand, dict_val_grand = {}, {}
                     for pos_g, r_g in df_conf_grand.iterrows():
                         nome_g = str(r_g.get('NOME', '')).strip().upper()
                         if nome_g:
                             dict_pos_grand[nome_g] = pos_g + 1
-                            dict_val_grand[nome_g] = float(r_g[col_grand])
+                            dict_val_grand[nome_g] = r_g[col_grand]
 
-                    # 3. Mapear para TODOS os Conferentes do T3
+                    # Mapear e carregar justificação no Dashboard Individual
                     idx_conferentes_t3 = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE')].index
                     for idx_c in idx_conferentes_t3:
                         nome_c = str(df.at[idx_c, 'NOME']).strip().upper()
                         
                         p_frac = dict_pos_frac.get(nome_c, 0)
-                        v_frac = dict_val_frac.get(nome_c, 0.0)
+                        v_frac = dict_val_frac.get(nome_c, 0)
                         p_grand = dict_pos_grand.get(nome_c, 0)
-                        v_grand = dict_val_grand.get(nome_c, 0.0)
+                        v_grand = dict_val_grand.get(nome_c, 0)
                         
                         d_corr = float(df.at[idx_c, 'Dias Corridos'])
                         d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
                         prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
 
-                        # A Posição do Ranking passa a ser a melhor posição entre as duas modalidades
                         posicoes_validas = [p for p in [p_frac, p_grand] if p > 0]
                         melhor_pos = min(posicoes_validas) if posicoes_validas else 0
                         df.at[idx_c, 'Posicao Ranking'] = melhor_pos
                         
-                        # Atribuição de prêmios (apenas para o 1º Lugar)
                         valor_rank_tot = 0.0
-                        if p_frac == 1 and v_frac > 0:
-                            valor_rank_tot += (200.0 * prop)
-                        if p_grand == 1 and v_grand > 0:
-                            valor_rank_tot += (200.0 * prop)
+                        if p_frac == 1 and v_frac > 0: valor_rank_tot += (200.0 * prop)
+                        if p_grand == 1 and v_grand > 0: valor_rank_tot += (200.0 * prop)
                             
                         df.at[idx_c, 'Valor Ranking'] += valor_rank_tot
                         
-                        # Texto detalhado do Desempenho Acumulado para justificativa do gestor
-                        txt_frac_desc = f"{p_frac}º Fracionado ({v_frac:,.0f})".replace(',', '.') if p_frac > 0 else "Fracionado: 0"
-                        txt_grand_desc = f"{p_grand}º Grandeza ({v_grand:,.0f})".replace(',', '.') if p_grand > 0 else "Grandeza: 0"
+                        txt_frac_desc = f"{p_frac}º Fracionado ({v_frac:,.0f})".replace(',', '.') if p_frac > 0 else "Fracionado (0)"
+                        txt_grand_desc = f"{p_grand}º Grandeza ({v_grand:,.0f})".replace(',', '.') if p_grand > 0 else "Grandeza (0)"
                         
-                        df.at[idx_c, 'Ranking_Categoria'] = f"{txt_frac_desc} | {txt_grand_desc}"
+                        df.at[idx_c, 'Ranking_Categoria'] = f"{txt_frac_desc}  |  {txt_grand_desc}"
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
             metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
@@ -855,28 +847,33 @@ try:
             if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
                 st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
             
-            if pos > 0 and ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3')):
+            # 🎯 BANNER DE RANKING BLINDADO PARA APARECER PRA TODO MUNDO DESSES CARGOS
+            is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
+            
+            if is_ranking_cargo:
                 funcao_original = row.get('FUNÇÃO', '')
                 cat_rank = str(row.get('Ranking_Categoria', '')).strip()
                 
                 texto_funcao_rank = funcao_original
                 if cat_rank and 'CONFERENTE' in cargo_p:
-                    texto_funcao_rank = f"{funcao_original} [{cat_rank}]"
+                    texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>"
                     
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                 
                 if pos == 1: medalha, cor_rank = "🥇", "#ffd700" 
                 elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0" 
                 elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" 
-                else: medalha, cor_rank = "🏅", "#555555"          
+                elif pos > 0: medalha, cor_rank = "🏅", "#555555"
+                else: medalha, cor_rank = "📋", "#333333"          
                 
                 if val_rank > 0:
                     val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>"
                 else:
-                    texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00 (Fora do 1º Lugar)</b></span>"
+                    texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
                 
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipe de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
+                txt_posicao = f"<b>{medalha} Posição:</b> {pos}º lugar de {total_eq}" if pos > 0 else f"<b>{medalha} Análise da Equipe</b> ({total_eq} pessoas)"
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
             cols_meta = st.columns(4) 
@@ -1132,10 +1129,11 @@ try:
                                 c_frac = next((c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()), None)
                                 c_grand = next((c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()), None)
                                 
-                                try: v_frac = f"{float(str(pessoa_d_row.get(c_frac, 0)).replace(',', '.')):,.0f}".replace(',', '.') if c_frac else "0"
-                                except: v_frac = "0"
-                                try: v_grand = f"{float(str(pessoa_d_row.get(c_grand, 0)).replace(',', '.')):,.0f}".replace(',', '.') if c_grand else "0"
-                                except: v_grand = "0"
+                                v_frac_num = extrair_inteiro(pessoa_d_row.get(c_frac, 0)) if c_frac else 0
+                                v_grand_num = extrair_inteiro(pessoa_d_row.get(c_grand, 0)) if c_grand else 0
+                                
+                                v_frac = f"{v_frac_num:,.0f}".replace(',', '.')
+                                v_grand = f"{v_grand_num:,.0f}".replace(',', '.')
                                 
                                 st.markdown("#### 📅 Desempenho Acumulado")
                                 st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
