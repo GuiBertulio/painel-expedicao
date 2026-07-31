@@ -8,13 +8,27 @@ import plotly.express as px
 import gspread                  
 import io                       
 import calendar                 
+import re
 
 # =============================================================================
 # 🧰 FUNÇÕES DE APOIO E LIMPEZA DE DADOS
 # =============================================================================
 def extrair_inteiro(val):
-    v_str = str(val).split(',')[0].replace('.', '').strip()
+    if pd.isna(val): return 0
+    v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
+    
+    # Remove qualquer caractere que não seja número, ponto ou vírgula
+    v_str = re.sub(r'[^\d.,]', '', v_str)
+    if not v_str: return 0
+    
+    # Se houver vírgula (centavos), corta e pega só a parte inteira
+    if ',' in v_str:
+        v_str = v_str.split(',')[0]
+        
+    # Remove os pontos de milhar
+    v_str = v_str.replace('.', '')
+    
     try: return int(v_str)
     except: return 0
 
@@ -420,7 +434,7 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR DE RANKING COMPLETO (COM LIMPEZA DE PONTOS)
+            # 🎯 NOVO MOTOR DE RANKING (AGRUPAMENTO SEGURO ANTI-LINHAS DUPLICADAS ZERADAS)
             col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
             col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
             
@@ -429,23 +443,27 @@ for turno in ['T2', 'T3']:
                                            (df_conferente['FUNÇÃO'].astype(str).str.strip().str.upper() == 'CONFERENTE')].copy()
                 
                 if not df_conf_t3.empty:
+                    # Limpa os números e agrupa por NOME (Soma tudo pra evitar que linha fantasma = 0 apague o valor real)
                     df_conf_t3[col_frac] = df_conf_t3[col_frac].apply(extrair_inteiro)
                     df_conf_t3[col_grand] = df_conf_t3[col_grand].apply(extrair_inteiro)
+                    
+                    df_agg = df_conf_t3.groupby('NOME', as_index=False)[[col_frac, col_grand]].sum()
+                    df_agg['NOME'] = df_agg['NOME'].astype(str).str.strip().str.upper()
 
-                    # Ranquear FRACIONADO (Somente quem tem valor é classificado)
-                    df_conf_frac = df_conf_t3.sort_values(by=col_frac, ascending=False).reset_index(drop=True)
+                    # Ranquear FRACIONADO 
+                    df_agg_frac = df_agg.sort_values(by=col_frac, ascending=False).reset_index(drop=True)
                     dict_pos_frac, dict_val_frac = {}, {}
-                    for pos_f, r_f in df_conf_frac.iterrows():
-                        nome_f = str(r_f.get('NOME', '')).strip().upper()
+                    for pos_f, r_f in df_agg_frac.iterrows():
+                        nome_f = r_f['NOME']
                         if nome_f:
                             dict_pos_frac[nome_f] = pos_f + 1
                             dict_val_frac[nome_f] = r_f[col_frac]
 
-                    # Ranquear GRANDEZA (Somente quem tem valor é classificado)
-                    df_conf_grand = df_conf_t3.sort_values(by=col_grand, ascending=False).reset_index(drop=True)
+                    # Ranquear GRANDEZA 
+                    df_agg_grand = df_agg.sort_values(by=col_grand, ascending=False).reset_index(drop=True)
                     dict_pos_grand, dict_val_grand = {}, {}
-                    for pos_g, r_g in df_conf_grand.iterrows():
-                        nome_g = str(r_g.get('NOME', '')).strip().upper()
+                    for pos_g, r_g in df_agg_grand.iterrows():
+                        nome_g = r_g['NOME']
                         if nome_g:
                             dict_pos_grand[nome_g] = pos_g + 1
                             dict_val_grand[nome_g] = r_g[col_grand]
@@ -847,7 +865,6 @@ try:
             if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
                 st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
             
-            # 🎯 BANNER DE RANKING BLINDADO PARA APARECER PRA TODO MUNDO DESSES CARGOS
             is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
             
             if is_ranking_cargo:
@@ -1129,8 +1146,9 @@ try:
                                 c_frac = next((c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()), None)
                                 c_grand = next((c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()), None)
                                 
-                                v_frac_num = extrair_inteiro(pessoa_d_row.get(c_frac, 0)) if c_frac else 0
-                                v_grand_num = extrair_inteiro(pessoa_d_row.get(c_grand, 0)) if c_grand else 0
+                                # 🎯 SOMA TOTAL DE LINHAS (BLINDADO CONTRA LINHAS DUPLICADAS VAZIAS)
+                                v_frac_num = df_pessoa_diario[c_frac].apply(extrair_inteiro).sum() if c_frac else 0
+                                v_grand_num = df_pessoa_diario[c_grand].apply(extrair_inteiro).sum() if c_grand else 0
                                 
                                 v_frac = f"{v_frac_num:,.0f}".replace(',', '.')
                                 v_grand = f"{v_grand_num:,.0f}".replace(',', '.')
