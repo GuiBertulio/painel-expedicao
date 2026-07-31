@@ -367,13 +367,14 @@ def carregar_diarios():
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 # =============================================================================
-# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (FORA DA FUNÇÃO PARA LER AS ABAS NOVAS)
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
+df['Ranking_Categoria'] = "" # 🎯 Nova memória para gravar a categoria da vitória
 
 for turno in ['T2', 'T3']:
     for cargo in df['FUNÇÃO'].unique():
@@ -420,7 +421,6 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR INTELIGENTE: Puxa Fracionado e Grandeza direto pelas novas colunas
             col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
             col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
             
@@ -447,6 +447,7 @@ for turno in ['T2', 'T3']:
                                 
                                 df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
                                 df.at[idx_c, 'Posicao Ranking'] = 1  
+                                df.at[idx_c, 'Ranking_Categoria'] = "Fracionado"
 
                     # 2. Campeão da Grandeza (Primeiro Lugar Leva Tudo)
                     if df_conf_t3[col_grand].sum() > 0:
@@ -463,6 +464,11 @@ for turno in ['T2', 'T3']:
                                 
                                 df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
                                 df.at[idx_c, 'Posicao Ranking'] = 1  
+                                cat_atual = df.at[idx_c, 'Ranking_Categoria']
+                                if cat_atual == "Fracionado":
+                                    df.at[idx_c, 'Ranking_Categoria'] = "Fracionado e Grandeza"
+                                else:
+                                    df.at[idx_c, 'Ranking_Categoria'] = "Grandeza"
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
             metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
@@ -563,11 +569,17 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             
             if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno == 'T3') or ('OPERADOR' in funcao_upper and turno == 'T3')):
                 val_rank = float(row.get('Valor Ranking', 0))
+                cat_rank = row.get('Ranking_Categoria', '')
+                
                 if val_rank > 0: 
+                    txt_indicador = "Ranking"
+                    if 'CONFERENTE' in funcao_upper and cat_rank:
+                        txt_indicador = f"Ranking ({cat_rank})"
+                        
                     df_auditoria.append({
                         "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
                         "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
-                        "INDICADOR": "Ranking", "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-"
+                        "INDICADOR": txt_indicador, "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-"
                     })
         
         df_export = pd.DataFrame(df_auditoria)
@@ -830,6 +842,13 @@ try:
             
             if pos > 0 and ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3')):
                 funcao_original = row.get('FUNÇÃO', '')
+                cat_rank = str(row.get('Ranking_Categoria', '')).strip()
+                
+                # 🎯 NOVO: Se for Conferente com prêmio, mostra qual ranking ganhou
+                texto_funcao_rank = funcao_original
+                if cat_rank and 'CONFERENTE' in cargo_p:
+                    texto_funcao_rank = f"{funcao_original} ({cat_rank})"
+                    
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                 
                 if pos == 1: medalha, cor_rank = "🥇", "#ffd700" 
@@ -843,7 +862,7 @@ try:
                 else:
                     texto_premio_rank = ""
                 
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipa de {funcao_original}{texto_premio_rank}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'><b>{medalha} Posição no Ranking:</b> {pos}º lugar de {total_eq} na equipa de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
             cols_meta = st.columns(4) 
@@ -1095,7 +1114,6 @@ try:
                                 c3.metric("🎯 JL", jl_display)
                                 st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
                         else:
-                            # NOVO: Caso não tenham datas (colunas fixas de totais no diário de conferente)
                             if "CONFERENTE" in cargo_p:
                                 c_frac = next((c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()), None)
                                 c_grand = next((c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()), None)
