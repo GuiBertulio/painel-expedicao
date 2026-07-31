@@ -18,15 +18,12 @@ def extrair_inteiro(val):
     v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
     
-    # Remove qualquer caractere que não seja número, ponto ou vírgula
     v_str = re.sub(r'[^\d.,]', '', v_str)
     if not v_str: return 0
     
-    # Se houver vírgula (centavos), corta e pega só a parte inteira
     if ',' in v_str:
         v_str = v_str.split(',')[0]
         
-    # Remove os pontos de milhar
     v_str = v_str.replace('.', '')
     
     try: return int(v_str)
@@ -434,7 +431,7 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR DE RANKING (AGRUPAMENTO SEGURO ANTI-LINHAS DUPLICADAS ZERADAS)
+            # 🎯 NOVO MOTOR DE RANKING BLINDADO: LIMPEZA DE NOMES ANTES DE AGRUPAR
             col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
             col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
             
@@ -443,18 +440,18 @@ for turno in ['T2', 'T3']:
                                            (df_conferente['FUNÇÃO'].astype(str).str.strip().str.upper() == 'CONFERENTE')].copy()
                 
                 if not df_conf_t3.empty:
-                    # Limpa os números e agrupa por NOME (Soma tudo pra evitar que linha fantasma = 0 apague o valor real)
+                    # Limpeza brutal de NOME e valores ANTES de somar (Evita "Efeito Cascata" do 0 sobrescrever)
+                    df_conf_t3['NOME_CLEAN'] = df_conf_t3['NOME'].astype(str).str.strip().str.upper()
                     df_conf_t3[col_frac] = df_conf_t3[col_frac].apply(extrair_inteiro)
                     df_conf_t3[col_grand] = df_conf_t3[col_grand].apply(extrair_inteiro)
                     
-                    df_agg = df_conf_t3.groupby('NOME', as_index=False)[[col_frac, col_grand]].sum()
-                    df_agg['NOME'] = df_agg['NOME'].astype(str).str.strip().str.upper()
+                    df_agg = df_conf_t3.groupby('NOME_CLEAN', as_index=False)[[col_frac, col_grand]].sum()
 
                     # Ranquear FRACIONADO 
                     df_agg_frac = df_agg.sort_values(by=col_frac, ascending=False).reset_index(drop=True)
                     dict_pos_frac, dict_val_frac = {}, {}
                     for pos_f, r_f in df_agg_frac.iterrows():
-                        nome_f = r_f['NOME']
+                        nome_f = r_f['NOME_CLEAN']
                         if nome_f:
                             dict_pos_frac[nome_f] = pos_f + 1
                             dict_val_frac[nome_f] = r_f[col_frac]
@@ -463,25 +460,26 @@ for turno in ['T2', 'T3']:
                     df_agg_grand = df_agg.sort_values(by=col_grand, ascending=False).reset_index(drop=True)
                     dict_pos_grand, dict_val_grand = {}, {}
                     for pos_g, r_g in df_agg_grand.iterrows():
-                        nome_g = r_g['NOME']
+                        nome_g = r_g['NOME_CLEAN']
                         if nome_g:
                             dict_pos_grand[nome_g] = pos_g + 1
                             dict_val_grand[nome_g] = r_g[col_grand]
 
-                    # Mapear e carregar justificação no Dashboard Individual
+                    # Mapear para a tabela oficial
                     idx_conferentes_t3 = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE')].index
                     for idx_c in idx_conferentes_t3:
-                        nome_c = str(df.at[idx_c, 'NOME']).strip().upper()
+                        nome_oficial = str(df.at[idx_c, 'NOME']).strip().upper()
                         
-                        p_frac = dict_pos_frac.get(nome_c, 0)
-                        v_frac = dict_val_frac.get(nome_c, 0)
-                        p_grand = dict_pos_grand.get(nome_c, 0)
-                        v_grand = dict_val_grand.get(nome_c, 0)
+                        p_frac = dict_pos_frac.get(nome_oficial, 0)
+                        v_frac = dict_val_frac.get(nome_oficial, 0)
+                        p_grand = dict_pos_grand.get(nome_oficial, 0)
+                        v_grand = dict_val_grand.get(nome_oficial, 0)
                         
                         d_corr = float(df.at[idx_c, 'Dias Corridos'])
                         d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
                         prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
 
+                        # A Posição do Ranking geral será a melhor posição alcançada
                         posicoes_validas = [p for p in [p_frac, p_grand] if p > 0]
                         melhor_pos = min(posicoes_validas) if posicoes_validas else 0
                         df.at[idx_c, 'Posicao Ranking'] = melhor_pos
@@ -839,7 +837,8 @@ try:
                 
                 ocorrencias_texto = []
                 if not df_aux.empty and 'NOME' in df_aux.columns:
-                    dados_aux = df_aux[df_aux['NOME'] == pessoa_selecionada]
+                    df_aux['NOME_CLEAN'] = df_aux['NOME'].astype(str).str.strip().str.upper()
+                    dados_aux = df_aux[df_aux['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
                     if not dados_aux.empty:
                         linha_aux = dados_aux.iloc[0]
                         valores_aux = [str(v).strip().upper() for v in linha_aux.values]
@@ -1079,7 +1078,9 @@ try:
                     df_uso_diario = df_conferente
 
                 if usa_diario and not df_uso_diario.empty:
-                    df_pessoa_diario = df_uso_diario[df_uso_diario['NOME'] == pessoa_selecionada]
+                    df_uso_diario['NOME_CLEAN'] = df_uso_diario['NOME'].astype(str).str.strip().str.upper()
+                    df_pessoa_diario = df_uso_diario[df_uso_diario['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
+                    
                     if not df_pessoa_diario.empty:
                         pessoa_d_row = df_pessoa_diario.iloc[0]
                         cols_datas_reais = []
@@ -1146,7 +1147,6 @@ try:
                                 c_frac = next((c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()), None)
                                 c_grand = next((c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()), None)
                                 
-                                # 🎯 SOMA TOTAL DE LINHAS (BLINDADO CONTRA LINHAS DUPLICADAS VAZIAS)
                                 v_frac_num = df_pessoa_diario[c_frac].apply(extrair_inteiro).sum() if c_frac else 0
                                 v_grand_num = df_pessoa_diario[c_grand].apply(extrair_inteiro).sum() if c_grand else 0
                                 
