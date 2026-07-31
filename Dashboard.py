@@ -18,12 +18,15 @@ def extrair_inteiro(val):
     v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
     
+    # Remove qualquer caractere que não seja número, ponto ou vírgula
     v_str = re.sub(r'[^\d.,]', '', v_str)
     if not v_str: return 0
     
+    # Se houver vírgula (centavos), corta e pega só a parte inteira
     if ',' in v_str:
         v_str = v_str.split(',')[0]
         
+    # Remove os pontos de milhar
     v_str = v_str.replace('.', '')
     
     try: return int(v_str)
@@ -350,27 +353,27 @@ def carregar_diarios():
     dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
-        try:
-            aba_sep = planilha.worksheet("Relatorio Diario").get_all_values()
-            if aba_sep: dfs['sep'] = pd.DataFrame(aba_sep[1:], columns=aba_sep[0]).rename(columns=lambda x: str(x).strip())
+        
+        # 🎯 RADAR DE CABEÇALHOS CORRETOS: Descobre a linha certa que tem a palavra "NOME"
+        def processar_aba(nome_aba):
+            aba_bruta = planilha.worksheet(nome_aba).get_all_values()
+            if not aba_bruta: return pd.DataFrame()
+            header_idx = 0
+            for i, row_vals in enumerate(aba_bruta):
+                if "NOME" in [str(cell).strip().upper() for cell in row_vals]:
+                    header_idx = i
+                    break
+            df_aba = pd.DataFrame(aba_bruta[header_idx+1:], columns=aba_bruta[header_idx])
+            df_aba.columns = [str(c).strip() for c in df_aba.columns]
+            return df_aba
+
+        try: dfs['sep'] = processar_aba("Relatorio Diario")
         except: pass
-        try:
-            aba_op = planilha.worksheet("Relatorio Operador").get_all_values()
-            if aba_op: dfs['op'] = pd.DataFrame(aba_op[1:], columns=aba_op[0]).rename(columns=lambda x: str(x).strip())
+        try: dfs['op'] = processar_aba("Relatorio Operador")
         except: pass
-        try:
-            aba_conf = planilha.worksheet("Relatorio Diario Conferente").get_all_values()
-            if aba_conf: dfs['conf'] = pd.DataFrame(aba_conf[1:], columns=aba_conf[0]).rename(columns=lambda x: str(x).strip())
+        try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
         except: pass
-        try:
-            aba_aux = planilha.worksheet("Aux JL").get_all_values()
-            if aba_aux:
-                header_idx = 0
-                for i, row_vals in enumerate(aba_aux):
-                    if "NOME" in [str(cell).strip().upper() for cell in row_vals]:
-                        header_idx = i
-                        break
-                dfs['aux'] = pd.DataFrame(aba_aux[header_idx+1:], columns=aba_aux[header_idx]).rename(columns=lambda x: str(x).strip())
+        try: dfs['aux'] = processar_aba("Aux JL")
         except: pass
 
     except Exception:
@@ -378,7 +381,7 @@ def carregar_diarios():
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 # =============================================================================
-# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (TRANSPARENTE PARA TODOS)
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (SOMA LATERAL DE TODAS COLUNAS)
 # =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
@@ -431,39 +434,46 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR DE RANKING BLINDADO: LIMPEZA DE NOMES ANTES DE AGRUPAR
-            col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
-            col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
+            # 🎯 NOVO MOTOR DE RANKING: Varredura de TODAS as colunas do mês
+            cols_frac = [c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()]
+            cols_grand = [c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()]
             
-            if col_frac and col_grand and not df_conferente.empty:
+            if (cols_frac or cols_grand) and not df_conferente.empty:
                 df_conf_t3 = df_conferente[(df_conferente['TURNO'].astype(str).str.strip().str.upper() == 'T3') & 
                                            (df_conferente['FUNÇÃO'].astype(str).str.strip().str.upper() == 'CONFERENTE')].copy()
                 
                 if not df_conf_t3.empty:
-                    # Limpeza brutal de NOME e valores ANTES de somar (Evita "Efeito Cascata" do 0 sobrescrever)
                     df_conf_t3['NOME_CLEAN'] = df_conf_t3['NOME'].astype(str).str.strip().str.upper()
-                    df_conf_t3[col_frac] = df_conf_t3[col_frac].apply(extrair_inteiro)
-                    df_conf_t3[col_grand] = df_conf_t3[col_grand].apply(extrair_inteiro)
                     
-                    df_agg = df_conf_t3.groupby('NOME_CLEAN', as_index=False)[[col_frac, col_grand]].sum()
+                    # Soma todas as colunas de cada tipo, linha por linha
+                    df_conf_t3['TOTAL_FRAC'] = 0
+                    for c in cols_frac:
+                        df_conf_t3['TOTAL_FRAC'] += df_conf_t3[c].apply(extrair_inteiro)
+                        
+                    df_conf_t3['TOTAL_GRAND'] = 0
+                    for c in cols_grand:
+                        df_conf_t3['TOTAL_GRAND'] += df_conf_t3[c].apply(extrair_inteiro)
+                    
+                    # Agrupa pelo nome para matar de vez as linhas duplicadas e zeros fantasmas
+                    df_agg = df_conf_t3.groupby('NOME_CLEAN', as_index=False)[['TOTAL_FRAC', 'TOTAL_GRAND']].sum()
 
                     # Ranquear FRACIONADO 
-                    df_agg_frac = df_agg.sort_values(by=col_frac, ascending=False).reset_index(drop=True)
+                    df_agg_frac = df_agg.sort_values(by='TOTAL_FRAC', ascending=False).reset_index(drop=True)
                     dict_pos_frac, dict_val_frac = {}, {}
                     for pos_f, r_f in df_agg_frac.iterrows():
                         nome_f = r_f['NOME_CLEAN']
                         if nome_f:
                             dict_pos_frac[nome_f] = pos_f + 1
-                            dict_val_frac[nome_f] = r_f[col_frac]
+                            dict_val_frac[nome_f] = r_f['TOTAL_FRAC']
 
                     # Ranquear GRANDEZA 
-                    df_agg_grand = df_agg.sort_values(by=col_grand, ascending=False).reset_index(drop=True)
+                    df_agg_grand = df_agg.sort_values(by='TOTAL_GRAND', ascending=False).reset_index(drop=True)
                     dict_pos_grand, dict_val_grand = {}, {}
                     for pos_g, r_g in df_agg_grand.iterrows():
                         nome_g = r_g['NOME_CLEAN']
                         if nome_g:
                             dict_pos_grand[nome_g] = pos_g + 1
-                            dict_val_grand[nome_g] = r_g[col_grand]
+                            dict_val_grand[nome_g] = r_g['TOTAL_GRAND']
 
                     # Mapear para a tabela oficial
                     idx_conferentes_t3 = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE')].index
@@ -1082,82 +1092,20 @@ try:
                     df_pessoa_diario = df_uso_diario[df_uso_diario['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
                     
                     if not df_pessoa_diario.empty:
-                        pessoa_d_row = df_pessoa_diario.iloc[0]
-                        cols_datas_reais = []
-                        opces_datas = []
+                        cols_frac = [c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()]
+                        cols_grand = [c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()]
                         
-                        for c in df_uso_diario.columns:
-                            c_str = str(c).strip()
-                            if any(char.isdigit() for char in c_str) and ('/' in c_str or '-' in c_str) and 'Inicio' not in c_str and 'Horas' not in c_str and 'Itens' not in c_str and 'JL' not in c_str and 'Mov' not in c_str and 'Frac' not in c_str and 'Grand' not in c_str:
-                                cols_datas_reais.append(c_str)
-                                data_limpa = c_str.split(' ')[0] 
-                                if '-' in data_limpa and len(data_limpa.split('-')[0]) == 4:
-                                    ano, mes, dia = data_limpa.split('-')
-                                    opces_datas.append(f"{dia}/{mes}/{ano}")
-                                else:
-                                    opces_datas.append(data_limpa)
+                        v_frac_num = sum(df_pessoa_diario[c].apply(extrair_inteiro).sum() for c in cols_frac)
+                        v_grand_num = sum(df_pessoa_diario[c].apply(extrair_inteiro).sum() for c in cols_grand)
                         
-                        if cols_datas_reais:
-                            st.markdown("#### 📅 Detalhamento Diário")
-                            data_escolhida_display = st.selectbox("Data Apuração", opces_datas, label_visibility="collapsed", key="sel_data_diario_alinhado")
-                            idx_escolha = opces_datas.index(data_escolhida_display)
-                            nome_coluna_real = cols_datas_reais[idx_escolha]
-                            col_index = list(df_uso_diario.columns).index(nome_coluna_real)
-                            
-                            try: val_1 = str(pessoa_d_row.iloc[col_index]).strip()
-                            except: val_1 = "0"
-                            try: val_2 = str(pessoa_d_row.iloc[col_index + 1]).strip()
-                            except: val_2 = "0"
-                            try: val_3 = str(pessoa_d_row.iloc[col_index + 2]).strip()
-                            except: val_3 = "0"
-                            try: val_4 = str(pessoa_d_row.iloc[col_index + 3]).strip()
-                            except: val_4 = "0"
-                            
-                            val_1 = val_1 if val_1 and val_1.lower() not in ['nan', 'none'] else "0"
-                            val_2 = val_2 if val_2 and val_2.lower() not in ['nan', 'none'] else "0"
-                            val_3 = val_3 if val_3 and val_3.lower() not in ['nan', 'none'] else "0"
-                            val_4 = val_4 if val_4 and val_4.lower() not in ['nan', 'none'] else "0"
-                            
-                            if "SEPARADOR" in cargo_p:
-                                try:
-                                    if val_4 and val_4.lower() not in ['nan', 'none']:
-                                        val_jl_num = float(val_4.replace(',', '.').replace('%', ''))
-                                        if val_jl_num <= 2.0 and "%" not in val_4: val_jl_num = val_jl_num * 100
-                                        jl_display = f"{int(val_jl_num)}%" 
-                                    else: jl_display = "0%"
-                                except: jl_display = "0%"
-                                try: v_itens = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_itens = "0"
-                                try: v_veloc = f"{int(round(float(val_3.replace(',', '.'))))}"
-                                except: v_veloc = "0"
-                                try:
-                                    horas_dec = float(val_2.replace(',', '.'))
-                                    h = int(horas_dec)
-                                    m = int((horas_dec - h) * 60)
-                                    s = int((((horas_dec - h) * 60) - m) * 60)
-                                    v_horas = f"{h:02d}:{m:02d}:{s:02d}"
-                                except: v_horas = "00:00:00"
-                                c1, c2, c3 = st.columns(3)
-                                c1.metric("⏱️ Horas", v_horas)
-                                c2.metric("⚡ Itens/Hora", v_veloc)
-                                c3.metric("🎯 JL", jl_display)
-                                st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
-                        else:
-                            if "CONFERENTE" in cargo_p:
-                                c_frac = next((c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()), None)
-                                c_grand = next((c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()), None)
-                                
-                                v_frac_num = df_pessoa_diario[c_frac].apply(extrair_inteiro).sum() if c_frac else 0
-                                v_grand_num = df_pessoa_diario[c_grand].apply(extrair_inteiro).sum() if c_grand else 0
-                                
-                                v_frac = f"{v_frac_num:,.0f}".replace(',', '.')
-                                v_grand = f"{v_grand_num:,.0f}".replace(',', '.')
-                                
-                                st.markdown("#### 📅 Desempenho Acumulado")
-                                st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
-                                c1, c2 = st.columns(2)
-                                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
-                                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
+                        v_frac = f"{v_frac_num:,.0f}".replace(',', '.')
+                        v_grand = f"{v_grand_num:,.0f}".replace(',', '.')
+                        
+                        st.markdown("#### 📅 Desempenho Acumulado")
+                        st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
+                        c1, c2 = st.columns(2)
+                        with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
+                        with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
 
                 kpis_ativos_pessoa = []
                 for k in kpis_mapeados:
