@@ -14,7 +14,11 @@ import re
 # 🧰 FUNÇÕES DE APOIO E LIMPEZA DE DADOS
 # =============================================================================
 def extrair_inteiro(val):
-    if pd.isna(val): return 0
+    try:
+        if pd.isna(val): return 0
+    except ValueError:
+        return 0
+    
     v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
     
@@ -354,7 +358,6 @@ def carregar_diarios():
     try:
         planilha = conectar_planilha()
         
-        # 🎯 RADAR DE CABEÇALHOS CORRETOS: Descobre a linha certa que tem a palavra "NOME"
         def processar_aba(nome_aba):
             aba_bruta = planilha.worksheet(nome_aba).get_all_values()
             if not aba_bruta: return pd.DataFrame()
@@ -381,7 +384,7 @@ def carregar_diarios():
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 # =============================================================================
-# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (SOMA LATERAL DE TODAS COLUNAS)
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (SOMA LATERAL BLINDADA)
 # =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
@@ -434,25 +437,25 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR DE RANKING: Varredura de TODAS as colunas do mês
-            cols_frac = [c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()]
-            cols_grand = [c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()]
+            # 🎯 NOVO MOTOR DE RANKING: Varredura de colunas por ÍNDICE (Posição 1, 2, 3...)
+            idx_cols_frac = [i for i, c in enumerate(df_conferente.columns) if 'FRACIONADO' in str(c).upper()]
+            idx_cols_grand = [i for i, c in enumerate(df_conferente.columns) if 'GRANDEZA' in str(c).upper()]
             
-            if (cols_frac or cols_grand) and not df_conferente.empty:
+            if (idx_cols_frac or idx_cols_grand) and not df_conferente.empty:
                 df_conf_t3 = df_conferente[(df_conferente['TURNO'].astype(str).str.strip().str.upper() == 'T3') & 
                                            (df_conferente['FUNÇÃO'].astype(str).str.strip().str.upper() == 'CONFERENTE')].copy()
                 
                 if not df_conf_t3.empty:
                     df_conf_t3['NOME_CLEAN'] = df_conf_t3['NOME'].astype(str).str.strip().str.upper()
                     
-                    # Soma todas as colunas de cada tipo, linha por linha
+                    # Soma todas as colunas de cada tipo, usando o índice posicional (.iloc) para não confundir nomes duplicados
                     df_conf_t3['TOTAL_FRAC'] = 0
-                    for c in cols_frac:
-                        df_conf_t3['TOTAL_FRAC'] += df_conf_t3[c].apply(extrair_inteiro)
+                    for i in idx_cols_frac:
+                        df_conf_t3['TOTAL_FRAC'] += df_conf_t3.iloc[:, i].apply(extrair_inteiro)
                         
                     df_conf_t3['TOTAL_GRAND'] = 0
-                    for c in cols_grand:
-                        df_conf_t3['TOTAL_GRAND'] += df_conf_t3[c].apply(extrair_inteiro)
+                    for i in idx_cols_grand:
+                        df_conf_t3['TOTAL_GRAND'] += df_conf_t3.iloc[:, i].apply(extrair_inteiro)
                     
                     # Agrupa pelo nome para matar de vez as linhas duplicadas e zeros fantasmas
                     df_agg = df_conf_t3.groupby('NOME_CLEAN', as_index=False)[['TOTAL_FRAC', 'TOTAL_GRAND']].sum()
@@ -1092,11 +1095,11 @@ try:
                     df_pessoa_diario = df_uso_diario[df_uso_diario['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
                     
                     if not df_pessoa_diario.empty:
-                        cols_frac = [c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()]
-                        cols_grand = [c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()]
+                        cols_frac = [i for i, c in enumerate(df_uso_diario.columns) if 'FRACIONADO' in str(c).upper()]
+                        cols_grand = [i for i, c in enumerate(df_uso_diario.columns) if 'GRANDEZA' in str(c).upper()]
                         
-                        v_frac_num = sum(df_pessoa_diario[c].apply(extrair_inteiro).sum() for c in cols_frac)
-                        v_grand_num = sum(df_pessoa_diario[c].apply(extrair_inteiro).sum() for c in cols_grand)
+                        v_frac_num = sum(df_pessoa_diario.iloc[:, c].apply(extrair_inteiro).sum() for c in cols_frac)
+                        v_grand_num = sum(df_pessoa_diario.iloc[:, c].apply(extrair_inteiro).sum() for c in cols_grand)
                         
                         v_frac = f"{v_frac_num:,.0f}".replace(',', '.')
                         v_grand = f"{v_grand_num:,.0f}".replace(',', '.')
