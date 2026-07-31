@@ -366,12 +366,12 @@ def carregar_diarios():
         pass
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
+# =============================================================================
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (FORA DA FUNÇÃO PARA LER AS ABAS NOVAS)
+# =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
 
-# =============================================================================
-# 🏆 CÁLCULO DO RANKING BLINDADO (INCLUINDO CONFERENTES T3 COM DATAS DIÁRIAS)
-# =============================================================================
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
 
@@ -420,57 +420,49 @@ for turno in ['T2', 'T3']:
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR INTELIGENTE: Puxa direto da planilha 'Relatorio Diario Conferente'
-            if not df_conferente.empty and 'NOME' in df_conferente.columns:
-                somas_frac = {}
-                somas_grand = {}
+            # 🎯 NOVO MOTOR INTELIGENTE: Puxa Fracionado e Grandeza direto pelas novas colunas
+            col_frac = next((c for c in df_conferente.columns if 'FRACIONADO' in str(c).upper()), None)
+            col_grand = next((c for c in df_conferente.columns if 'GRANDEZA' in str(c).upper()), None)
+            
+            if col_frac and col_grand and not df_conferente.empty:
+                df_conf_t3 = df_conferente[(df_conferente['TURNO'].astype(str).str.strip().str.upper() == 'T3') & 
+                                           (df_conferente['FUNÇÃO'].astype(str).str.strip().str.upper() == 'CONFERENTE')].copy()
                 
-                # Mapeia colunas do diário para Fracionado (coluna_data) e Grandeza (coluna_data + 1)
-                cols_diario = list(df_conferente.columns)
-                for i, col in enumerate(cols_diario):
-                    c_str = str(col).strip()
-                    if any(char.isdigit() for char in c_str) and ('/' in c_str or '-' in c_str) and 'Inicio' not in c_str and 'Horas' not in c_str:
-                        col_frac = i
-                        col_grand = i + 1
+                if not df_conf_t3.empty:
+                    df_conf_t3[col_frac] = pd.to_numeric(df_conf_t3[col_frac], errors='coerce').fillna(0)
+                    df_conf_t3[col_grand] = pd.to_numeric(df_conf_t3[col_grand], errors='coerce').fillna(0)
+
+                    # 1. Campeão do Fracionado (Primeiro Lugar Leva Tudo)
+                    if df_conf_t3[col_frac].sum() > 0:
+                        maior_frac_idx = df_conf_t3[col_frac].idxmax()
+                        maior_frac_nome = df_conf_t3.loc[maior_frac_idx, 'NOME']
+                        maior_frac_val = df_conf_t3[col_frac].max()
                         
-                        for _, conf_row in df_conferente.iterrows():
-                            nome_conf = str(conf_row.get('NOME', '')).strip().upper()
-                            if not nome_conf: continue
-                            
-                            try: v_f = float(str(conf_row.iloc[col_frac]).replace('.', '').replace(',', '.'))
-                            except: v_f = 0.0
-                            
-                            try: v_g = float(str(conf_row.iloc[col_grand]).replace('.', '').replace(',', '.'))
-                            except: v_g = 0.0
-                            
-                            somas_frac[nome_conf] = somas_frac.get(nome_conf, 0.0) + v_f
-                            somas_grand[nome_conf] = somas_grand.get(nome_conf, 0.0) + v_g
+                        if maior_frac_val > 0:
+                            idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == str(maior_frac_nome).upper().strip())].index
+                            for idx_c in idx_camp:
+                                d_corr = float(df.at[idx_c, 'Dias Corridos'])
+                                d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
+                                prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
+                                
+                                df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
+                                df.at[idx_c, 'Posicao Ranking'] = 1  
 
-                # 1. Avalia o Campeão do Fracionado
-                if somas_frac:
-                    maior_frac_nome = max(somas_frac, key=somas_frac.get)
-                    if somas_frac[maior_frac_nome] > 0:
-                        idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == maior_frac_nome)].index
-                        for idx_c in idx_camp:
-                            d_corr = float(df.at[idx_c, 'Dias Corridos'])
-                            d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
-                            prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
-                            
-                            df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
-                            df.at[idx_c, 'Posicao Ranking'] = 1
-
-                # 2. Avalia o Campeão da Grandeza
-                if somas_grand:
-                    maior_grand_nome = max(somas_grand, key=somas_grand.get)
-                    if somas_grand[maior_grand_nome] > 0:
-                        idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == maior_grand_nome)].index
-                        for idx_c in idx_camp:
-                            d_corr = float(df.at[idx_c, 'Dias Corridos'])
-                            d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
-                            prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
-                            
-                            df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
-                            df.at[idx_c, 'Posicao Ranking'] = 1
+                    # 2. Campeão da Grandeza (Primeiro Lugar Leva Tudo)
+                    if df_conf_t3[col_grand].sum() > 0:
+                        maior_grand_idx = df_conf_t3[col_grand].idxmax()
+                        maior_grand_nome = df_conf_t3.loc[maior_grand_idx, 'NOME']
+                        maior_grand_val = df_conf_t3[col_grand].max()
+                        
+                        if maior_grand_val > 0:
+                            idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == str(maior_grand_nome).upper().strip())].index
+                            for idx_c in idx_camp:
+                                d_corr = float(df.at[idx_c, 'Dias Corridos'])
+                                d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
+                                prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
+                                
+                                df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
+                                df.at[idx_c, 'Posicao Ranking'] = 1  
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
             metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
@@ -491,9 +483,10 @@ for turno in ['T2', 'T3']:
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                 pos += 1
 
-# SOMA GERAL
+# FINALIZAÇÃO DA SOMA
 colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
 df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
+
 
 # =============================================================================
 # 📅 3. LÓGICA DE DATAS E BARRA LATERAL
@@ -1101,24 +1094,22 @@ try:
                                 c2.metric("⚡ Itens/Hora", v_veloc)
                                 c3.metric("🎯 JL", jl_display)
                                 st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
-                            elif "CONFERENTE" in cargo_p:
-                                try: v_frac = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
+                        else:
+                            # NOVO: Caso não tenham datas (colunas fixas de totais no diário de conferente)
+                            if "CONFERENTE" in cargo_p:
+                                c_frac = next((c for c in df_uso_diario.columns if 'FRACIONADO' in str(c).upper()), None)
+                                c_grand = next((c for c in df_uso_diario.columns if 'GRANDEZA' in str(c).upper()), None)
+                                
+                                try: v_frac = f"{float(str(pessoa_d_row.get(c_frac, 0)).replace(',', '.')):,.0f}".replace(',', '.') if c_frac else "0"
                                 except: v_frac = "0"
-                                try: v_grand = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
+                                try: v_grand = f"{float(str(pessoa_d_row.get(c_grand, 0)).replace(',', '.')):,.0f}".replace(',', '.') if c_grand else "0"
                                 except: v_grand = "0"
+                                
+                                st.markdown("#### 📅 Desempenho Acumulado")
                                 st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
                                 c1, c2 = st.columns(2)
                                 with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
                                 with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
-                            elif "OPERADOR" in cargo_p:
-                                try: v_horiz = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_horiz = "0"
-                                try: v_vert = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_vert = "0"
-                                st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
-                                c1, c2 = st.columns(2)
-                                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
-                                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
                 kpis_ativos_pessoa = []
                 for k in kpis_mapeados:
