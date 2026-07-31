@@ -332,121 +332,6 @@ def carregar_dados():
                     if v_100_base > 0:
                         df.at[idx, f"{kpi}_Valor"] = (v_100_base * fator_p) * proporcao_dias
 
-    # =============================================================================
-    # 🏆 CÁLCULO DO RANKING
-    # =============================================================================
-    df['Valor Ranking'] = 0.0
-    df['Posicao Ranking'] = 0
-    
-    for turno in ['T2', 'T3']:
-        for cargo in df['FUNÇÃO'].unique():
-            cargo_str = str(cargo).upper()
-            df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
-            if df_eq.empty: continue
-            
-            kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
-            if not kpis: continue
-            
-            if 'SEPARADOR' in cargo_str:
-                metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
-                                    next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
-                
-                if not metrica_rank: continue
-                
-                df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
-                df_eq = df_eq.sort_values(by=metrica_rank, ascending=False)
-                
-                pos = 1
-                for idx, row_eq in df_eq.iterrows():
-                    if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
-                    df.at[idx, 'Posicao Ranking'] = pos
-                    
-                    d_corr_rank = float(row_eq.get('Dias Corridos', 0))
-                    d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
-                    prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
-
-                    if turno == 'T3':
-                        if pos == 1: val_base = 250.0
-                        elif pos == 2: val_base = 200.0
-                        elif pos == 3: val_base = 100.0
-                        else: val_base = 0.0
-                    elif turno == 'T2':
-                        if pos == 1: val_base = 150.0
-                        elif pos == 2: val_base = 100.0
-                        elif pos == 3: val_base = 80.0
-                        else: val_base = 0.0
-                    else:
-                        val_base = 0.0
-                    
-                    if val_base > 0:
-                        df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
-                    pos += 1
-
-            elif 'CONFERENTE' in cargo_str and turno == 'T3':
-                metrica_frac = next((k for k in kpis if 'FRAC' in k.upper() or 'ITENS CONF' in k.upper()), None)
-                metrica_grand = next((k for k in kpis if 'GRAND' in k.upper() or 'PALETS CONF' in k.upper()), None)
-                
-                if metrica_frac:
-                    racional = df_eq[f"{metrica_frac}_Racional"].mode()[0] if not df_eq[f"{metrica_frac}_Racional"].empty else 1
-                    df_eq[metrica_frac] = pd.to_numeric(df_eq[metrica_frac], errors='coerce').fillna(0)
-                    df_frac = df_eq.sort_values(by=metrica_frac, ascending=(racional != 1))
-                    
-                    pos = 1
-                    for idx, row_eq in df_frac.iterrows():
-                        if float(row_eq.get(metrica_frac, 0)) <= 0: continue
-                        if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
-                            df.at[idx, 'Posicao Ranking'] = pos
-                        
-                        d_corr_rank = float(row_eq.get('Dias Corridos', 0))
-                        d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
-                        prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
-
-                        if pos == 1:
-                            df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
-                        pos += 1
-
-                if metrica_grand:
-                    racional = df_eq[f"{metrica_grand}_Racional"].mode()[0] if not df_eq[f"{metrica_grand}_Racional"].empty else 1
-                    df_eq[metrica_grand] = pd.to_numeric(df_eq[metrica_grand], errors='coerce').fillna(0)
-                    df_grand = df_eq.sort_values(by=metrica_grand, ascending=(racional != 1))
-                    
-                    pos = 1
-                    for idx, row_eq in df_grand.iterrows():
-                        if float(row_eq.get(metrica_grand, 0)) <= 0: continue
-                        if df.at[idx, 'Posicao Ranking'] == 0 or pos < df.at[idx, 'Posicao Ranking']:
-                            df.at[idx, 'Posicao Ranking'] = pos
-                            
-                        d_corr_rank = float(row_eq.get('Dias Corridos', 0))
-                        d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
-                        prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
-
-                        if pos == 1: 
-                            df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
-                        pos += 1
-
-            elif 'OPERADOR' in cargo_str and turno == 'T3':
-                metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
-                racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
-                df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
-                df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
-                
-                pos = 1
-                for idx, row_eq in df_eq.iterrows():
-                    if float(row_eq.get(metrica_rank, 0)) <= 0: continue
-                    df.at[idx, 'Posicao Ranking'] = pos
-                    
-                    d_corr_rank = float(row_eq.get('Dias Corridos', 0))
-                    d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
-                    prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
-
-                    if pos == 1: 
-                        df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
-                    pos += 1
-
-    # PASSO 5: A SOMA GERAL 
-    colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
-    df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
-
     return df
 
 @st.cache_data(ttl=60)
@@ -483,6 +368,132 @@ def carregar_diarios():
 
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
+
+# =============================================================================
+# 🏆 CÁLCULO DO RANKING BLINDADO (INCLUINDO CONFERENTES T3 COM DATAS DIÁRIAS)
+# =============================================================================
+df['Valor Ranking'] = 0.0
+df['Posicao Ranking'] = 0
+
+for turno in ['T2', 'T3']:
+    for cargo in df['FUNÇÃO'].unique():
+        cargo_str = str(cargo).upper()
+        df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
+        if df_eq.empty: continue
+        
+        kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
+        if not kpis: continue
+        
+        if 'SEPARADOR' in cargo_str:
+            metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
+                                next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
+            
+            if not metrica_rank: continue
+            
+            df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
+            df_eq = df_eq.sort_values(by=metrica_rank, ascending=False)
+            
+            pos = 1
+            for idx, row_eq in df_eq.iterrows():
+                if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
+                df.at[idx, 'Posicao Ranking'] = pos
+                
+                d_corr_rank = float(row_eq.get('Dias Corridos', 0))
+                d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
+                prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
+
+                if turno == 'T3':
+                    if pos == 1: val_base = 250.0
+                    elif pos == 2: val_base = 200.0
+                    elif pos == 3: val_base = 100.0
+                    else: val_base = 0.0
+                elif turno == 'T2':
+                    if pos == 1: val_base = 150.0
+                    elif pos == 2: val_base = 100.0
+                    elif pos == 3: val_base = 80.0
+                    else: val_base = 0.0
+                else:
+                    val_base = 0.0
+                
+                if val_base > 0:
+                    df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
+                pos += 1
+
+        elif 'CONFERENTE' in cargo_str and turno == 'T3':
+            # 🎯 NOVO MOTOR INTELIGENTE: Puxa direto da planilha 'Relatorio Diario Conferente'
+            if not df_conferente.empty and 'NOME' in df_conferente.columns:
+                somas_frac = {}
+                somas_grand = {}
+                
+                # Mapeia colunas do diário para Fracionado (coluna_data) e Grandeza (coluna_data + 1)
+                cols_diario = list(df_conferente.columns)
+                for i, col in enumerate(cols_diario):
+                    c_str = str(col).strip()
+                    if any(char.isdigit() for char in c_str) and ('/' in c_str or '-' in c_str) and 'Inicio' not in c_str and 'Horas' not in c_str:
+                        col_frac = i
+                        col_grand = i + 1
+                        
+                        for _, conf_row in df_conferente.iterrows():
+                            nome_conf = str(conf_row.get('NOME', '')).strip().upper()
+                            if not nome_conf: continue
+                            
+                            try: v_f = float(str(conf_row.iloc[col_frac]).replace('.', '').replace(',', '.'))
+                            except: v_f = 0.0
+                            
+                            try: v_g = float(str(conf_row.iloc[col_grand]).replace('.', '').replace(',', '.'))
+                            except: v_g = 0.0
+                            
+                            somas_frac[nome_conf] = somas_frac.get(nome_conf, 0.0) + v_f
+                            somas_grand[nome_conf] = somas_grand.get(nome_conf, 0.0) + v_g
+
+                # 1. Avalia o Campeão do Fracionado
+                if somas_frac:
+                    maior_frac_nome = max(somas_frac, key=somas_frac.get)
+                    if somas_frac[maior_frac_nome] > 0:
+                        idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == maior_frac_nome)].index
+                        for idx_c in idx_camp:
+                            d_corr = float(df.at[idx_c, 'Dias Corridos'])
+                            d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
+                            prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
+                            
+                            df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
+                            df.at[idx_c, 'Posicao Ranking'] = 1
+
+                # 2. Avalia o Campeão da Grandeza
+                if somas_grand:
+                    maior_grand_nome = max(somas_grand, key=somas_grand.get)
+                    if somas_grand[maior_grand_nome] > 0:
+                        idx_camp = df[(df['TURNO'] == 'T3') & (df['FUNÇÃO'] == 'CONFERENTE') & (df['NOME'].str.upper().str.strip() == maior_grand_nome)].index
+                        for idx_c in idx_camp:
+                            d_corr = float(df.at[idx_c, 'Dias Corridos'])
+                            d_trab = float(df.at[idx_c, 'Dias Trabalhados'])
+                            prop = min(d_trab / d_corr, 1.0) if d_corr > 0 else 1.0
+                            
+                            df.at[idx_c, 'Valor Ranking'] += (200.0 * prop)
+                            df.at[idx_c, 'Posicao Ranking'] = 1
+
+        elif 'OPERADOR' in cargo_str and turno == 'T3':
+            metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
+            racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
+            df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
+            df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
+            
+            pos = 1
+            for idx, row_eq in df_eq.iterrows():
+                if float(row_eq.get(metrica_rank, 0)) <= 0: continue
+                df.at[idx, 'Posicao Ranking'] = pos
+                
+                d_corr_rank = float(row_eq.get('Dias Corridos', 0))
+                d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
+                prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
+
+                if pos == 1: 
+                    df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
+                pos += 1
+
+# SOMA GERAL
+colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
+df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
 # =============================================================================
 # 📅 3. LÓGICA DE DATAS E BARRA LATERAL
