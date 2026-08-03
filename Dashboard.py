@@ -393,13 +393,14 @@ def carregar_diarios():
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 # =============================================================================
-# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (BLINDADO CONTRA METAS/RACIONAIS)
 # =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
+df['Ranking_Categoria'] = "" 
 
 for turno in ['T2', 'T3']:
     for cargo in df['FUNÇÃO'].unique():
@@ -407,20 +408,23 @@ for turno in ['T2', 'T3']:
         df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
         if df_eq.empty: continue
         
+        # 🎯 FILTRO OFICIAL: O Ranking só pode ler os nomes limpos de KPI
         kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
         if not kpis: continue
         
         if 'SEPARADOR' in cargo_str:
-            metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
-                                next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
+            metrica_rank = next((k for k in kpis if 'ITENS' in k.upper() and 'RAMPA' not in k.upper()), None)
             if not metrica_rank: continue
             
+            racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
-            df_eq = df_eq.sort_values(by=metrica_rank, ascending=False)
+            df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
             
             pos = 1
             for idx, row_eq in df_eq.iterrows():
-                if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
+                val_kpi = float(row_eq.get(metrica_rank, 0))
+                if val_kpi <= 0: continue 
+                
                 df.at[idx, 'Posicao Ranking'] = pos
                 
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
@@ -442,12 +446,18 @@ for turno in ['T2', 'T3']:
                 
                 if val_base > 0:
                     df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
+                df.at[idx, 'Ranking_Categoria'] = f"Volume: {val_kpi:,.0f}".replace(',', '.')
                 pos += 1
 
-        # 🎯 NOVO MOTOR DE RANKING: Lê a função já separada e rankeia todo mundo de forma independente
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            metrica_rank = next((c for c in df_eq.columns if 'ITENS' in str(c).upper() or 'CONF' in str(c).upper() or 'FRAC' in str(c).upper() or 'GRAND' in str(c).upper()), None)
+            # 🎯 NOVO MOTOR: Isola apenas os KPIs válidos (Ignora metas, racionais, etc)
+            kpis_validos = [k for k in kpis if 'ITENS' in k.upper() or 'CONF' in k.upper() or 'FRAC' in k.upper() or 'GRAND' in k.upper()]
             
+            if 'GRANDEZA' in cargo_str:
+                metrica_rank = next((k for k in kpis_validos if 'GRAND' in k.upper()), kpis_validos[0] if kpis_validos else None)
+            else:
+                metrica_rank = next((k for k in kpis_validos if 'FRAC' in k.upper()), kpis_validos[0] if kpis_validos else None)
+                
             if not metrica_rank: continue
             
             racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
@@ -456,7 +466,9 @@ for turno in ['T2', 'T3']:
             
             pos = 1
             for idx, row_eq in df_eq.iterrows():
-                if float(row_eq.get(metrica_rank, 0)) <= 0: continue
+                val_kpi = float(row_eq.get(metrica_rank, 0))
+                if val_kpi <= 0: continue
+                
                 df.at[idx, 'Posicao Ranking'] = pos
                 
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
@@ -465,17 +477,23 @@ for turno in ['T2', 'T3']:
 
                 if pos == 1: 
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
+                
+                df.at[idx, 'Ranking_Categoria'] = f"Volume: {val_kpi:,.0f}".replace(',', '.')
                 pos += 1
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
-            metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
+            metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0] if kpis else None)
+            if not metrica_rank: continue
+            
             racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
             df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
             
             pos = 1
             for idx, row_eq in df_eq.iterrows():
-                if float(row_eq.get(metrica_rank, 0)) <= 0: continue
+                val_kpi = float(row_eq.get(metrica_rank, 0))
+                if val_kpi <= 0: continue
+                
                 df.at[idx, 'Posicao Ranking'] = pos
                 
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
@@ -484,6 +502,8 @@ for turno in ['T2', 'T3']:
 
                 if pos == 1: 
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
+                
+                df.at[idx, 'Ranking_Categoria'] = f"Volume: {val_kpi:,.0f}".replace(',', '.')
                 pos += 1
 
 # FINALIZAÇÃO DA SOMA
@@ -565,11 +585,16 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             
             if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno == 'T3') or ('OPERADOR' in funcao_upper and turno == 'T3')):
                 val_rank = float(row.get('Valor Ranking', 0))
+                cat_rank = row.get('Ranking_Categoria', '')
                 
+                txt_indicador = "Ranking"
+                if 'CONFERENTE' in funcao_upper and cat_rank:
+                    txt_indicador = f"Ranking ({cat_rank})"
+                    
                 df_auditoria.append({
                     "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
                     "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
-                    "INDICADOR": "Ranking", "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-" if val_rank > 0 else "0%"
+                    "INDICADOR": txt_indicador, "REALIZADO": f"{pos}º Lugar", "VALOR GANHO (R$)": val_rank, "META ATINGIDA": "-" if val_rank > 0 else "0%"
                 })
         
         df_export = pd.DataFrame(df_auditoria)
@@ -835,6 +860,12 @@ try:
             
             if is_ranking_cargo:
                 funcao_original = row.get('FUNÇÃO', '')
+                cat_rank = str(row.get('Ranking_Categoria', '')).strip()
+                
+                texto_funcao_rank = funcao_original
+                if cat_rank:
+                    texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>"
+                    
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                 
                 if pos == 1: medalha, cor_rank = "🥇", "#ffd700" 
@@ -850,7 +881,7 @@ try:
                     texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
                 
                 txt_posicao = f"<b>{medalha} Posição:</b> {pos}º lugar de {total_eq}" if pos > 0 else f"<b>{medalha} Análise da Equipe</b> ({total_eq} pessoas)"
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {funcao_original}{texto_premio_rank}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
             # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
             cols_meta = st.columns(4) 
