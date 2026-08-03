@@ -85,14 +85,9 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "SEPARADOR G", "ITENS SEP"): 150,
         ("T3", "SEPARADOR G", "ITENS/HORA"): 150,
         
-        # Base Conferentes T3
         ("T3", "CONFERENTE", "ITENS CONF."): 350,
-        ("T3", "CONFERENTE", "ITENS CONF FRACIONADO"): 350,
         ("T3", "CONFERENTE", "DEV. %"): 150,
-        
-        # Base Conferentes Grandeza T3
         ("T3", "CONFERENTE GRANDEZA", "ITENS CONF."): 350,
-        ("T3", "CONFERENTE GRANDEZA", "ITENS CONF GRANDEZA"): 350,
         ("T3", "CONFERENTE GRANDEZA", "DEV. %"): 150,
         
         ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
@@ -393,7 +388,7 @@ def carregar_diarios():
     return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
 
 # =============================================================================
-# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING (BLINDADO CONTRA METAS/RACIONAIS)
+# 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
 df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
@@ -408,23 +403,20 @@ for turno in ['T2', 'T3']:
         df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
         if df_eq.empty: continue
         
-        # 🎯 FILTRO OFICIAL: O Ranking só pode ler os nomes limpos de KPI
         kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
         if not kpis: continue
         
         if 'SEPARADOR' in cargo_str:
-            metrica_rank = next((k for k in kpis if 'ITENS' in k.upper() and 'RAMPA' not in k.upper()), None)
+            metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
+                                next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
             if not metrica_rank: continue
             
-            racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
-            df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
+            df_eq = df_eq.sort_values(by=metrica_rank, ascending=False)
             
             pos = 1
             for idx, row_eq in df_eq.iterrows():
-                val_kpi = float(row_eq.get(metrica_rank, 0))
-                if val_kpi <= 0: continue 
-                
+                if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
                 df.at[idx, 'Posicao Ranking'] = pos
                 
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
@@ -446,21 +438,15 @@ for turno in ['T2', 'T3']:
                 
                 if val_base > 0:
                     df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
-                df.at[idx, 'Ranking_Categoria'] = f"Volume: {val_kpi:,.0f}".replace(',', '.')
                 pos += 1
 
+        # 🎯 NOVO MOTOR INTELIGENTE: Rankeia Conferente e Grandeza direto da Aux Calc
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
-            # 🎯 NOVO MOTOR: Isola apenas os KPIs válidos (Ignora metas, racionais, etc)
-            kpis_validos = [k for k in kpis if 'ITENS' in k.upper() or 'CONF' in k.upper() or 'FRAC' in k.upper() or 'GRAND' in k.upper()]
-            
-            if 'GRANDEZA' in cargo_str:
-                metrica_rank = next((k for k in kpis_validos if 'GRAND' in k.upper()), kpis_validos[0] if kpis_validos else None)
-            else:
-                metrica_rank = next((k for k in kpis_validos if 'FRAC' in k.upper()), kpis_validos[0] if kpis_validos else None)
-                
+            metrica_rank = next((k for k in kpis if 'ITENS CONF' in k.upper()), None)
             if not metrica_rank: continue
             
             racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
+            
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
             df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
             
@@ -478,22 +464,20 @@ for turno in ['T2', 'T3']:
                 if pos == 1: 
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                 
-                df.at[idx, 'Ranking_Categoria'] = f"Volume: {val_kpi:,.0f}".replace(',', '.')
+                cat_name = "Grandeza" if "GRANDEZA" in cargo_str else "Fracionado"
+                df.at[idx, 'Ranking_Categoria'] = f"{cat_name} ({val_kpi:,.0f})".replace(',', '.')
+                
                 pos += 1
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
-            metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0] if kpis else None)
-            if not metrica_rank: continue
-            
+            metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
             racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
             df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
             
             pos = 1
             for idx, row_eq in df_eq.iterrows():
-                val_kpi = float(row_eq.get(metrica_rank, 0))
-                if val_kpi <= 0: continue
-                
+                if float(row_eq.get(metrica_rank, 0)) <= 0: continue
                 df.at[idx, 'Posicao Ranking'] = pos
                 
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
@@ -502,8 +486,6 @@ for turno in ['T2', 'T3']:
 
                 if pos == 1: 
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
-                
-                df.at[idx, 'Ranking_Categoria'] = f"Volume: {val_kpi:,.0f}".replace(',', '.')
                 pos += 1
 
 # FINALIZAÇÃO DA SOMA
@@ -863,7 +845,7 @@ try:
                 cat_rank = str(row.get('Ranking_Categoria', '')).strip()
                 
                 texto_funcao_rank = funcao_original
-                if cat_rank:
+                if cat_rank and 'CONFERENTE' in cargo_p:
                     texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>"
                     
                 total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
@@ -926,12 +908,10 @@ try:
                 real_perc = perc_atingimento * 100
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
                 
-                is_itens_t2_sepg = (turno_p == 'T2' and 'SEPARADOR G' in cargo_p and 'ITENS SEP' in str(kpi).upper())
-                
                 html_tabela_premios = ""
                 v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
                 
-                if v_100_base > 0 and not is_itens_t2_sepg:
+                if v_100_base > 0:
                     v_m1 = v_100_base * 0.5
                     v_m2 = v_100_base * 1.0
                     v_m3 = v_100_base * 1.2
@@ -949,14 +929,13 @@ try:
 </div></div>"""
                 
                 html_dinheiro = ""
-                if not is_itens_t2_sepg:
-                    val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
-                    
-                    if valor_reais > 0:
-                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
-                    elif v_100_base > 0:
-                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
+                val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
+                
+                if valor_reais > 0:
+                    html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
+                elif v_100_base > 0:
+                    html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
 
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                     val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
@@ -1133,24 +1112,6 @@ try:
                                 c2.metric("⚡ Itens/Hora", v_veloc)
                                 c3.metric("🎯 JL", jl_display)
                                 st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
-                            elif "CONFERENTE" in cargo_p:
-                                try: v_frac = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_frac = "0"
-                                try: v_grand = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_grand = "0"
-                                st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
-                                c1, c2 = st.columns(2)
-                                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
-                                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
-                            elif "OPERADOR" in cargo_p:
-                                try: v_horiz = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_horiz = "0"
-                                try: v_vert = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_vert = "0"
-                                st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
-                                c1, c2 = st.columns(2)
-                                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
-                                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
                 kpis_ativos_pessoa = []
                 for k in kpis_mapeados:
