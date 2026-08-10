@@ -353,7 +353,6 @@ def carregar_diarios():
         except: pass
         try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
         except: pass
-        # 💡 MUDANÇA AQUI: Agora ele volta a ler as ocorrências diretas da aba Aux JL!
         try: dfs['aux_jl'] = processar_aba("Aux JL")
         except: pass
 
@@ -525,7 +524,8 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     def formata(v):
                         if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%".replace('.', ',')
+                        elif "LÍQ" in str(kpi).upper() or "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): 
+                            return f"{v:.1f}%".replace('.', ',')
                         else: return f"{v:,.0f}".replace(',', '.')
                     
                     df_auditoria.append({
@@ -717,7 +717,7 @@ try:
                 elif racional == 0 and realizado > meta1: abaixo_da_meta = True
 
                 if abaixo_da_meta:
-                    if "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Mínimo (Meta 1) {meta1:.2f}%")
+                    if "LÍQ" in str(kpi).upper() or "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
                     else: detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Mínimo (Meta 1) {meta1:,.0f}".replace(',', '.'))
 
             if detalhes_gargalo:
@@ -781,7 +781,6 @@ try:
                 proporcao_tela = (d_trab_p / d_corridos_p) * 100
                 st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
                 
-            # 💡 MÁGICA DA ABA "AUX JL": Coleta APENAS as ocorrências de ofensores que diminuem o dinheiro
             ocorrencias_texto = []
             if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
                 df_aux_jl['NOME_CLEAN'] = df_aux_jl['NOME'].astype(str).str.strip().str.upper()
@@ -789,7 +788,6 @@ try:
                 if not dados_aux.empty:
                     linha_aux = dados_aux.iloc[0]
                     
-                    # Retira os pontos e padroniza para o Python achar tudo certo (Ex: "F.I" vira "FI")
                     valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
                     
                     qtd_nt = valores_aux.count('NT')
@@ -799,9 +797,9 @@ try:
                     qtd_fi = valores_aux.count('FI')
                     qtd_ad = valores_aux.count('AD')
                     
-                    qtd_sa = valores_aux.count('SA') # Saída Antecipada
-                    qtd_fb = valores_aux.count('FB') # Folga Banco
-                    qtd_aa = valores_aux.count('AA') # Atividade Auxiliar
+                    qtd_sa = valores_aux.count('SA') 
+                    qtd_fb = valores_aux.count('FB') 
+                    qtd_aa = valores_aux.count('AA') 
                     
                     if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
                     if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
@@ -921,12 +919,13 @@ try:
                 elif v_100_base > 0:
                     html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
 
+                # 💡 AQUI REMOVI O ARREDONDAMENTO DA JL (.0f mudou para .1f)
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                     val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}" if meta2_val > 0 else "-"
-                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                    val_tela = f"{realizado:.2f}%"
-                    alvo_tela = f"{alvo_atual:.2f}%" if meta2_val > 0 else "-"
+                elif "LÍQ" in str(kpi).upper() or "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                    val_tela = f"{realizado:.1f}%".replace('.', ',')
+                    alvo_tela = f"{alvo_atual:.1f}%".replace('.', ',') if meta2_val > 0 else "-"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
@@ -1083,9 +1082,10 @@ try:
                                     if val_4 and val_4.lower() not in ['nan', 'none']:
                                         val_jl_num = float(val_4.replace(',', '.').replace('%', ''))
                                         if val_jl_num <= 2.0 and "%" not in val_4: val_jl_num = val_jl_num * 100
-                                        jl_display = f"{int(val_jl_num)}%" 
-                                    else: jl_display = "0%"
-                                except: jl_display = "0%"
+                                        # 💡 AQUI REMOVI O ARREDONDAMENTO DIÁRIO DA JL
+                                        jl_display = f"{val_jl_num:.1f}%".replace('.', ',') 
+                                    else: jl_display = "0,0%"
+                                except: jl_display = "0,0%"
                                 try: v_itens = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
                                 except: v_itens = "0"
                                 try: v_veloc = f"{int(round(float(val_3.replace(',', '.'))))}"
@@ -1139,7 +1139,8 @@ try:
                 for col in df_tabela_mini.columns:
                     if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
                     elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                    elif "Líq." in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%d%%")
+                    # 💡 AQUI REMOVI O ARREDONDAMENTO DA COLUNA DE JL NA TABELA
+                    elif "LÍQ" in col.upper(): config_colunas[col] = st.column_config.NumberColumn(col, format="%.1f%%")
                     else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                 
                 st.markdown("#### 📊 Matriz de Frequência")
@@ -1213,15 +1214,13 @@ try:
                         elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                         else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
+                        # 💡 AQUI REMOVI O ARREDONDAMENTO DA JL NA VISAO DE EQUIPE
                         if "Tempo" in str(kpi):
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                             t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                        elif "LÍQ" in str(kpi).upper():
-                            v_tela = f"{real_med:.1f}%"
-                            t_tela = f"{alvo_atual_med:.1f}%"
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                            v_tela = f"{real_med:.2f}%"
-                            t_tela = f"{alvo_atual_med:.2f}%"
+                        elif "LÍQ" in str(kpi).upper() or "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                            v_tela = f"{real_med:.1f}%".replace('.', ',')
+                            t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
                         else:
                             v_tela = f"{real_med:,.0f}".replace(',', '.')
                             t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
@@ -1275,7 +1274,8 @@ try:
             for col in df_tabela.columns:
                 if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
                 elif col in ['Avaria', 'Corte %', 'Dev. %']: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                elif "Líq." in col: config[col] = st.column_config.NumberColumn(col, format="%d%%")
+                # 💡 AQUI REMOVI O ARREDONDAMENTO DA COLUNA DE JL NA TABELA DA EQUIPE
+                elif "LÍQ" in col.upper(): config[col] = st.column_config.NumberColumn(col, format="%.1f%%")
                 else: config[col] = st.column_config.NumberColumn(col, format="%d")
 
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
