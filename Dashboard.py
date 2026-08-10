@@ -17,6 +17,7 @@ st.set_page_config(page_title="Dashboard Expedição | TAF", page_icon="📊", l
 
 st.markdown("""
     <style>
+    /* Esconde as marcas e menus padrões do Streamlit para parecer um sistema web próprio */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -308,7 +309,7 @@ def carregar_dados():
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'absent': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
         
@@ -352,18 +353,19 @@ def carregar_diarios():
         except: pass
         try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
         except: pass
-        try: dfs['absent'] = processar_aba("Aux Absent")
+        # 💡 MUDANÇA AQUI: Agora ele volta a ler as ocorrências diretas da aba Aux JL!
+        try: dfs['aux_jl'] = processar_aba("Aux JL")
         except: pass
 
     except Exception:
         pass
-    return dfs['sep'], dfs['op'], dfs['conf'], dfs['absent']
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl']
 
 # =============================================================================
 # 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
-df_diario, df_operador, df_conferente, df_absent = carregar_diarios()
+df_diario, df_operador, df_conferente, df_aux_jl = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
@@ -779,14 +781,15 @@ try:
                 proporcao_tela = (d_trab_p / d_corridos_p) * 100
                 st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
                 
-            # 💡 AQUI ENTRA A MÁGICA DA AUX ABSENT REVISADA (Apenas os Detratores do Valor)
+            # 💡 MÁGICA DA ABA "AUX JL": Coleta APENAS as ocorrências de ofensores que diminuem o dinheiro
             ocorrencias_texto = []
-            if not df_absent.empty and 'NOME' in df_absent.columns:
-                df_absent['NOME_CLEAN'] = df_absent['NOME'].astype(str).str.strip().str.upper()
-                dados_aux = df_absent[df_absent['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
+            if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
+                df_aux_jl['NOME_CLEAN'] = df_aux_jl['NOME'].astype(str).str.strip().str.upper()
+                dados_aux = df_aux_jl[df_aux_jl['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
                 if not dados_aux.empty:
                     linha_aux = dados_aux.iloc[0]
-                    # Retira os pontos (F.I vira FI) para o Python achar de qualquer jeito que o RH digitar
+                    
+                    # Retira os pontos e padroniza para o Python achar tudo certo (Ex: "F.I" vira "FI")
                     valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
                     
                     qtd_nt = valores_aux.count('NT')
@@ -796,12 +799,19 @@ try:
                     qtd_fi = valores_aux.count('FI')
                     qtd_ad = valores_aux.count('AD')
                     
+                    qtd_sa = valores_aux.count('SA') # Saída Antecipada
+                    qtd_fb = valores_aux.count('FB') # Folga Banco
+                    qtd_aa = valores_aux.count('AA') # Atividade Auxiliar
+                    
                     if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
                     if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
                     if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
                     if qtd_at > 0: ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT)")
                     if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (FI)")
                     if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (AD)")
+                    if qtd_sa > 0: ocorrencias_texto.append(f"⏱️ <b>{qtd_sa}</b> Saída(s) Antecipada(s) (SA)")
+                    if qtd_fb > 0: ocorrencias_texto.append(f"🏦 <b>{qtd_fb}</b> Folga(s) Banco (FB)")
+                    if qtd_aa > 0: ocorrencias_texto.append(f"🛠️ <b>{qtd_aa}</b> dia(s) em Atividade Auxiliar (AA)")
             
             if ocorrencias_texto:
                 st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Impacto no Pagamento (Redução de Dias Trabalhados):</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
