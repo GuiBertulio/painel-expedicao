@@ -11,6 +11,53 @@ import calendar
 import re
 
 # =============================================================================
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (O CSS do site)
+# =============================================================================
+st.set_page_config(page_title="Dashboard Expedição | TAF", page_icon="📊", layout="wide")
+
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    .block-container { padding-top: 2rem !important; }
+    
+    .card-meta { 
+        background-color: var(--background-color); 
+        padding: 15px;                             
+        border-radius: 10px;                        
+        border-left: 8px solid #ccc;                
+        margin-bottom: 15px;                        
+    }
+    
+    .card-detrator { 
+        background-color: rgba(239, 68, 68, 0.1);  
+        border: 1px solid #ef4444;                 
+        padding: 20px; 
+        border-radius: 12px; 
+        margin-bottom: 15px; 
+    }
+    
+    .texto-card-principal { 
+        font-size: 42px;                           
+        color: var(--text-color); 
+        font-weight: 900;                          
+        line-height: 1.1; 
+    }
+    
+    .texto-card-titulo { 
+        font-size: 22px;                           
+        color: var(--text-color); 
+        font-weight: 900; 
+        margin-bottom: 5px; 
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
+
+# =============================================================================
 # 🧰 FUNÇÕES DE APOIO E LIMPEZA DE DADOS
 # =============================================================================
 def extrair_inteiro(val):
@@ -22,15 +69,12 @@ def extrair_inteiro(val):
     v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
     
-    # Remove qualquer caractere que não seja número, ponto ou vírgula
     v_str = re.sub(r'[^\d.,]', '', v_str)
     if not v_str: return 0
     
-    # Se houver vírgula (centavos), corta e pega só a parte inteira
     if ',' in v_str:
         v_str = v_str.split(',')[0]
         
-    # Remove os pontos de milhar
     v_str = v_str.replace('.', '')
     
     try: return int(v_str)
@@ -115,7 +159,7 @@ def obter_valor_100(turno, funcao, kpi):
     return mapa.get((t, f, k), 0)
 
 # =============================================================================
-# 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS (Seu Banco de Dados Interno)
+# 🔐 CONFIGURAÇÃO DE USUÁRIOS E SENHAS
 # =============================================================================
 USUARIOS = {
     "diegoc": {"senha": "ger#26", "perfil": "Gerente", "turno_acesso": "Todos"},
@@ -136,50 +180,7 @@ USUARIOS = {
 }
 
 # =============================================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (O CSS do site)
-# =============================================================================
-st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
-
-st.markdown("""
-    <style>
-    .block-container { padding-top: 2rem !important; }
-    
-    .card-meta { 
-        background-color: var(--background-color); 
-        padding: 15px;                             
-        border-radius: 10px;                       
-        border-left: 8px solid #ccc;               
-        margin-bottom: 15px;                       
-    }
-    
-    .card-detrator { 
-        background-color: rgba(239, 68, 68, 0.1);  
-        border: 1px solid #ef4444;                 
-        padding: 20px; 
-        border-radius: 12px; 
-        margin-bottom: 15px; 
-    }
-    
-    .texto-card-principal { 
-        font-size: 42px;                           
-        color: var(--text-color); 
-        font-weight: 900;                          
-        line-height: 1.1; 
-    }
-    
-    .texto-card-titulo { 
-        font-size: 22px;                           
-        color: var(--text-color); 
-        font-weight: 900; 
-        margin-bottom: 5px; 
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
-
-# =============================================================================
-# 🚪 TELA DE LOGIN (BARREIRA DE SEGURANÇA)
+# 🚪 TELA DE LOGIN
 # =============================================================================
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
@@ -206,7 +207,7 @@ if not st.session_state["logado"]:
     st.stop() 
 
 # =============================================================================
-# 🔗 CONEXÃO COM GOOGLE SHEETS E CARREGAMENTO
+# 🔗 CONEXÃO COM GOOGLE SHEETS
 # =============================================================================
 def conectar_planilha():
     cred_dict = dict(st.secrets["gcp_service_account"]) 
@@ -303,62 +304,11 @@ def carregar_dados():
                 desc = erros_e * 10
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
 
-    # =============================================================================
-    # 💰 OVERRIDE FINANCEIRO: MOTOR DE CÁLCULO PROPORCIONAL (FÉRIAS/ATESTADOS)
-    # =============================================================================
-    kpis_para_recalcular = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c] 
-    
-    for kpi in kpis_para_recalcular:
-        if f"{kpi}_Valor" in df.columns:
-            df[f"{kpi}_Valor"] = df[f"{kpi}_Valor"].astype(float)
-    
-    for idx, row in df.iterrows():
-        turno_e = str(row.get('TURNO', '')).upper()   
-        funcao_e = str(row.get('FUNÇÃO', '')).upper() 
-
-        dias_corridos = float(row.get('Dias Corridos', 0))
-        dias_trabalhados = float(row.get('Dias Trabalhados', 0))
-        
-        proporcao_dias = 1.0 
-        if dias_corridos > 0:
-            proporcao_dias = dias_trabalhados / dias_corridos
-            if proporcao_dias > 1.0: 
-                proporcao_dias = 1.0
-
-        for kpi in kpis_para_recalcular:
-            if f"{kpi}_Valor" in df.columns:
-                df.at[idx, f"{kpi}_Valor"] = 0.0
-
-                meta2 = row.get(f"{kpi}_Meta2", 0) 
-                try: meta2_val = float(meta2)
-                except: meta2_val = 0
-
-                if meta2_val > 0:
-                    realizado = float(row.get(kpi, 0)) 
-                    meta1 = float(row.get(f"{kpi}_Meta1", meta2_val)) 
-                    meta3 = float(row.get(f"{kpi}_Meta3", meta2_val)) 
-                    racional = float(row.get(f"{kpi}_Racional", 1))   
-
-                    if racional == 1: 
-                        if realizado >= meta3: fator_p = 1.2       
-                        elif realizado >= meta2_val: fator_p = 1.0 
-                        elif realizado >= meta1: fator_p = 0.5     
-                        else: fator_p = 0.0                        
-                    else: 
-                        if realizado <= meta3: fator_p = 1.2
-                        elif realizado <= meta2_val: fator_p = 1.0
-                        elif realizado <= meta1: fator_p = 0.5
-                        else: fator_p = 0.0
-
-                    v_100_base = obter_valor_100(turno_e, funcao_e, kpi) 
-                    if v_100_base > 0:
-                        df.at[idx, f"{kpi}_Valor"] = (v_100_base * fator_p) * proporcao_dias
-
     return df
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'absent': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
         
@@ -374,7 +324,6 @@ def carregar_diarios():
             
             headers = aba_bruta[header_idx]
             
-            # 🎯 CARIMBO DE DATA: Puxa a data da linha mesclada e carimba na coluna para o selectbox funcionar perfeitamente
             if header_idx > 0:
                 linha_datas = []
                 for row_i in range(header_idx):
@@ -403,18 +352,18 @@ def carregar_diarios():
         except: pass
         try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
         except: pass
-        try: dfs['aux'] = processar_aba("Aux JL")
+        try: dfs['absent'] = processar_aba("Aux Absent")
         except: pass
 
     except Exception:
         pass
-    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux']
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['absent']
 
 # =============================================================================
 # 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
-df_diario, df_operador, df_conferente, df_aux = carregar_diarios()
+df_diario, df_operador, df_conferente, df_absent = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
@@ -463,7 +412,6 @@ for turno in ['T2', 'T3']:
                     df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
                 pos += 1
 
-        # 🎯 NOVO MOTOR INTELIGENTE: Rankeia Conferente e Grandeza direto da Aux Calc
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
             metrica_rank = next((k for k in kpis if 'ITENS CONF' in k.upper()), None)
             if not metrica_rank: continue
@@ -511,7 +459,6 @@ for turno in ['T2', 'T3']:
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                 pos += 1
 
-# FINALIZAÇÃO DA SOMA
 colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
 df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
@@ -832,28 +779,32 @@ try:
                 proporcao_tela = (d_trab_p / d_corridos_p) * 100
                 st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
                 
-                ocorrencias_texto = []
-                if not df_aux.empty and 'NOME' in df_aux.columns:
-                    df_aux['NOME_CLEAN'] = df_aux['NOME'].astype(str).str.strip().str.upper()
-                    dados_aux = df_aux[df_aux['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
-                    if not dados_aux.empty:
-                        linha_aux = dados_aux.iloc[0]
-                        valores_aux = [str(v).strip().upper() for v in linha_aux.values]
-                        
-                        qtd_fe = valores_aux.count('FE')
-                        qtd_fi = valores_aux.count('F.I')
-                        qtd_ad = valores_aux.count('A.D')
-                        qtd_at = valores_aux.count('AT')
-                        
-                        if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (F.I)")
-                        if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (A.D)")
-                        if qtd_at > 0:
-                            alerta_atestado = " <span style='color:#ef4444; font-weight:bold;'>(Penalidade de -0.5 aplicada por passar de 3 dias)</span>" if qtd_at > 3 else ""
-                            ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT){alerta_atestado}")
-                        if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
-                
-                if ocorrencias_texto:
-                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Detalhamento de Ocorrências no Mês:</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
+            # 💡 AQUI ENTRA A MÁGICA DA AUX ABSENT REVISADA (Apenas os Detratores do Valor)
+            ocorrencias_texto = []
+            if not df_absent.empty and 'NOME' in df_absent.columns:
+                df_absent['NOME_CLEAN'] = df_absent['NOME'].astype(str).str.strip().str.upper()
+                dados_aux = df_absent[df_absent['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
+                if not dados_aux.empty:
+                    linha_aux = dados_aux.iloc[0]
+                    # Retira os pontos (F.I vira FI) para o Python achar de qualquer jeito que o RH digitar
+                    valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
+                    
+                    qtd_nt = valores_aux.count('NT')
+                    qtd_fc = valores_aux.count('FC')
+                    qtd_fe = valores_aux.count('FE')
+                    qtd_at = valores_aux.count('AT')
+                    qtd_fi = valores_aux.count('FI')
+                    qtd_ad = valores_aux.count('AD')
+                    
+                    if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
+                    if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
+                    if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
+                    if qtd_at > 0: ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT)")
+                    if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (FI)")
+                    if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (AD)")
+            
+            if ocorrencias_texto:
+                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Impacto no Pagamento (Redução de Dias Trabalhados):</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
             
             erros_qtd = int(row.get('ERROS', 0))
             penalidade_txt = str(row.get('Penalidade_Texto', ''))
@@ -1073,6 +1024,7 @@ try:
                     df_pessoa_diario = df_uso_diario[df_uso_diario['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
                     
                     if not df_pessoa_diario.empty:
+                        pessoa_d_row = df_pessoa_diario.iloc[0]
                         cols_datas_reais = []
                         opces_datas = []
                         datas_vistas = set()
