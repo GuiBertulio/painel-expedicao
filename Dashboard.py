@@ -524,8 +524,8 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     def formata(v):
                         if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
-                        elif "LÍQ" in str(kpi).upper() or "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): 
-                            return f"{v:.1f}%".replace('.', ',')
+                        elif "LÍQ" in str(kpi).upper(): return f"{v:.1f}%".replace('.', ',')
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%".replace('.', ',')
                         else: return f"{v:,.0f}".replace(',', '.')
                     
                     df_auditoria.append({
@@ -717,7 +717,8 @@ try:
                 elif racional == 0 and realizado > meta1: abaixo_da_meta = True
 
                 if abaixo_da_meta:
-                    if "LÍQ" in str(kpi).upper() or "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
+                    if "LÍQ" in str(kpi).upper(): detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
+                    elif "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Mínimo (Meta 1) {meta1:.2f}%")
                     else: detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Mínimo (Meta 1) {meta1:,.0f}".replace(',', '.'))
 
             if detalhes_gargalo:
@@ -919,13 +920,15 @@ try:
                 elif v_100_base > 0:
                     html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
 
-                # 💡 AQUI REMOVI O ARREDONDAMENTO DA JL (.0f mudou para .1f)
                 if "Tempo" in str(kpi) or ":" in str(realizado):
                     val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                     alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}" if meta2_val > 0 else "-"
-                elif "LÍQ" in str(kpi).upper() or "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                elif "LÍQ" in str(kpi).upper():
                     val_tela = f"{realizado:.1f}%".replace('.', ',')
                     alvo_tela = f"{alvo_atual:.1f}%".replace('.', ',') if meta2_val > 0 else "-"
+                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                    val_tela = f"{realizado:.2f}%".replace('.', ',')
+                    alvo_tela = f"{alvo_atual:.2f}%".replace('.', ',') if meta2_val > 0 else "-"
                 else:
                     val_tela = f"{realizado:,.0f}".replace(',', '.')
                     alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
@@ -1082,7 +1085,6 @@ try:
                                     if val_4 and val_4.lower() not in ['nan', 'none']:
                                         val_jl_num = float(val_4.replace(',', '.').replace('%', ''))
                                         if val_jl_num <= 2.0 and "%" not in val_4: val_jl_num = val_jl_num * 100
-                                        # 💡 AQUI REMOVI O ARREDONDAMENTO DIÁRIO DA JL
                                         jl_display = f"{val_jl_num:.1f}%".replace('.', ',') 
                                     else: jl_display = "0,0%"
                                 except: jl_display = "0,0%"
@@ -1138,9 +1140,8 @@ try:
                 config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
                 for col in df_tabela_mini.columns:
                     if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
-                    elif col in ['Avaria', 'Corte %', 'Dev. %']: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                    # 💡 AQUI REMOVI O ARREDONDAMENTO DA COLUNA DE JL NA TABELA
                     elif "LÍQ" in col.upper(): config_colunas[col] = st.column_config.NumberColumn(col, format="%.1f%%")
+                    elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                     else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
                 
                 st.markdown("#### 📊 Matriz de Frequência")
@@ -1214,13 +1215,15 @@ try:
                         elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
                         else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
-                        # 💡 AQUI REMOVI O ARREDONDAMENTO DA JL NA VISAO DE EQUIPE
                         if "Tempo" in str(kpi):
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                             t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                        elif "LÍQ" in str(kpi).upper() or "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                        elif "LÍQ" in str(kpi).upper():
                             v_tela = f"{real_med:.1f}%".replace('.', ',')
                             t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                            v_tela = f"{real_med:.2f}%".replace('.', ',')
+                            t_tela = f"{alvo_atual_med:.2f}%".replace('.', ',')
                         else:
                             v_tela = f"{real_med:,.0f}".replace(',', '.')
                             t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
@@ -1273,9 +1276,8 @@ try:
             config = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
             for col in df_tabela.columns:
                 if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
-                elif col in ['Avaria', 'Corte %', 'Dev. %']: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                # 💡 AQUI REMOVI O ARREDONDAMENTO DA COLUNA DE JL NA TABELA DA EQUIPE
                 elif "LÍQ" in col.upper(): config[col] = st.column_config.NumberColumn(col, format="%.1f%%")
+                elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
                 else: config[col] = st.column_config.NumberColumn(col, format="%d")
 
             st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
