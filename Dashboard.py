@@ -299,7 +299,7 @@ def carregar_dados():
         
         if erros_e > 0:
             if 'SEPARADOR' in cargo_e:
-                desc = erros_e * 50
+                desc = erros_e * 20
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Itens"
             elif 'OPERADOR' in cargo_e:
                 desc = erros_e * 10
