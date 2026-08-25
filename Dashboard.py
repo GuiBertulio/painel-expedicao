@@ -660,34 +660,48 @@ if st.session_state["perfil"] == "Gerente":
                 
             potencial_max_list.append(potencial)
             
-            # --- 2. Busca do Motivo (Se zerou o prêmio) ---
+            # --- 2. Busca do Motivo (Sempre olha a Aux JL se zerou o prêmio) ---
             motivo = "-"
             if valor_final <= 0:
-                if d_trab <= 0:
-                    motivo = "Dias Trabalhados Zerados"
-                else:
-                    achou_motivo = False
-                    if not df_aux_jl_clean.empty:
-                        dados_aux = df_aux_jl_clean[df_aux_jl_clean['NOME_CLEAN'] == nome_str]
-                        if not dados_aux.empty:
-                            linha_aux = dados_aux.iloc[0]
-                            valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
-                            
-                            qtd_fi = valores_aux.count('FI')
-                            qtd_ad = valores_aux.count('AD')
-                            
-                            if qtd_fi > 0 and qtd_ad > 0:
-                                motivo = "Falta Injustif. + Advertência"
-                                achou_motivo = True
-                            elif qtd_fi > 0:
-                                motivo = "Falta Injustificada"
-                                achou_motivo = True
-                            elif qtd_ad > 0:
-                                motivo = "Advertência"
-                                achou_motivo = True
-                    
-                    if not achou_motivo:
+                achou_motivo = False
+                if not df_aux_jl_clean.empty:
+                    dados_aux = df_aux_jl_clean[df_aux_jl_clean['NOME_CLEAN'] == nome_str]
+                    if not dados_aux.empty:
+                        linha_aux = dados_aux.iloc[0]
+                        valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
+                        
+                        qtd_fi = valores_aux.count('FI')
+                        qtd_ad = valores_aux.count('AD')
+                        qtd_fe = valores_aux.count('FE')
+                        qtd_at = valores_aux.count('AT')
+                        qtd_nt = valores_aux.count('NT')
+                        
+                        if qtd_fi > 0 and qtd_ad > 0:
+                            motivo = "Falta Injustif. + Advertência"
+                            achou_motivo = True
+                        elif qtd_fi > 0:
+                            motivo = "Falta Injustificada"
+                            achou_motivo = True
+                        elif qtd_ad > 0:
+                            motivo = "Advertência"
+                            achou_motivo = True
+                        elif qtd_fe > 0:
+                            motivo = "Férias"
+                            achou_motivo = True
+                        elif qtd_at > 0:
+                            motivo = "Atestado"
+                            achou_motivo = True
+                        elif qtd_nt > 0 and d_trab <= 0:
+                            motivo = "Não Trabalhado (NT)"
+                            achou_motivo = True
+                
+                # Se procurou na aba e não achou nenhuma dessas marcações:
+                if not achou_motivo:
+                    if d_trab <= 0:
+                        motivo = "Dias Trabalhados Zerados"
+                    else:
                         motivo = "Não atingiu a meta mínima"
+                        
             motivos_list.append(motivo)
 
         # Montando o novo DF do RH
