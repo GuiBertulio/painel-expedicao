@@ -624,19 +624,96 @@ if st.session_state["perfil"] == "Gerente":
     st.sidebar.markdown("### 🗃️ Fechamento RH")
 
     if not df_filtrado.empty:
+        # 💡 MÁGICA NOVA: Lendo a base do Aux JL e mapeando o Potencial Máximo
+        potencial_max_list = []
+        motivos_list = []
+        
+        if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
+            df_aux_jl_clean = df_aux_jl.copy()
+            df_aux_jl_clean['NOME_CLEAN'] = df_aux_jl_clean['NOME'].astype(str).str.strip().str.upper()
+        else:
+            df_aux_jl_clean = pd.DataFrame()
+
+        kpis_mapeados_rh = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
+
+        for idx, row in df_filtrado.iterrows():
+            nome_str = str(row['NOME']).strip().upper()
+            valor_final = row['Valor Final']
+            d_trab = int(row.get('Dias Trabalhados', 0))
+            
+            # --- 1. Cálculo do Potencial Máximo (Meta Máx + Ranking Máx) ---
+            potencial = 0
+            for k in kpis_mapeados_rh:
+                if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0:
+                    potencial += obter_valor_100(row['TURNO'], row['FUNÇÃO'], k) * 1.2
+            
+            cargo_str = str(row['FUNÇÃO']).upper()
+            turno_str = str(row['TURNO']).upper()
+            
+            if 'SEPARADOR' in cargo_str:
+                if turno_str == 'T3': potencial += 250
+                elif turno_str == 'T2': potencial += 150
+            elif 'CONFERENTE' in cargo_str and turno_str == 'T3':
+                potencial += 200
+            elif 'OPERADOR' in cargo_str and turno_str == 'T3':
+                potencial += 200
+                
+            potencial_max_list.append(potencial)
+            
+            # --- 2. Busca do Motivo (Se zerou o prêmio) ---
+            motivo = "-"
+            if valor_final <= 0:
+                if d_trab <= 0:
+                    motivo = "Dias Trabalhados Zerados"
+                else:
+                    achou_motivo = False
+                    if not df_aux_jl_clean.empty:
+                        dados_aux = df_aux_jl_clean[df_aux_jl_clean['NOME_CLEAN'] == nome_str]
+                        if not dados_aux.empty:
+                            linha_aux = dados_aux.iloc[0]
+                            valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
+                            
+                            qtd_fi = valores_aux.count('FI')
+                            qtd_ad = valores_aux.count('AD')
+                            
+                            if qtd_fi > 0 and qtd_ad > 0:
+                                motivo = "Falta Injustif. + Advertência"
+                                achou_motivo = True
+                            elif qtd_fi > 0:
+                                motivo = "Falta Injustificada"
+                                achou_motivo = True
+                            elif qtd_ad > 0:
+                                motivo = "Advertência"
+                                achou_motivo = True
+                    
+                    if not achou_motivo:
+                        motivo = "Não atingiu a meta mínima"
+            motivos_list.append(motivo)
+
+        # Montando o novo DF do RH
         df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
+        df_rh['Potencial Máx. (R$)'] = potencial_max_list
+        df_rh['Motivo'] = motivos_list
+        
         df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
         df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
+        df_rh['Potencial Máx. (R$)'] = df_rh['Potencial Máx. (R$)'].round(2)
+        
+        # Reorganiza a ordem para exibir bonito na tela
+        df_rh = df_rh[['Matrícula', 'Nome', 'FUNÇÃO', 'TURNO', 'Potencial Máx. (R$)', 'Premiação (R$)', 'Motivo']]
         df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome']).sort_values(by='Nome')
         
         config_rh = {
             "Matrícula": st.column_config.TextColumn("Matrícula"), 
-            "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f")
+            "Potencial Máx. (R$)": st.column_config.NumberColumn("Potencial Máx. (R$)", format="R$ %.2f"),
+            "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f"),
+            "Motivo": st.column_config.TextColumn("Motivo (Se Zerado)")
         }
         st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
         
         df_download = df_rh.copy()
         df_download['Premiação (R$)'] = df_download['Premiação (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+        df_download['Potencial Máx. (R$)'] = df_download['Potencial Máx. (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
         csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
         
         try:
