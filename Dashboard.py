@@ -20,7 +20,8 @@ st.markdown("""
     /* Esconde as marcas e menus padrões do Streamlit para parecer um sistema web próprio */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    
+    /* Repare que a linha "header {visibility: hidden;}" foi removida para a setinha voltar a aparecer no celular! */
     
     .block-container { padding-top: 2rem !important; }
     
