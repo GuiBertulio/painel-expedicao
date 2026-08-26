@@ -209,7 +209,7 @@ if not st.session_state["logado"]:
     st.stop() 
 
 # =============================================================================
-# 🔗 CONEXÃO COM GOOGLE SHEETS
+# 🔗 CONEXÃO COM GOOGLE SHEETS E CARREGAMENTO
 # =============================================================================
 def conectar_planilha():
     cred_dict = dict(st.secrets["gcp_service_account"]) 
@@ -220,7 +220,10 @@ def conectar_planilha():
 @st.cache_data(ttl=60) 
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=0&single=true&output=csv"
-    df = pd.read_csv(link_csv)
+    
+    # 💡 CORREÇÃO: Ensina o Pandas a ler o padrão Brasileiro direto na fonte
+    df = pd.read_csv(link_csv, decimal=',', thousands='.')
+    
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
     
@@ -288,9 +291,13 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split(".").str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors="coerce").dt.total_seconds().fillna(0)
             else:
-                s = df[col].astype(str).str.replace("R$", "", regex=False).str.replace("%", "", regex=False).str.strip()
-                s_numerico = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-                df[col] = pd.to_numeric(s_numerico, errors="coerce").fillna(0)
+                # 💡 CORREÇÃO: Blindagem para não mexer no valor se ele já for número
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    df[col] = df[col].fillna(0)
+                else:
+                    s = df[col].astype(str).str.replace("R$", "", regex=False).str.replace("%", "", regex=False).str.strip()
+                    s_numerico = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+                    df[col] = pd.to_numeric(s_numerico, errors="coerce").fillna(0)
                 
     df['Penalidade_Texto'] = ""
 
@@ -302,6 +309,9 @@ def carregar_dados():
             if 'SEPARADOR' in cargo_e:
                 desc = erros_e * 20
                 df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Itens"
+            elif 'OPERADOR' in cargo_e:
+                desc = erros_e * 10
+                df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
 
     return df
 
@@ -621,7 +631,6 @@ if st.session_state["perfil"] == "Gerente":
     st.sidebar.markdown("### 🗃️ Fechamento RH")
 
     if not df_filtrado.empty:
-        # 💡 MÁGICA NOVA: Lendo a base do Aux JL e mapeando o Potencial Máximo
         potencial_max_list = []
         motivos_list = []
         
@@ -638,7 +647,6 @@ if st.session_state["perfil"] == "Gerente":
             valor_final = row['Valor Final']
             d_trab = int(row.get('Dias Trabalhados', 0))
             
-            # --- 1. Cálculo do Potencial Máximo (Meta Máx + Ranking Máx) ---
             potencial = 0
             for k in kpis_mapeados_rh:
                 if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0:
@@ -657,7 +665,6 @@ if st.session_state["perfil"] == "Gerente":
                 
             potencial_max_list.append(potencial)
             
-            # --- 2. Busca do Motivo (Sempre olha a Aux JL se zerou o prêmio) ---
             motivo = "-"
             if valor_final <= 0:
                 achou_motivo = False
@@ -692,7 +699,6 @@ if st.session_state["perfil"] == "Gerente":
                             motivo = "Não Trabalhado (NT)"
                             achou_motivo = True
                 
-                # Se procurou na aba e não achou nenhuma dessas marcações:
                 if not achou_motivo:
                     if d_trab <= 0:
                         motivo = "Dias Trabalhados Zerados"
@@ -701,7 +707,6 @@ if st.session_state["perfil"] == "Gerente":
                         
             motivos_list.append(motivo)
 
-        # Montando o novo DF do RH
         df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
         df_rh['Potencial Máx. (R$)'] = potencial_max_list
         df_rh['Motivo'] = motivos_list
@@ -710,7 +715,6 @@ if st.session_state["perfil"] == "Gerente":
         df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
         df_rh['Potencial Máx. (R$)'] = df_rh['Potencial Máx. (R$)'].round(2)
         
-        # Reorganiza a ordem para exibir bonito na tela
         df_rh = df_rh[['Matrícula', 'Nome', 'FUNÇÃO', 'TURNO', 'Potencial Máx. (R$)', 'Premiação (R$)', 'Motivo']]
         df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome']).sort_values(by='Nome')
         
@@ -1000,6 +1004,7 @@ try:
 <div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div>
 </div></div>"""
                 
+                # 💡 CORREÇÃO DA MULTIPLICAÇÃO: Para evitar que o float do Python bugue na exibição se houver vírgula
                 html_dinheiro = ""
                 val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
@@ -1169,6 +1174,7 @@ try:
                             val_3 = val_3 if val_3 and val_3.lower() not in ['nan', 'none'] else "0"
                             val_4 = val_4 if val_4 and val_4.lower() not in ['nan', 'none'] else "0"
                             
+                            # 💡 CORREÇÃO DA MULTIPLICAÇÃO: Para evitar que o float do Python bugue na exibição na tela diária
                             if "SEPARADOR" in cargo_p:
                                 try:
                                     if val_4 and val_4.lower() not in ['nan', 'none']:
@@ -1177,12 +1183,12 @@ try:
                                         jl_display = f"{val_jl_num:.1f}%".replace('.', ',') 
                                     else: jl_display = "0,0%"
                                 except: jl_display = "0,0%"
-                                try: v_itens = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
+                                try: v_itens = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                 except: v_itens = "0"
-                                try: v_veloc = f"{int(round(float(val_3.replace(',', '.'))))}"
+                                try: v_veloc = f"{int(round(float(val_3.replace('.', '').replace(',', '.'))))}"
                                 except: v_veloc = "0"
                                 try:
-                                    horas_dec = float(val_2.replace(',', '.'))
+                                    horas_dec = float(val_2.replace('.', '').replace(',', '.'))
                                     h = int(horas_dec)
                                     m = int((horas_dec - h) * 60)
                                     s = int((((horas_dec - h) * 60) - m) * 60)
@@ -1194,18 +1200,18 @@ try:
                                 c3.metric("🎯 JL", jl_display)
                                 st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
                             elif "CONFERENTE" in cargo_p:
-                                try: v_frac = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
+                                try: v_frac = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                 except: v_frac = "0"
-                                try: v_grand = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
+                                try: v_grand = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                 except: v_grand = "0"
                                 st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
                                 c1, c2 = st.columns(2)
                                 with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
                                 with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
                             elif "OPERADOR" in cargo_p:
-                                try: v_horiz = f"{float(val_1.replace(',', '.')):,.0f}".replace(',', '.')
+                                try: v_horiz = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                 except: v_horiz = "0"
-                                try: v_vert = f"{float(val_2.replace(',', '.')):,.0f}".replace(',', '.')
+                                try: v_vert = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                 except: v_vert = "0"
                                 st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
                                 c1, c2 = st.columns(2)
