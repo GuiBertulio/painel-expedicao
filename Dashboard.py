@@ -95,7 +95,6 @@ def obter_valor_100(turno, funcao, kpi):
         ("T1", "DESCARGA", "CARGA BAT."): 125,
         ("T1", "DESCARGA", "CESTA"): 60,
         ("T1", "DEVOLUÇÃO", "DEV. %"): 150,
-        ("T1", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T1", "LÍDER", "AVARIA"): 150,
         ("T1", "LÍDER", "MÉD. PALETS CONF."): 300,
         ("T1", "LÍDER", "TEMPO MÉDIO"): 300,
@@ -103,12 +102,12 @@ def obter_valor_100(turno, funcao, kpi):
         ("T1", "OPERADOR", "TEMPO MÉDIO"): 100,
         ("T1", "PUXA", "PALETS PX."): 200,
         ("T1", "PUXA", "TEMPO MÉDIO"): 100,
+        ("T1", "AVARIA", "AVARIA"): 150,
         
         ("T2", "AVARIA", "AVARIA"): 150,
         ("T2", "CONFERENTE", "ITENS CONF."): 300,
         ("T2", "CONFERENTE", "DEV. %"): 150,
         ("T2", "DEVOLUÇÃO", "DEV. %"): 150,
-        ("T2", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T2", "INVENTARIO", "CORTE %"): 200,
         ("T2", "LÍDER", "AVARIA"): 150,
         ("T2", "LÍDER", "RESSUP. EQ."): 240,
@@ -139,7 +138,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "CONFERENTE GRANDEZA", "DEV. %"): 150,
         
         ("T3", "DEVOLUÇÃO", "DEV. %"): 150,
-        ("T3", "DEVOLUÇÃO", "AVARIA"): 150,
+        ("T3", "AVARIA", "AVARIA"): 150,
         
         ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
         ("T3", "OPERADOR", "AVARIA"): 100,
@@ -510,7 +509,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             d_trab = float(row.get('Dias Trabalhados', 0))
             d_meta = float(row.get('Dias Meta', 0))
             
-            funcao_upper = str(funcao).upper()
+            funcao_upper = str(funcao).strip().upper()
             
             for kpi in kpis_gerais:
                 meta2 = float(row.get(f"{kpi}_Meta2", 0))
@@ -521,10 +520,13 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     meta3 = float(row.get(f"{kpi}_Meta3", 0))
                     racional = float(row.get(f"{kpi}_Racional", 1))
                     
-                    is_meta_unica = ('DEVOLUÇÃO' in funcao_upper and str(kpi).upper() in ['DEV. %', 'AVARIA'])
+                    kpi_upper = str(kpi).strip().upper()
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
+                    is_meta_unica_ava = ('AVARIA' in funcao_upper and kpi_upper == 'AVARIA')
+                    is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
                     
                     if is_meta_unica:
-                        alvo_atual = 0.48 if str(kpi).upper() == 'DEV. %' else 0.07
+                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                         faixa_meta = "100%" if real <= alvo_atual else "0%"
                         if meta1 <= 0: meta1 = alvo_atual
                         if meta3 <= 0: meta3 = alvo_atual
@@ -658,16 +660,19 @@ if st.session_state["perfil"] == "Gerente":
             nome_str = str(row['NOME']).strip().upper()
             valor_final = row['Valor Final']
             d_trab = int(row.get('Dias Trabalhados', 0))
-            cargo_str = str(row['FUNÇÃO']).upper()
-            turno_str = str(row['TURNO']).upper()
+            cargo_str = str(row['FUNÇÃO']).strip().upper()
+            turno_str = str(row['TURNO']).strip().upper()
             
-            # --- 1. Cálculo do Potencial Máximo (Meta Máx + Ranking Máx) ---
             potencial = 0
             for k in kpis_mapeados_rh:
                 if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0:
                     v_base = obter_valor_100(row['TURNO'], row['FUNÇÃO'], k)
                     
-                    if 'DEVOLUÇÃO' in cargo_str and k.upper() in ['DEV. %', 'AVARIA']:
+                    kpi_upper = str(k).strip().upper()
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %')
+                    is_meta_unica_ava = ('AVARIA' in cargo_str and kpi_upper == 'AVARIA')
+                    
+                    if is_meta_unica_dev or is_meta_unica_ava:
                         potencial += v_base # Meta Única não tem fator multiplicador 1.2
                     else:
                         potencial += v_base * 1.2
@@ -682,7 +687,6 @@ if st.session_state["perfil"] == "Gerente":
                 
             potencial_max_list.append(potencial)
             
-            # --- 2. Busca do Motivo (Sempre olha a Aux JL se zerou o prêmio) ---
             motivo = "-"
             if valor_final <= 0:
                 achou_motivo = False
@@ -813,7 +817,7 @@ try:
 
         for idx, row in df_filtrado.iterrows():
             detalhes_gargalo = []
-            cargo_c = str(row['FUNÇÃO']).upper()
+            cargo_c = str(row['FUNÇÃO']).strip().upper()
             
             for kpi in kpis_mapeados:
                 meta2 = row.get(f"{kpi}_Meta2", 0)
@@ -825,11 +829,15 @@ try:
 
                 if racional == 1 and realizado == 0: continue 
                 
-                is_meta_unica = ('DEVOLUÇÃO' in cargo_c and kpi.upper() in ['DEV. %', 'AVARIA'])
+                kpi_upper = str(kpi).strip().upper()
+                is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
+                is_meta_unica_ava = ('AVARIA' in cargo_c and kpi_upper == 'AVARIA')
+                is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+                
                 abaixo_da_meta = False
                 
                 if is_meta_unica:
-                    alvo_atual = 0.48 if kpi.upper() == 'DEV. %' else 0.07
+                    alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                     if realizado > alvo_atual:
                         abaixo_da_meta = True
                         meta1 = alvo_atual # Truque para o texto exibir certo
@@ -896,8 +904,8 @@ try:
             
             pos = int(row.get('Posicao Ranking', 0))
             val_rank = row.get('Valor Ranking', 0)
-            cargo_p = str(row.get('FUNÇÃO', '')).upper()
-            turno_p = str(row.get('TURNO', '')).upper()
+            cargo_p = str(row.get('FUNÇÃO', '')).strip().upper()
+            turno_p = str(row.get('TURNO', '')).strip().upper()
             
             if d_trab_p < d_corridos_p and d_corridos_p > 0:
                 proporcao_tela = (d_trab_p / d_corridos_p) * 100
@@ -986,11 +994,13 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
-                # 💡 MÁGICA NOVA: Regra de Meta Única para a função de DEVOLUÇÃO
-                is_meta_unica = ('DEVOLUÇÃO' in cargo_p and kpi.upper() in ['DEV. %', 'AVARIA'])
+                kpi_upper = str(kpi).strip().upper()
+                is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
+                is_meta_unica_ava = ('AVARIA' in cargo_p and kpi_upper == 'AVARIA')
+                is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
 
                 if is_meta_unica:
-                    alvo_atual = 0.48 if kpi.upper() == 'DEV. %' else 0.07
+                    alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                     nome_alvo = "Meta Única"
                     
                     if realizado <= alvo_atual:
@@ -1339,11 +1349,15 @@ try:
                         real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
                         soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
 
-                        # 💡 MÁGICA NOVA: Regra de Meta Única para a função de DEVOLUÇÃO (Visão Equipe)
-                        is_meta_unica = ('DEVOLUÇÃO' in cargo_atual.upper() and kpi.upper() in ['DEV. %', 'AVARIA'])
+                        cargo_atual_upper = str(cargo_atual).strip().upper()
+                        kpi_upper = str(kpi).strip().upper()
+                        
+                        is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
+                        is_meta_unica_ava = ('AVARIA' in cargo_atual_upper and kpi_upper == 'AVARIA')
+                        is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
 
                         if is_meta_unica:
-                            alvo_atual_med = 0.48 if kpi.upper() == 'DEV. %' else 0.07
+                            alvo_atual_med = 0.48 if is_meta_unica_dev else 0.07
                             nome_alvo = "Meta Única"
                             
                             if real_med <= alvo_atual_med:
@@ -1394,6 +1408,7 @@ try:
                         val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                         html_dinheiro_med = ""
                         
+                        # 🛡️ BLINDAGEM DO SEPARADOR G T2 PARA EQUIPE (Não exibir dinheiro)
                         turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
                         is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
                         
