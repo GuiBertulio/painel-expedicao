@@ -95,6 +95,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T1", "DESCARGA", "CARGA BAT."): 125,
         ("T1", "DESCARGA", "CESTA"): 60,
         ("T1", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T1", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T1", "LÍDER", "AVARIA"): 150,
         ("T1", "LÍDER", "MÉD. PALETS CONF."): 300,
         ("T1", "LÍDER", "TEMPO MÉDIO"): 300,
@@ -107,6 +108,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "CONFERENTE", "ITENS CONF."): 300,
         ("T2", "CONFERENTE", "DEV. %"): 150,
         ("T2", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T2", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T2", "INVENTARIO", "CORTE %"): 200,
         ("T2", "LÍDER", "AVARIA"): 150,
         ("T2", "LÍDER", "RESSUP. EQ."): 240,
@@ -135,6 +137,9 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "CONFERENTE", "DEV. %"): 150,
         ("T3", "CONFERENTE GRANDEZA", "ITENS CONF."): 350,
         ("T3", "CONFERENTE GRANDEZA", "DEV. %"): 150,
+        
+        ("T3", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T3", "DEVOLUÇÃO", "AVARIA"): 150,
         
         ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
         ("T3", "OPERADOR", "AVARIA"): 100,
@@ -221,7 +226,6 @@ def conectar_planilha():
 def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=0&single=true&output=csv"
     
-    # 💡 CORREÇÃO: Ensina o Pandas a ler o padrão Brasileiro direto na fonte
     df = pd.read_csv(link_csv, decimal=',', thousands='.')
     
     df.columns = df.columns.astype(str).str.strip()
@@ -291,7 +295,6 @@ def carregar_dados():
                 texto_limpo = df[col].astype(str).str.split(".").str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors="coerce").dt.total_seconds().fillna(0)
             else:
-                # 💡 CORREÇÃO: Blindagem para não mexer no valor se ele já for número
                 if pd.api.types.is_numeric_dtype(df[col]):
                     df[col] = df[col].fillna(0)
                 else:
@@ -507,6 +510,8 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             d_trab = float(row.get('Dias Trabalhados', 0))
             d_meta = float(row.get('Dias Meta', 0))
             
+            funcao_upper = str(funcao).upper()
+            
             for kpi in kpis_gerais:
                 meta2 = float(row.get(f"{kpi}_Meta2", 0))
                 if meta2 > 0:
@@ -516,19 +521,27 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     meta3 = float(row.get(f"{kpi}_Meta3", 0))
                     racional = float(row.get(f"{kpi}_Racional", 1))
                     
-                    if meta1 <= 0: meta1 = meta2
-                    if meta3 <= 0: meta3 = meta2
+                    is_meta_unica = ('DEVOLUÇÃO' in funcao_upper and str(kpi).upper() in ['DEV. %', 'AVARIA'])
                     
-                    if racional == 1: 
-                        if real < meta1: faixa_meta = "0%"
-                        elif real < meta2: faixa_meta = "50%"
-                        elif real < meta3: faixa_meta = "100%"
-                        else: faixa_meta = "120%"
-                    else: 
-                        if real > meta1: faixa_meta = "0%"
-                        elif real > meta2: faixa_meta = "50%"
-                        elif real > meta3: faixa_meta = "100%"
-                        else: faixa_meta = "120%"
+                    if is_meta_unica:
+                        alvo_atual = 0.48 if str(kpi).upper() == 'DEV. %' else 0.07
+                        faixa_meta = "100%" if real <= alvo_atual else "0%"
+                        if meta1 <= 0: meta1 = alvo_atual
+                        if meta3 <= 0: meta3 = alvo_atual
+                    else:
+                        if meta1 <= 0: meta1 = meta2
+                        if meta3 <= 0: meta3 = meta2
+                        
+                        if racional == 1: 
+                            if real < meta1: faixa_meta = "0%"
+                            elif real < meta2: faixa_meta = "50%"
+                            elif real < meta3: faixa_meta = "100%"
+                            else: faixa_meta = "120%"
+                        else: 
+                            if real > meta1: faixa_meta = "0%"
+                            elif real > meta2: faixa_meta = "50%"
+                            elif real > meta3: faixa_meta = "100%"
+                            else: faixa_meta = "120%"
                     
                     def formata(v):
                         if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
@@ -543,7 +556,6 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     })
             
             pos = int(row.get('Posicao Ranking', 0))
-            funcao_upper = str(funcao).upper()
             
             if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno == 'T3') or ('OPERADOR' in funcao_upper and turno == 'T3')):
                 val_rank = float(row.get('Valor Ranking', 0))
@@ -646,14 +658,19 @@ if st.session_state["perfil"] == "Gerente":
             nome_str = str(row['NOME']).strip().upper()
             valor_final = row['Valor Final']
             d_trab = int(row.get('Dias Trabalhados', 0))
+            cargo_str = str(row['FUNÇÃO']).upper()
+            turno_str = str(row['TURNO']).upper()
             
+            # --- 1. Cálculo do Potencial Máximo (Meta Máx + Ranking Máx) ---
             potencial = 0
             for k in kpis_mapeados_rh:
                 if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0:
-                    potencial += obter_valor_100(row['TURNO'], row['FUNÇÃO'], k) * 1.2
-            
-            cargo_str = str(row['FUNÇÃO']).upper()
-            turno_str = str(row['TURNO']).upper()
+                    v_base = obter_valor_100(row['TURNO'], row['FUNÇÃO'], k)
+                    
+                    if 'DEVOLUÇÃO' in cargo_str and k.upper() in ['DEV. %', 'AVARIA']:
+                        potencial += v_base # Meta Única não tem fator multiplicador 1.2
+                    else:
+                        potencial += v_base * 1.2
             
             if 'SEPARADOR' in cargo_str:
                 if turno_str == 'T3': potencial += 250
@@ -665,6 +682,7 @@ if st.session_state["perfil"] == "Gerente":
                 
             potencial_max_list.append(potencial)
             
+            # --- 2. Busca do Motivo (Sempre olha a Aux JL se zerou o prêmio) ---
             motivo = "-"
             if valor_final <= 0:
                 achou_motivo = False
@@ -795,6 +813,8 @@ try:
 
         for idx, row in df_filtrado.iterrows():
             detalhes_gargalo = []
+            cargo_c = str(row['FUNÇÃO']).upper()
+            
             for kpi in kpis_mapeados:
                 meta2 = row.get(f"{kpi}_Meta2", 0)
                 if pd.isna(meta2) or str(meta2).strip() in ['0', '0.0', '-', '']: continue
@@ -804,10 +824,18 @@ try:
                 meta1 = float(row.get(f"{kpi}_Meta1", meta2))
 
                 if racional == 1 and realizado == 0: continue 
-
+                
+                is_meta_unica = ('DEVOLUÇÃO' in cargo_c and kpi.upper() in ['DEV. %', 'AVARIA'])
                 abaixo_da_meta = False
-                if racional == 1 and realizado < meta1: abaixo_da_meta = True
-                elif racional == 0 and realizado > meta1: abaixo_da_meta = True
+                
+                if is_meta_unica:
+                    alvo_atual = 0.48 if kpi.upper() == 'DEV. %' else 0.07
+                    if realizado > alvo_atual:
+                        abaixo_da_meta = True
+                        meta1 = alvo_atual # Truque para o texto exibir certo
+                else:
+                    if racional == 1 and realizado < meta1: abaixo_da_meta = True
+                    elif racional == 0 and realizado > meta1: abaixo_da_meta = True
 
                 if abaixo_da_meta:
                     if "LÍQ" in str(kpi).upper(): detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
@@ -816,7 +844,7 @@ try:
 
             if detalhes_gargalo:
                 houve_detrator = True
-                nome_c, cod_c, cargo_c, turno_c = row['NOME'], row['CÓD.'], row['FUNÇÃO'], row['TURNO']
+                nome_c, cod_c, turno_c = row['NOME'], row['CÓD.'], row['TURNO']
                 d_trab = int(row.get('Dias Trabalhados', 0))
 
                 with st.container():
@@ -958,45 +986,67 @@ try:
                 racional = float(row.get(f"{kpi}_Racional", 1))
                 valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
-                if racional == 1: 
-                    perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
-                    if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                    elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                    elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                    else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                # 💡 MÁGICA NOVA: Regra de Meta Única para a função de DEVOLUÇÃO
+                is_meta_unica = ('DEVOLUÇÃO' in cargo_p and kpi.upper() in ['DEV. %', 'AVARIA'])
+
+                if is_meta_unica:
+                    alvo_atual = 0.48 if kpi.upper() == 'DEV. %' else 0.07
+                    nome_alvo = "Meta Única"
                     
-                    if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                    elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                    elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                else: 
-                    perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
-                    if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                    elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                    elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                    else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                    if realizado <= alvo_atual:
+                        cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                        real_perc = 100.0
+                    else:
+                        cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                        real_perc = (alvo_atual / realizado * 100) if realizado > 0 else 0
+                else:
+                    if racional == 1: 
+                        perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
+                        if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                        elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
+                        elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                        else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                        
+                        if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
+                        elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                        elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                    else: 
+                        perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
+                        if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                        elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
+                        elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                        else: alvo_atual, nome_alvo = meta3, "Meta Máx"
 
-                    if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                    elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                    elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                    else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                        if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
+                        elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                        elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
 
-                real_perc = perc_atingimento * 100
+                    real_perc = perc_atingimento * 100
+                
                 grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
                 
                 html_tabela_premios = ""
                 v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
                 
                 if v_100_base > 0:
-                    v_m1 = v_100_base * 0.5
-                    v_m2 = v_100_base * 1.0
-                    v_m3 = v_100_base * 1.2
-                    
-                    v_m1_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    
-                    html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
+                    if is_meta_unica:
+                        html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
+<div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
+<div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
+<div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ 150,00</span></div>
+</div></div>"""
+                    else:
+                        v_m1 = v_100_base * 0.5
+                        v_m2 = v_100_base * 1.0
+                        v_m3 = v_100_base * 1.2
+                        
+                        v_m1_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        
+                        html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
 <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
 <div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
 <div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div>
@@ -1004,7 +1054,6 @@ try:
 <div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div>
 </div></div>"""
                 
-                # 💡 CORREÇÃO DA MULTIPLICAÇÃO: Para evitar que o float do Python bugue na exibição se houver vírgula
                 html_dinheiro = ""
                 val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
@@ -1174,7 +1223,6 @@ try:
                             val_3 = val_3 if val_3 and val_3.lower() not in ['nan', 'none'] else "0"
                             val_4 = val_4 if val_4 and val_4.lower() not in ['nan', 'none'] else "0"
                             
-                            # 💡 CORREÇÃO DA MULTIPLICAÇÃO: Para evitar que o float do Python bugue na exibição na tela diária
                             if "SEPARADOR" in cargo_p:
                                 try:
                                     if val_4 and val_4.lower() not in ['nan', 'none']:
@@ -1291,24 +1339,38 @@ try:
                         real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
                         soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
 
-                        if racional_temp == 1: 
-                            if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                            elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                            elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                            else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                            perc = (real_med / meta2_med) if meta2_med > 0 else 0
-                        else: 
-                            if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                            elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                            elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                            else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                            perc = (meta2_med / real_med) if real_med > 0 else 1.2
+                        # 💡 MÁGICA NOVA: Regra de Meta Única para a função de DEVOLUÇÃO (Visão Equipe)
+                        is_meta_unica = ('DEVOLUÇÃO' in cargo_atual.upper() and kpi.upper() in ['DEV. %', 'AVARIA'])
 
-                        real_perc = perc * 100
-                        if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                        elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                        elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                        if is_meta_unica:
+                            alvo_atual_med = 0.48 if kpi.upper() == 'DEV. %' else 0.07
+                            nome_alvo = "Meta Única"
+                            
+                            if real_med <= alvo_atual_med:
+                                cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                                real_perc = 100.0
+                            else:
+                                cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                                real_perc = (alvo_atual_med / real_med * 100) if real_med > 0 else 0
+                        else:
+                            if racional_temp == 1: 
+                                if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                                elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                                elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                                else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                                perc = (real_med / meta2_med) if meta2_med > 0 else 0
+                            else: 
+                                if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                                elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                                elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                                else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                                perc = (meta2_med / real_med) if real_med > 0 else 1.2
+
+                            real_perc = perc * 100
+                            if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
+                            elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                            elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
                         
                         if "Tempo" in str(kpi):
                             v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
@@ -1332,7 +1394,6 @@ try:
                         val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                         html_dinheiro_med = ""
                         
-                        # 🛡️ BLINDAGEM DO SEPARADOR G T2 PARA EQUIPE (Não exibir dinheiro)
                         turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
                         is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
                         
