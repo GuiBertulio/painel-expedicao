@@ -95,6 +95,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T1", "DESCARGA", "CARGA BAT."): 125,
         ("T1", "DESCARGA", "CESTA"): 60,
         ("T1", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T1", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T1", "LÍDER", "AVARIA"): 150,
         ("T1", "LÍDER", "MÉD. PALETS CONF."): 300,
         ("T1", "LÍDER", "TEMPO MÉDIO"): 300,
@@ -108,6 +109,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "CONFERENTE", "ITENS CONF."): 300,
         ("T2", "CONFERENTE", "DEV. %"): 150,
         ("T2", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T2", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T2", "INVENTARIO", "CORTE %"): 200,
         ("T2", "LÍDER", "AVARIA"): 150,
         ("T2", "LÍDER", "RESSUP. EQ."): 240,
@@ -117,10 +119,10 @@ def obter_valor_100(turno, funcao, kpi):
         ("T2", "MESA", "DEV. %"): 220,
         ("T2", "MESA", "ITENS/HORA EQ."): 220,
         ("T2", "OPERADOR", "MOV. HORIZONTAL"): 450,
-        ("T2", "OPERADOR", "AVARIA"): 100,
+        ("T2", "OPERADOR", "AVARIA"): 150,
         ("T2", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
         ("T2", "CARREGAMENTO BOX", "DEV. %"): 150,
-        ("T2", "CARREGAMENTO BOX", "AVARIA"): 100,
+        ("T2", "CARREGAMENTO BOX", "AVARIA"): 150,
         ("T2", "SEPARADOR G", "RESSUP. AP."): 200,
         ("T2", "SEPARADOR G", "ITENS/HORA"): 200,
         ("T2", "SEPARADOR G", "ITENS SEP"): 0, 
@@ -138,16 +140,17 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "CONFERENTE GRANDEZA", "DEV. %"): 150,
         
         ("T3", "DEVOLUÇÃO", "DEV. %"): 150,
+        ("T3", "DEVOLUÇÃO", "AVARIA"): 150,
         ("T3", "AVARIA", "AVARIA"): 150,
         
         ("T3", "OPERADOR", "MOV. HORIZONTAL"): 450,
-        ("T3", "OPERADOR", "AVARIA"): 100,
+        ("T3", "OPERADOR", "AVARIA"): 150,
         ("T3", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
         ("T3", "CARREGAMENTO BOX", "DEV. %"): 150,
-        ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,
+        ("T3", "CARREGAMENTO BOX", "AVARIA"): 150,
         ("T3", "RAMPEIRO", "ITENS RAMPA"): 150, 
         ("T3", "RAMPEIRO", "DEV. %"): 150,      
-        ("T3", "RAMPEIRO", "AVARIA"): 100,      
+        ("T3", "RAMPEIRO", "AVARIA"): 150,      
         ("T3", "MESA", "JORNADA LÍQ. EQ."): 220,
         ("T3", "MESA", "DEV. %"): 220,
         ("T3", "MESA", "CORTE %"): 220,
@@ -159,7 +162,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "LÍDER", "DEV. %"): 240,
         ("T3", "LÍDER", "ITENS/HORA EQ."): 240,
         ("T3", "RESPONSAVEL SALA BATERIAS", "ITENS/HORA"): 150,
-        ("T3", "RESPONSAVEL SALA BATERIAS", "AVARIA"): 100,
+        ("T3", "RESPONSAVEL SALA BATERIAS", "AVARIA"): 150,
         ("T3", "RESPONSAVEL SALA BATERIAS", "CHECKLIST MANUTENÇÃO"): 250,
     }
     return mapa.get((t, f, k), 0)
@@ -522,7 +525,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = ('AVARIA' in funcao_upper and kpi_upper == 'AVARIA')
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
                     is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
                     
                     if is_meta_unica:
@@ -670,7 +673,7 @@ if st.session_state["perfil"] == "Gerente":
                     
                     kpi_upper = str(k).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = ('AVARIA' in cargo_str and kpi_upper == 'AVARIA')
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
                     
                     if is_meta_unica_dev or is_meta_unica_ava:
                         potencial += v_base # Meta Única não tem fator multiplicador 1.2
@@ -831,7 +834,7 @@ try:
                 
                 kpi_upper = str(kpi).strip().upper()
                 is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
-                is_meta_unica_ava = ('AVARIA' in cargo_c and kpi_upper == 'AVARIA')
+                is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
                 is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
                 
                 abaixo_da_meta = False
@@ -996,7 +999,7 @@ try:
 
                 kpi_upper = str(kpi).strip().upper()
                 is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
-                is_meta_unica_ava = ('AVARIA' in cargo_p and kpi_upper == 'AVARIA')
+                is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
                 is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
 
                 if is_meta_unica:
@@ -1042,10 +1045,11 @@ try:
                 
                 if v_100_base > 0:
                     if is_meta_unica:
+                        v_unica_str = f"{v_100_base:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
 <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
 <div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
-<div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ 150,00</span></div>
+<div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div>
 </div></div>"""
                     else:
                         v_m1 = v_100_base * 0.5
@@ -1353,7 +1357,7 @@ try:
                         kpi_upper = str(kpi).strip().upper()
                         
                         is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
-                        is_meta_unica_ava = ('AVARIA' in cargo_atual_upper and kpi_upper == 'AVARIA')
+                        is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
                         is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
 
                         if is_meta_unica:
