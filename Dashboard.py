@@ -240,9 +240,9 @@ def carregar_dados():
             try:
                 df.rename(columns={
                     colunas[i]: f"{nome_kpi}_Racional",
-                    colunas[i+1]: f"{nome_kpi}_Meta1",
-                    colunas[i+2]: f"{nome_kpi}_Meta2", 
-                    colunas[i+3]: f"{nome_kpi}_Meta3",
+                    colunas[i+1]: f"{nome_kpi}_1",
+                    colunas[i+2]: f"{nome_kpi}_2", 
+                    colunas[i+3]: f"{nome_kpi}_3",
                     colunas[i+4]: f"{nome_kpi}_Valor"
                 }, inplace=True)
             except IndexError:
@@ -263,7 +263,7 @@ def carregar_dados():
 
     c_corr = achar_coluna("DIAS CORRIDOS", ["DIAS CORR"])
     c_trab = achar_coluna("DIAS TRABALHADOS", ["DIAS TRAB"])
-    c_meta = achar_coluna("DIAS META", ["DIAS META"])
+    c_ = achar_coluna("DIAS ", ["DIAS "])
     c_ini = achar_coluna("DATA INICIO", ["DATA INIC", "DATA INÍC"])
     c_fim = achar_coluna("DATA FIM", ["DATA FIM", "DATA APURA"])
     c_erro = achar_coluna("ERROS", ["ERRO"])
@@ -274,8 +274,8 @@ def carregar_dados():
     if c_trab: df['Dias Trabalhados'] = pd.to_numeric(df[c_trab], errors='coerce').fillna(0).astype(int)
     else: df['Dias Trabalhados'] = 0
         
-    if c_meta: df['Dias Meta'] = pd.to_numeric(df[c_meta], errors='coerce').fillna(0).astype(int)
-    else: df['Dias Meta'] = 0
+    if c_: df['Dias '] = pd.to_numeric(df[c_], errors='coerce').fillna(0).astype(int)
+    else: df['Dias '] = 0
         
     if c_ini: df['Data Inicio'] = df[c_ini]
     if c_fim: df['Data Fim'] = df[c_fim]
@@ -293,7 +293,7 @@ def carregar_dados():
     
     for col in df.columns:
         if col not in colunas_texto:
-            if col in ["Tempo Médio", "Tempo Médio_Meta1", "Tempo Médio_Meta2", "Tempo Médio_Meta3"]:
+            if col in ["Tempo Médio", "Tempo Médio_1", "Tempo Médio_2", "Tempo Médio_3"]:
                 texto_limpo = df[col].astype(str).str.split(".").str[0].str.strip()
                 df[col] = pd.to_timedelta(texto_limpo, errors="coerce").dt.total_seconds().fillna(0)
             else:
@@ -510,21 +510,21 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             
             d_corridos = float(row.get('Dias Corridos', 0))
             d_trab = float(row.get('Dias Trabalhados', 0))
-            d_meta = float(row.get('Dias Meta', 0))
+            d_ = float(row.get('Dias ', 0))
             
             funcao_upper = str(funcao).strip().upper()
             
             for kpi in kpis_gerais:
-                meta2 = float(row.get(f"{kpi}_Meta2", 0))
-                if meta2 > 0:
+                2 = float(row.get(f"{kpi}_2", 0))
+                if 2 > 0:
                     real = float(row.get(kpi, 0))
                     valor = float(row.get(f"{kpi}_Valor", 0))
-                    meta1 = float(row.get(f"{kpi}_Meta1", 0))
-                    meta3 = float(row.get(f"{kpi}_Meta3", 0))
+                    1 = float(row.get(f"{kpi}_1", 0))
+                    3 = float(row.get(f"{kpi}_3", 0))
                     racional = float(row.get(f"{kpi}_Racional", 1))
                     
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
+                    is__unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
                     is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
                     is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
                     
