@@ -229,7 +229,6 @@ def carregar_dados():
     link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=0&single=true&output=csv"
     
     df = pd.read_csv(link_csv, decimal=',', thousands='.')
-    
     df.columns = df.columns.astype(str).str.strip()
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
     
@@ -339,8 +338,9 @@ def carregar_diarios():
             
             headers = aba_bruta[header_idx]
             
-            # Bloqueio de carimbo para as abas que já possuem datas nos títulos
-            if header_idx > 0 and nome_aba not in ["Acompanhamento JL", "Ponto T3"]:
+            # 💡 MUDANÇA AQUI: Removi a exclusão da aba Acompanhamento JL da regra de datas. 
+            # Agora ele junta as datas do cabeçalho normalmente.
+            if header_idx > 0 and nome_aba not in ["Ponto T3"]:
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
@@ -355,8 +355,13 @@ def carregar_diarios():
                         if match:
                             current_date = match.group(0)
                         
-                        if current_date and current_date not in headers[col_idx]:
-                            headers[col_idx] = f"{current_date} - {headers[col_idx]}"
+                        # 💡 MUDANÇA AQUI: Se a coluna de baixo for vazia (Como na Acomp JL), o nome da coluna vira só a data!
+                        if current_date and current_date not in str(headers[col_idx]):
+                            val_head = str(headers[col_idx]).strip()
+                            if val_head == "" or val_head == "None" or val_head == "nan":
+                                headers[col_idx] = current_date
+                            else:
+                                headers[col_idx] = f"{current_date} - {val_head}"
 
             df_aba = pd.DataFrame(aba_bruta[header_idx+1:], columns=headers)
             df_aba.columns = [str(c).strip() for c in df_aba.columns]
@@ -368,10 +373,8 @@ def carregar_diarios():
         except: pass
         try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
         except: pass
-        try: dfs['aux_jl'] = processar_aba("Aux JL")
+        try: dfs['aux_jl'] = processar_aba("Aux Absent")
         except: pass
-        
-        # Novas Abas Adicionadas
         try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
         except: pass
         try: dfs['ponto_t3'] = processar_aba("Ponto T3")
@@ -508,7 +511,6 @@ if st.sidebar.button("Sair / Logout", use_container_width=True):
 st.sidebar.markdown("---")
 st.sidebar.title("🔍 Filtros do Painel")
 
-# O novo botão gerencial fica logo no topo da barra
 ver_jornada = st.sidebar.checkbox("⏱️ Acompanhamento Jornada Líquida (T3)", help="Exibe a matriz de horas diárias dos separadores")
 
 if st.session_state.get("usuario") in ["guilherme", "nilo"]:
@@ -541,7 +543,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
                     is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
                     
                     if is_meta_unica:
@@ -683,10 +685,10 @@ if st.session_state["perfil"] == "Gerente":
                     
                     kpi_upper = str(k).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
                     
                     if is_meta_unica_dev or is_meta_unica_ava:
-                        potencial += v_base # Meta Única não tem fator multiplicador 1.2
+                        potencial += v_base 
                     else:
                         potencial += v_base * 1.2
             
@@ -802,37 +804,50 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 SE O BOTÃO DE ACOMPANHAMENTO JL FOR CLICADO, ESCONDE O DASHBOARD NORMAL E MOSTRA A MATRIZ
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
     if df_acomp_jl.empty or df_ponto_t3.empty:
         st.warning("⚠️ As abas 'Acompanhamento JL' e/ou 'Ponto T3' não foram encontradas na sua planilha do Google.")
     else:
-        # Puxa todas as colunas que parecem datas (Ex: 26/08/2026) da aba Acompanhamento JL
-        colunas_data = [c for c in df_acomp_jl.columns if re.match(r'\d{2}/\d{2}/\d{4}', str(c))]
+        # Puxa todas as colunas que parecem datas 
+        colunas_data = [c for c in df_acomp_jl.columns if re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c))]
         
         if not colunas_data:
             st.warning("⚠️ Nenhuma data foi encontrada na aba 'Acompanhamento JL'.")
         else:
             hoje = datetime.date.today()
-            ontem_str = (hoje - datetime.timedelta(days=1)).strftime("%d/%m/%Y")
+            ontem = hoje - datetime.timedelta(days=1)
+            ontem_str_1 = ontem.strftime("%d/%m/%Y")
+            ontem_str_2 = ontem.strftime("%Y-%m-%d")
             
-            # Tenta deixar a data de ontem como padrão
             default_idx = len(colunas_data) - 1
-            if ontem_str in colunas_data:
-                default_idx = colunas_data.index(ontem_str)
+            for i, c in enumerate(colunas_data):
+                if ontem_str_1 in c or ontem_str_2 in c:
+                    default_idx = i
+                    break
             
-            # Cria a caixa de seleção de data no topo
             col_sel, col_vazia = st.columns([1, 3])
             data_selecionada = col_sel.selectbox("📅 Escolha o dia para analisar:", colunas_data, index=default_idx)
             
-            # Filtra apenas quem é do T3 e tem o cargo "Separador"
             df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
             df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
             
-            # Filtra a aba Ponto T3 pela data selecionada
-            df_ponto_filt = df_ponto_t3[df_ponto_t3['DATAAPURACAO'].astype(str).str.strip() == data_selecionada]
+            # Formata a data para a busca no Ponto T3 ser infalível
+            def formatar_data_br(d_str):
+                d_str = str(d_str).strip()
+                match = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
+                if match:
+                    return f"{match.group(3)}/{match.group(2)}/{match.group(1)}"
+                return d_str
+            
+            data_busca_limpa = formatar_data_br(data_selecionada)
+            
+            if 'DATA_BUSCA' not in df_ponto_t3.columns:
+                df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].apply(formatar_data_br)
+                
+            df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_busca_limpa]
             
             dados_tabela_jl = []
             soma_jl_flt = 0.0
@@ -843,7 +858,6 @@ if ver_jornada:
                 nome = str(row.get('NOME', '')).strip()
                 funcao = str(row.get('FUNÇÃO', '')).strip()
                 
-                # Pega a JL do dia na aba Acompanhamento JL
                 val_jl_raw = str(row.get(data_selecionada, '0')).strip()
                 try:
                     val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
@@ -859,7 +873,6 @@ if ver_jornada:
                     jl_str = val_jl_raw if val_jl_raw else "0,0%"
                     jl_float = 0.0
                     
-                # Pega as Horas Trabalhadas da aba Ponto T3 cruzando a Matrícula
                 horas_str = "—"
                 if not df_ponto_filt.empty and 'CONTRATO' in df_ponto_filt.columns:
                     match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO'].astype(str).str.strip() == cod]
@@ -877,7 +890,6 @@ if ver_jornada:
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                # Ordena para os mais produtivos ficarem no topo
                 df_display = df_display.sort_values(by="_jl_float", ascending=False).drop(columns=["_jl_float"])
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
@@ -887,7 +899,7 @@ if ver_jornada:
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
-# 💡 SE O BOTÃO ESTIVER DESMARCADO, MOSTRA O DASHBOARD NORMAL
+# 💡 DASHBOARD NORMAL
 else:
     try:
         kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
@@ -933,7 +945,7 @@ else:
                     
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
                     is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
                     
                     abaixo_da_meta = False
@@ -942,7 +954,7 @@ else:
                         alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                         if realizado > alvo_atual:
                             abaixo_da_meta = True
-                            meta1 = alvo_atual # Truque para o texto exibir certo
+                            meta1 = alvo_atual 
                     else:
                         if racional == 1 and realizado < meta1: abaixo_da_meta = True
                         elif racional == 0 and realizado > meta1: abaixo_da_meta = True
@@ -1098,7 +1110,7 @@ else:
 
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
                     is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
 
                     if is_meta_unica:
@@ -1456,7 +1468,7 @@ else:
                             kpi_upper = str(kpi).strip().upper()
                             
                             is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
-                            is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                            is_meta_unica_ava = (kpi_upper == 'AVARIA') 
                             is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
 
                             if is_meta_unica:
