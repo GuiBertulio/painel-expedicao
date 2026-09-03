@@ -150,7 +150,7 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "CARREGAMENTO BOX", "AVARIA"): 100,
         ("T3", "RAMPEIRO", "ITENS RAMPA"): 150, 
         ("T3", "RAMPEIRO", "DEV. %"): 150,      
-        ("T3", "RAMPEIRO", "AVARIA"): 150,      
+        ("T3", "RAMPEIRO", "AVARIA"): 100,      
         ("T3", "MESA", "JORNADA LÍQ. EQ."): 220,
         ("T3", "MESA", "DEV. %"): 220,
         ("T3", "MESA", "CORTE %"): 220,
@@ -175,7 +175,7 @@ USUARIOS = {
     "suelin": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "rh": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
-    "gabriel": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": ["T1", "T2"]},
+    "andreus": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, 
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
@@ -322,7 +322,7 @@ def carregar_dados():
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
         
@@ -332,13 +332,15 @@ def carregar_diarios():
             
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
-                if "NOME" in [str(cell).strip().upper() for cell in row_vals]:
+                val_upper = [str(cell).strip().upper() for cell in row_vals]
+                if "NOME" in val_upper or "NOMECOMPLETO" in val_upper or "CÓD." in val_upper:
                     header_idx = i
                     break
             
             headers = aba_bruta[header_idx]
             
-            if header_idx > 0:
+            # Bloqueio de carimbo para as abas que já possuem datas nos títulos
+            if header_idx > 0 and nome_aba not in ["Acompanhamento JL", "Ponto T3"]:
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
@@ -368,16 +370,24 @@ def carregar_diarios():
         except: pass
         try: dfs['aux_jl'] = processar_aba("Aux JL")
         except: pass
+        
+        # Novas Abas Adicionadas
+        try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
+        except: pass
+        try: dfs['ponto_t3'] = processar_aba("Ponto T3")
+        except: pass
 
-    except Exception:
+    except Exception as e:
+        print(f"Erro ao carregar abas diárias: {e}")
         pass
-    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl']
+    
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl'], dfs['ponto_t3']
 
 # =============================================================================
 # 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
-df_diario, df_operador, df_conferente, df_aux_jl = carregar_diarios()
+df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl, df_ponto_t3 = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
@@ -493,8 +503,14 @@ if st.sidebar.button("Sair / Logout", use_container_width=True):
     st.rerun()
 
 # =============================================================================
-# 📥 BOTÃO DE AUDITORIA
+# 📥 BOTÃO DE AUDITORIA E FILTROS
 # =============================================================================
+st.sidebar.markdown("---")
+st.sidebar.title("🔍 Filtros do Painel")
+
+# O novo botão gerencial fica logo no topo da barra
+ver_jornada = st.sidebar.checkbox("⏱️ Acompanhamento Jornada Líquida (T3)", help="Exibe a matriz de horas diárias dos separadores")
+
 if st.session_state.get("usuario") in ["guilherme", "nilo"]:
     is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
     
@@ -606,12 +622,6 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
         )
     else:
         st.sidebar.button("🔒 Fechamento (Auditoria)", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
-
-# =============================================================================
-# 🎛️ FILTROS DE SELEÇÃO 
-# =============================================================================
-st.sidebar.markdown("---")
-st.sidebar.title("🔍 Filtros do Painel")
 
 turno_logado = st.session_state["turno_acesso"]
 
@@ -787,675 +797,763 @@ if st.session_state["perfil"] == "Gerente":
             mime="text/csv", type="primary", use_container_width=True, key="btn_rh_sistema"
         )
 
+
 # =============================================================================
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
-try:
-    kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
 
-    col_titulo, col_kpis = st.columns([1, 1.2])
-    with col_titulo:
-        st.title("📊 Monitor de Produtividade")
-        st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
-
-    with col_kpis:
-        st.markdown("## 🎯 Visão Geral")
-        kpi1, kpi2, kpi3 = st.columns(3)
-        col_vol = next((k for k in kpis_mapeados if 'itens' in k.lower() or 'palet' in k.lower() or 'mov' in k.lower()), kpis_mapeados[0] if kpis_mapeados else None)
-        total_vol = df_filtrado[col_vol].sum() if col_vol and col_vol in df_filtrado.columns else 0
+# 💡 SE O BOTÃO DE ACOMPANHAMENTO JL FOR CLICADO, ESCONDE O DASHBOARD NORMAL E MOSTRA A MATRIZ
+if ver_jornada:
+    st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
+    
+    if df_acomp_jl.empty or df_ponto_t3.empty:
+        st.warning("⚠️ As abas 'Acompanhamento JL' e/ou 'Ponto T3' não foram encontradas na sua planilha do Google.")
+    else:
+        # Puxa todas as colunas que parecem datas (Ex: 26/08/2026) da aba Acompanhamento JL
+        colunas_data = [c for c in df_acomp_jl.columns if re.match(r'\d{2}/\d{2}/\d{4}', str(c))]
         
-        kpi1.metric(f"📦 {col_vol or 'Volume'}", f"{total_vol:,.0f}".replace(',', '.'))
-        kpi2.metric("👥 Colaboradores", len(df_filtrado))
-        total_horas = df_filtrado['Horas'].sum() if 'Horas' in df_filtrado.columns else 0
-        kpi3.metric("⏱️ Horas Registradas", f"{total_horas:.1f} h" if total_horas > 0 else "—")
-
-    st.divider() 
-
-    # =============================================================================
-    # 🚨 MÓDULO DETRATORES 
-    # =============================================================================
-    if focar_detratores:
-        st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
-        houve_detrator = False
-
-        for idx, row in df_filtrado.iterrows():
-            detalhes_gargalo = []
-            cargo_c = str(row['FUNÇÃO']).strip().upper()
+        if not colunas_data:
+            st.warning("⚠️ Nenhuma data foi encontrada na aba 'Acompanhamento JL'.")
+        else:
+            hoje = datetime.date.today()
+            ontem_str = (hoje - datetime.timedelta(days=1)).strftime("%d/%m/%Y")
             
-            for kpi in kpis_mapeados:
-                meta2 = row.get(f"{kpi}_Meta2", 0)
-                if pd.isna(meta2) or str(meta2).strip() in ['0', '0.0', '-', '']: continue
+            # Tenta deixar a data de ontem como padrão
+            default_idx = len(colunas_data) - 1
+            if ontem_str in colunas_data:
+                default_idx = colunas_data.index(ontem_str)
+            
+            # Cria a caixa de seleção de data no topo
+            col_sel, col_vazia = st.columns([1, 3])
+            data_selecionada = col_sel.selectbox("📅 Escolha o dia para analisar:", colunas_data, index=default_idx)
+            
+            # Filtra apenas quem é do T3 e tem o cargo "Separador"
+            df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
+            df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
+            
+            # Filtra a aba Ponto T3 pela data selecionada
+            df_ponto_filt = df_ponto_t3[df_ponto_t3['DATAAPURACAO'].astype(str).str.strip() == data_selecionada]
+            
+            dados_tabela_jl = []
+            soma_jl_flt = 0.0
+            qtd_validos = 0
+            
+            for _, row in df_jl_separadores.iterrows():
+                cod = str(row.get('CÓD.', '')).strip()
+                nome = str(row.get('NOME', '')).strip()
+                funcao = str(row.get('FUNÇÃO', '')).strip()
                 
-                realizado = float(row.get(kpi, 0))
-                racional = float(row.get(f"{kpi}_Racional", 1))
-                meta1 = float(row.get(f"{kpi}_Meta1", meta2))
-
-                if racional == 1 and realizado == 0: continue 
+                # Pega a JL do dia na aba Acompanhamento JL
+                val_jl_raw = str(row.get(data_selecionada, '0')).strip()
+                try:
+                    val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
+                    if val_num <= 2.0 and '%' not in val_jl_raw: 
+                        val_num *= 100
+                    jl_str = f"{val_num:.1f}%".replace('.', ',')
+                    jl_float = val_num
+                    
+                    if val_num > 0:
+                        soma_jl_flt += val_num
+                        qtd_validos += 1
+                except:
+                    jl_str = val_jl_raw if val_jl_raw else "0,0%"
+                    jl_float = 0.0
+                    
+                # Pega as Horas Trabalhadas da aba Ponto T3 cruzando a Matrícula
+                horas_str = "—"
+                if not df_ponto_filt.empty and 'CONTRATO' in df_ponto_filt.columns:
+                    match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO'].astype(str).str.strip() == cod]
+                    if not match_ponto.empty:
+                        horas_str = str(match_ponto.iloc[0].get('JORNADA', '—')).strip()
+                        
+                dados_tabela_jl.append({
+                    "Matrícula": cod,
+                    "Nome": nome,
+                    "Função": funcao,
+                    "Jornada Líquida (%)": jl_str,
+                    "Horas Trabalhadas": horas_str,
+                    "_jl_float": jl_float 
+                })
                 
-                kpi_upper = str(kpi).strip().upper()
-                is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
-                is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
-                is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+            if dados_tabela_jl:
+                df_display = pd.DataFrame(dados_tabela_jl)
+                # Ordena para os mais produtivos ficarem no topo
+                df_display = df_display.sort_values(by="_jl_float", ascending=False).drop(columns=["_jl_float"])
                 
-                abaixo_da_meta = False
+                media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
+                st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                if is_meta_unica:
-                    alvo_atual = 0.48 if is_meta_unica_dev else 0.07
-                    if realizado > alvo_atual:
-                        abaixo_da_meta = True
-                        meta1 = alvo_atual # Truque para o texto exibir certo
-                else:
-                    if racional == 1 and realizado < meta1: abaixo_da_meta = True
-                    elif racional == 0 and realizado > meta1: abaixo_da_meta = True
+                st.dataframe(df_display, hide_index=True, use_container_width=True)
+            else:
+                st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
-                if abaixo_da_meta:
-                    if "LÍQ" in str(kpi).upper(): detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
-                    elif "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Mínimo (Meta 1) {meta1:.2f}%")
-                    else: detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Mínimo (Meta 1) {meta1:,.0f}".replace(',', '.'))
+# 💡 SE O BOTÃO ESTIVER DESMARCADO, MOSTRA O DASHBOARD NORMAL
+else:
+    try:
+        kpis_mapeados = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
 
-            if detalhes_gargalo:
-                houve_detrator = True
-                nome_c, cod_c, turno_c = row['NOME'], row['CÓD.'], row['TURNO']
-                d_trab = int(row.get('Dias Trabalhados', 0))
+        col_titulo, col_kpis = st.columns([1, 1.2])
+        with col_titulo:
+            st.title("📊 Monitor de Produtividade")
+            st.info(f"📅 **Período Apurado:** de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}")
 
-                with st.container():
-                    st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Lançados:</b> {d_trab} dias<br><br><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
-                    col_feed, col_trein = st.columns(2)
-                    with col_feed:
-                        with st.expander(f"💬 Registrar Feedback: {nome_c}"):
-                            with st.form(key=f"form_feed_{idx}"):
-                                texto_feedback = st.text_area("Descreva o que foi conversado:")
-                                if st.form_submit_button("Salvar no Histórico"):
-                                    if texto_feedback:
+        with col_kpis:
+            st.markdown("## 🎯 Visão Geral")
+            kpi1, kpi2, kpi3 = st.columns(3)
+            col_vol = next((k for k in kpis_mapeados if 'itens' in k.lower() or 'palet' in k.lower() or 'mov' in k.lower()), kpis_mapeados[0] if kpis_mapeados else None)
+            total_vol = df_filtrado[col_vol].sum() if col_vol and col_vol in df_filtrado.columns else 0
+            
+            kpi1.metric(f"📦 {col_vol or 'Volume'}", f"{total_vol:,.0f}".replace(',', '.'))
+            kpi2.metric("👥 Colaboradores", len(df_filtrado))
+            total_horas = df_filtrado['Horas'].sum() if 'Horas' in df_filtrado.columns else 0
+            kpi3.metric("⏱️ Horas Registradas", f"{total_horas:.1f} h" if total_horas > 0 else "—")
+
+        st.divider() 
+
+        # =============================================================================
+        # 🚨 MÓDULO DETRATORES 
+        # =============================================================================
+        if focar_detratores:
+            st.markdown("## 🚨 Plano de Atuação: Operadores Abaixo do Esperado")
+            houve_detrator = False
+
+            for idx, row in df_filtrado.iterrows():
+                detalhes_gargalo = []
+                cargo_c = str(row['FUNÇÃO']).strip().upper()
+                
+                for kpi in kpis_mapeados:
+                    meta2 = row.get(f"{kpi}_Meta2", 0)
+                    if pd.isna(meta2) or str(meta2).strip() in ['0', '0.0', '-', '']: continue
+                    
+                    realizado = float(row.get(kpi, 0))
+                    racional = float(row.get(f"{kpi}_Racional", 1))
+                    meta1 = float(row.get(f"{kpi}_Meta1", meta2))
+
+                    if racional == 1 and realizado == 0: continue 
+                    
+                    kpi_upper = str(kpi).strip().upper()
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                    is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+                    
+                    abaixo_da_meta = False
+                    
+                    if is_meta_unica:
+                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
+                        if realizado > alvo_atual:
+                            abaixo_da_meta = True
+                            meta1 = alvo_atual # Truque para o texto exibir certo
+                    else:
+                        if racional == 1 and realizado < meta1: abaixo_da_meta = True
+                        elif racional == 0 and realizado > meta1: abaixo_da_meta = True
+
+                    if abaixo_da_meta:
+                        if "LÍQ" in str(kpi).upper(): detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
+                        elif "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Mínimo (Meta 1) {meta1:.2f}%")
+                        else: detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Mínimo (Meta 1) {meta1:,.0f}".replace(',', '.'))
+
+                if detalhes_gargalo:
+                    houve_detrator = True
+                    nome_c, cod_c, turno_c = row['NOME'], row['CÓD.'], row['TURNO']
+                    d_trab = int(row.get('Dias Trabalhados', 0))
+
+                    with st.container():
+                        st.markdown(f"<div class='card-detrator'><span style='font-size: 22px; font-weight: bold; color: {C_VERMELHO};'>⚠️ [{cod_c}] {nome_c}</span><br><b>Turno:</b> {turno_c} | <b>Função:</b> {cargo_c} | <b>Dias Lançados:</b> {d_trab} dias<br><br><span style='font-weight: bold; color: #ffca28;'>Pontos de Desvio Identificados:</span><br>{'<br>'.join(detalhes_gargalo)}</div>", unsafe_allow_html=True)
+                        col_feed, col_trein = st.columns(2)
+                        with col_feed:
+                            with st.expander(f"💬 Registrar Feedback: {nome_c}"):
+                                with st.form(key=f"form_feed_{idx}"):
+                                    texto_feedback = st.text_area("Descreva o que foi conversado:")
+                                    if st.form_submit_button("Salvar no Histórico"):
+                                        if texto_feedback:
+                                            try:
+                                                aba_rh = conectar_planilha().worksheet("Historico_RH")
+                                                agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
+                                                gestor = st.session_state["usuario"].capitalize()
+                                                aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback, gestor])
+                                                st.success("✅ Salvo!")
+                                            except Exception as e: st.error(f"Erro: {e}")
+                                        else: st.error("⚠️ Digite algo.")
+                        with col_trein:
+                            with st.expander(f"🎯 Solicitar Reciclagem: {nome_c}"):
+                                with st.form(key=f"form_trein_{idx}"):
+                                    motivo = st.selectbox("Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo"])
+                                    if st.form_submit_button("Enviar Solicitação"):
                                         try:
                                             aba_rh = conectar_planilha().worksheet("Historico_RH")
                                             agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                                             gestor = st.session_state["usuario"].capitalize()
-                                            aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback, gestor])
-                                            st.success("✅ Salvo!")
+                                            aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo, gestor])
+                                            st.success("📧 Enviado!")
                                         except Exception as e: st.error(f"Erro: {e}")
-                                    else: st.error("⚠️ Digite algo.")
-                    with col_trein:
-                        with st.expander(f"🎯 Solicitar Reciclagem: {nome_c}"):
-                            with st.form(key=f"form_trein_{idx}"):
-                                motivo = st.selectbox("Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo"])
-                                if st.form_submit_button("Enviar Solicitação"):
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+            if not houve_detrator: st.success("🎉 Nenhum detrator encontrado! Operação saudável.")
+
+        # =============================================================================
+        # 👤 VISÃO INDIVIDUAL DO COLABORADOR 
+        # =============================================================================
+        elif pessoa_selecionada != "Nenhum":
+            st.subheader(f"🎯 Atingimento: {pessoa_selecionada}")
+            dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
+
+            if not dados_pessoa.empty:
+                row = dados_pessoa.iloc[0]
+                
+                d_corridos_p = int(row.get('Dias Corridos', 0))
+                d_trab_p = int(row.get('Dias Trabalhados', 0))
+                d_meta_p = int(row.get('Dias Meta', 0))
+                
+                pos = int(row.get('Posicao Ranking', 0))
+                val_rank = row.get('Valor Ranking', 0)
+                cargo_p = str(row.get('FUNÇÃO', '')).strip().upper()
+                turno_p = str(row.get('TURNO', '')).strip().upper()
+                
+                if d_trab_p < d_corridos_p and d_corridos_p > 0:
+                    proporcao_tela = (d_trab_p / d_corridos_p) * 100
+                    st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
+                    
+                ocorrencias_texto = []
+                if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
+                    df_aux_jl['NOME_CLEAN'] = df_aux_jl['NOME'].astype(str).str.strip().str.upper()
+                    dados_aux = df_aux_jl[df_aux_jl['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
+                    if not dados_aux.empty:
+                        linha_aux = dados_aux.iloc[0]
+                        
+                        valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
+                        
+                        qtd_nt = valores_aux.count('NT')
+                        qtd_fc = valores_aux.count('FC')
+                        qtd_fe = valores_aux.count('FE')
+                        qtd_at = valores_aux.count('AT')
+                        qtd_fi = valores_aux.count('FI')
+                        qtd_ad = valores_aux.count('AD')
+                        
+                        qtd_sa = valores_aux.count('SA') 
+                        qtd_fb = valores_aux.count('FB') 
+                        qtd_aa = valores_aux.count('AA') 
+                        
+                        if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
+                        if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
+                        if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
+                        if qtd_at > 0: ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT)")
+                        if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (FI)")
+                        if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (AD)")
+                        if qtd_sa > 0: ocorrencias_texto.append(f"⏱️ <b>{qtd_sa}</b> Saída(s) Antecipada(s) (SA)")
+                        if qtd_fb > 0: ocorrencias_texto.append(f"🏦 <b>{qtd_fb}</b> Folga(s) Banco (FB)")
+                        if qtd_aa > 0: ocorrencias_texto.append(f"🛠️ <b>{qtd_aa}</b> dia(s) em Atividade Auxiliar (AA)")
+                
+                if ocorrencias_texto:
+                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Impacto no Pagamento (Redução de Dias Trabalhados):</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
+                
+                erros_qtd = int(row.get('ERROS', 0))
+                penalidade_txt = str(row.get('Penalidade_Texto', ''))
+                
+                if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
+                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
+                
+                is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
+                
+                if is_ranking_cargo:
+                    funcao_original = row.get('FUNÇÃO', '')
+                    cat_rank = str(row.get('Ranking_Categoria', '')).strip()
+                    
+                    texto_funcao_rank = funcao_original
+                    if cat_rank and 'CONFERENTE' in cargo_p:
+                        texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>"
+                        
+                    total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
+                    
+                    if pos == 1: medalha, cor_rank = "🥇", "#ffd700" 
+                    elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0" 
+                    elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" 
+                    elif pos > 0: medalha, cor_rank = "🏅", "#555555"
+                    else: medalha, cor_rank = "📋", "#333333"          
+                    
+                    if val_rank > 0:
+                        val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>"
+                    else:
+                        texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
+                    
+                    txt_posicao = f"<b>{medalha} Posição:</b> {pos}º lugar de {total_eq}" if pos > 0 else f"<b>{medalha} Análise da Equipe</b> ({total_eq} pessoas)"
+                    st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
+
+                # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
+                cols_meta = st.columns(4) 
+                col_idx = 0
+                grafico_dados = []
+
+                for kpi in kpis_mapeados:
+                    meta2 = row.get(f"{kpi}_Meta2", 0)
+                    try: meta2_val = float(meta2)
+                    except: meta2_val = 0
+                    
+                    if meta2_val <= 0: continue
+
+                    realizado = float(row.get(kpi, 0))
+                    meta1, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(row.get(f"{kpi}_Meta3", 0))
+                    racional = float(row.get(f"{kpi}_Racional", 1))
+                    valor_reais = float(row.get(f"{kpi}_Valor", 0))
+
+                    kpi_upper = str(kpi).strip().upper()
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
+                    is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                    is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+
+                    if is_meta_unica:
+                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
+                        nome_alvo = "Meta Única"
+                        
+                        if realizado <= alvo_atual:
+                            cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                            real_perc = 100.0
+                        else:
+                            cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                            real_perc = (alvo_atual / realizado * 100) if realizado > 0 else 0
+                    else:
+                        if racional == 1: 
+                            perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
+                            if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                            elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
+                            elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                            else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+                            
+                            if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
+                            elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                            elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                        else: 
+                            perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
+                            if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
+                            elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
+                            elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
+                            else: alvo_atual, nome_alvo = meta3, "Meta Máx"
+
+                            if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
+                            elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
+                            elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+
+                        real_perc = perc_atingimento * 100
+                    
+                    grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
+                    
+                    html_tabela_premios = ""
+                    v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
+                    
+                    if v_100_base > 0:
+                        if is_meta_unica:
+                            v_unica_str = f"{v_100_base:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
+    <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
+    <div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
+    <div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div>
+    </div></div>"""
+                        else:
+                            v_m1 = v_100_base * 0.5
+                            v_m2 = v_100_base * 1.0
+                            v_m3 = v_100_base * 1.2
+                            
+                            v_m1_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            
+                            html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
+    <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
+    <div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
+    <div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div>
+    <div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div>
+    <div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div>
+    </div></div>"""
+                    
+                    html_dinheiro = ""
+                    val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
+                    
+                    if valor_reais > 0:
+                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
+                    elif v_100_base > 0:
+                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
+
+                    if "Tempo" in str(kpi) or ":" in str(realizado):
+                        val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
+                        alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{(int(alvo_atual)%60):02d}" if meta2_val > 0 else "-"
+                    elif "LÍQ" in str(kpi).upper():
+                        val_tela = f"{realizado:.1f}%".replace('.', ',')
+                        alvo_tela = f"{alvo_atual:.1f}%".replace('.', ',') if meta2_val > 0 else "-"
+                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                        val_tela = f"{realizado:.2f}%".replace('.', ',')
+                        alvo_tela = f"{alvo_atual:.2f}%".replace('.', ',') if meta2_val > 0 else "-"
+                    else:
+                        val_tela = f"{realizado:,.0f}".replace(',', '.')
+                        alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
+
+                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
+                    
+                    aviso_erro = ""
+                    if erros_qtd > 0:
+                        if 'SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper():
+                            aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
+                        elif 'OPERADOR' in cargo_p and 'MOV' in str(kpi).upper():
+                            aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
+
+                    with cols_meta[col_idx % 4]:
+                        st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios}{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
+                    col_idx += 1
+
+                # --- SOMA FINAL ---
+                valor_final_total = row.get('Valor Final', 0)
+                if valor_final_total > 0:
+                    val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}")
+
+                st.divider()
+
+                # =============================================================================
+                # 🗣️ GESTÃO E FEEDBACK INDIVIDUAL
+                # =============================================================================
+                nome_c = row.get('NOME', pessoa_selecionada)
+                cod_c = row.get('CÓD.', '')
+
+                st.markdown(f"### 🗣️ Ações de Gestão: {nome_c}")
+                col_feed_ind, col_trein_ind = st.columns(2) 
+                
+                with col_feed_ind:
+                    with st.expander(f"💬 Registrar Feedback"):
+                        with st.form(key=f"form_feed_ind_{cod_c}"):
+                            texto_feedback = st.text_area("Descreva o que foi conversado (Elogios, Alinhamentos, etc):")
+                            if st.form_submit_button("Salvar no Histórico"):
+                                if texto_feedback:
                                     try:
                                         aba_rh = conectar_planilha().worksheet("Historico_RH")
                                         agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                                        gestor = st.session_state["usuario"].capitalize()
-                                        aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo, gestor])
-                                        st.success("📧 Enviado!")
+                                        gestor = st.session_state["usuario"].capitalize() 
+                                        aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback, gestor])
+                                        st.success("✅ Salvo!")
                                     except Exception as e: st.error(f"Erro: {e}")
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-        if not houve_detrator: st.success("🎉 Nenhum detrator encontrado! Operação saudável.")
-
-    # =============================================================================
-    # 👤 VISÃO INDIVIDUAL DO COLABORADOR 
-    # =============================================================================
-    elif pessoa_selecionada != "Nenhum":
-        st.subheader(f"🎯 Atingimento: {pessoa_selecionada}")
-        dados_pessoa = df_filtrado[df_filtrado['NOME'] == pessoa_selecionada]
-
-        if not dados_pessoa.empty:
-            row = dados_pessoa.iloc[0]
-            
-            d_corridos_p = int(row.get('Dias Corridos', 0))
-            d_trab_p = int(row.get('Dias Trabalhados', 0))
-            d_meta_p = int(row.get('Dias Meta', 0))
-            
-            pos = int(row.get('Posicao Ranking', 0))
-            val_rank = row.get('Valor Ranking', 0)
-            cargo_p = str(row.get('FUNÇÃO', '')).strip().upper()
-            turno_p = str(row.get('TURNO', '')).strip().upper()
-            
-            if d_trab_p < d_corridos_p and d_corridos_p > 0:
-                proporcao_tela = (d_trab_p / d_corridos_p) * 100
-                st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
+                                else: st.error("⚠️ Digite algo.")
                 
-            ocorrencias_texto = []
-            if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
-                df_aux_jl['NOME_CLEAN'] = df_aux_jl['NOME'].astype(str).str.strip().str.upper()
-                dados_aux = df_aux_jl[df_aux_jl['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
-                if not dados_aux.empty:
-                    linha_aux = dados_aux.iloc[0]
-                    
-                    valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
-                    
-                    qtd_nt = valores_aux.count('NT')
-                    qtd_fc = valores_aux.count('FC')
-                    qtd_fe = valores_aux.count('FE')
-                    qtd_at = valores_aux.count('AT')
-                    qtd_fi = valores_aux.count('FI')
-                    qtd_ad = valores_aux.count('AD')
-                    
-                    qtd_sa = valores_aux.count('SA') 
-                    qtd_fb = valores_aux.count('FB') 
-                    qtd_aa = valores_aux.count('AA') 
-                    
-                    if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
-                    if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
-                    if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
-                    if qtd_at > 0: ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT)")
-                    if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (FI)")
-                    if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (AD)")
-                    if qtd_sa > 0: ocorrencias_texto.append(f"⏱️ <b>{qtd_sa}</b> Saída(s) Antecipada(s) (SA)")
-                    if qtd_fb > 0: ocorrencias_texto.append(f"🏦 <b>{qtd_fb}</b> Folga(s) Banco (FB)")
-                    if qtd_aa > 0: ocorrencias_texto.append(f"🛠️ <b>{qtd_aa}</b> dia(s) em Atividade Auxiliar (AA)")
-            
-            if ocorrencias_texto:
-                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Impacto no Pagamento (Redução de Dias Trabalhados):</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
-            
-            erros_qtd = int(row.get('ERROS', 0))
-            penalidade_txt = str(row.get('Penalidade_Texto', ''))
-            
-            if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
-                st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
-            
-            is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
-            
-            if is_ranking_cargo:
-                funcao_original = row.get('FUNÇÃO', '')
-                cat_rank = str(row.get('Ranking_Categoria', '')).strip()
-                
-                texto_funcao_rank = funcao_original
-                if cat_rank and 'CONFERENTE' in cargo_p:
-                    texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>"
-                    
-                total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
-                
-                if pos == 1: medalha, cor_rank = "🥇", "#ffd700" 
-                elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0" 
-                elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" 
-                elif pos > 0: medalha, cor_rank = "🏅", "#555555"
-                else: medalha, cor_rank = "📋", "#333333"          
-                
-                if val_rank > 0:
-                    val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>"
-                else:
-                    texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
-                
-                txt_posicao = f"<b>{medalha} Posição:</b> {pos}º lugar de {total_eq}" if pos > 0 else f"<b>{medalha} Análise da Equipe</b> ({total_eq} pessoas)"
-                st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
-
-            # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
-            cols_meta = st.columns(4) 
-            col_idx = 0
-            grafico_dados = []
-
-            for kpi in kpis_mapeados:
-                meta2 = row.get(f"{kpi}_Meta2", 0)
-                try: meta2_val = float(meta2)
-                except: meta2_val = 0
-                
-                if meta2_val <= 0: continue
-
-                realizado = float(row.get(kpi, 0))
-                meta1, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(row.get(f"{kpi}_Meta3", 0))
-                racional = float(row.get(f"{kpi}_Racional", 1))
-                valor_reais = float(row.get(f"{kpi}_Valor", 0))
-
-                kpi_upper = str(kpi).strip().upper()
-                is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
-                is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
-                is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
-
-                if is_meta_unica:
-                    alvo_atual = 0.48 if is_meta_unica_dev else 0.07
-                    nome_alvo = "Meta Única"
-                    
-                    if realizado <= alvo_atual:
-                        cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                        real_perc = 100.0
-                    else:
-                        cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                        real_perc = (alvo_atual / realizado * 100) if realizado > 0 else 0
-                else:
-                    if racional == 1: 
-                        perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
-                        if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                        elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                        elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                        else: alvo_atual, nome_alvo = meta3, "Meta Máx"
-                        
-                        if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                        elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                        elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                    else: 
-                        perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
-                        if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                        elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                        elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                        else: alvo_atual, nome_alvo = meta3, "Meta Máx"
-
-                        if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                        elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                        elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                        else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-
-                    real_perc = perc_atingimento * 100
-                
-                grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
-                
-                html_tabela_premios = ""
-                v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
-                
-                if v_100_base > 0:
-                    if is_meta_unica:
-                        v_unica_str = f"{v_100_base:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
-<div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
-<div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
-<div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div>
-</div></div>"""
-                    else:
-                        v_m1 = v_100_base * 0.5
-                        v_m2 = v_100_base * 1.0
-                        v_m3 = v_100_base * 1.2
-                        
-                        v_m1_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        
-                        html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
-<div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
-<div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
-<div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div>
-<div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div>
-<div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div>
-</div></div>"""
-                
-                html_dinheiro = ""
-                val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
-                
-                if valor_reais > 0:
-                    html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
-                elif v_100_base > 0:
-                    html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
-
-                if "Tempo" in str(kpi) or ":" in str(realizado):
-                    val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
-                    alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{int(alvo_atual)%60:02d}" if meta2_val > 0 else "-"
-                elif "LÍQ" in str(kpi).upper():
-                    val_tela = f"{realizado:.1f}%".replace('.', ',')
-                    alvo_tela = f"{alvo_atual:.1f}%".replace('.', ',') if meta2_val > 0 else "-"
-                elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                    val_tela = f"{realizado:.2f}%".replace('.', ',')
-                    alvo_tela = f"{alvo_atual:.2f}%".replace('.', ',') if meta2_val > 0 else "-"
-                else:
-                    val_tela = f"{realizado:,.0f}".replace(',', '.')
-                    alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
-
-                alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
-                
-                aviso_erro = ""
-                if erros_qtd > 0:
-                    if 'SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper():
-                        aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
-                    elif 'OPERADOR' in cargo_p and 'MOV' in str(kpi).upper():
-                        aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
-
-                with cols_meta[col_idx % 4]:
-                    st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios}{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
-                col_idx += 1
-
-            # --- SOMA FINAL ---
-            valor_final_total = row.get('Valor Final', 0)
-            if valor_final_total > 0:
-                val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}")
-
-            st.divider()
-
-            # =============================================================================
-            # 🗣️ GESTÃO E FEEDBACK INDIVIDUAL
-            # =============================================================================
-            nome_c = row.get('NOME', pessoa_selecionada)
-            cod_c = row.get('CÓD.', '')
-
-            st.markdown(f"### 🗣️ Ações de Gestão: {nome_c}")
-            col_feed_ind, col_trein_ind = st.columns(2) 
-            
-            with col_feed_ind:
-                with st.expander(f"💬 Registrar Feedback"):
-                    with st.form(key=f"form_feed_ind_{cod_c}"):
-                        texto_feedback = st.text_area("Descreva o que foi conversado (Elogios, Alinhamentos, etc):")
-                        if st.form_submit_button("Salvar no Histórico"):
-                            if texto_feedback:
+                with col_trein_ind:
+                    with st.expander(f"🎯 Solicitar Reciclagem"):
+                        with st.form(key=f"form_trein_ind_{cod_c}"):
+                            motivo = st.selectbox("Motivo/Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo", "Comportamental", "Outros"])
+                            if st.form_submit_button("Enviar Solicitação"):
                                 try:
                                     aba_rh = conectar_planilha().worksheet("Historico_RH")
                                     agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                                     gestor = st.session_state["usuario"].capitalize() 
-                                    aba_rh.append_row([agora, str(cod_c), nome_c, "Feedback", texto_feedback, gestor])
-                                    st.success("✅ Salvo!")
+                                    aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo, gestor])
+                                    st.success("📧 Enviado!")
                                 except Exception as e: st.error(f"Erro: {e}")
-                            else: st.error("⚠️ Digite algo.")
-            
-            with col_trein_ind:
-                with st.expander(f"🎯 Solicitar Reciclagem"):
-                    with st.form(key=f"form_trein_ind_{cod_c}"):
-                        motivo = st.selectbox("Motivo/Gargalo:", ["Velocidade", "Erros/Avarias", "Sistema", "Processo", "Comportamental", "Outros"])
-                        if st.form_submit_button("Enviar Solicitação"):
-                            try:
-                                aba_rh = conectar_planilha().worksheet("Historico_RH")
-                                agora = (datetime.datetime.utcnow() - datetime.timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                                gestor = st.session_state["usuario"].capitalize() 
-                                aba_rh.append_row([agora, str(cod_c), nome_c, "Reciclagem", motivo, gestor])
-                                st.success("📧 Enviado!")
-                            except Exception as e: st.error(f"Erro: {e}")
 
-            st.divider()
-            st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
+                st.divider()
+                st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
 
-            col_grafico, col_tabelas_frequencia = st.columns([1.2, 1])
-            
-            with col_grafico:
-                if grafico_dados:
-                    df_grafico = pd.DataFrame(grafico_dados)
-                    
-                    df_grafico['Texto_Cor'] = df_grafico['Cor_Barra'].apply(lambda color: "black" if color == C_AMARELO else "white")
-                    
-                    fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
-                    fig.update_layout(showlegend=False, yaxis_title="<b>% do Volume Total</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
-                    fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
-                    
-                    fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor_Barra'].tolist(), line=dict(color='white', width=1)))
-                    fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
-                    fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("Nenhum indicador com meta estabelecida para gerar o gráfico.")
-            
-            with col_tabelas_frequencia:
-                cargo_p = str(row.get('FUNÇÃO', '')).upper()
-                turno_p = str(row.get('TURNO', '')).upper()
-
-                usa_diario = False
-                df_uso_diario = pd.DataFrame()
+                col_grafico, col_tabelas_frequencia = st.columns([1.2, 1])
                 
-                if "SEPARADOR" in cargo_p:
-                    usa_diario = True
-                    df_uso_diario = df_diario
-                elif "OPERADOR" in cargo_p:
-                    usa_diario = True
-                    df_uso_diario = df_operador
-                elif "CONFERENTE" in cargo_p:
-                    usa_diario = True
-                    df_uso_diario = df_conferente
-
-                if usa_diario and not df_uso_diario.empty:
-                    df_uso_diario['NOME_CLEAN'] = df_uso_diario['NOME'].astype(str).str.strip().str.upper()
-                    df_pessoa_diario = df_uso_diario[df_uso_diario['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
-                    
-                    if not df_pessoa_diario.empty:
-                        pessoa_d_row = df_pessoa_diario.iloc[0]
-                        cols_datas_reais = []
-                        opces_datas = []
-                        datas_vistas = set()
+                with col_grafico:
+                    if grafico_dados:
+                        df_grafico = pd.DataFrame(grafico_dados)
                         
-                        for c in df_uso_diario.columns:
-                            c_str = str(c).strip()
-                            if "INICIO" in c_str.upper() or "NOME" in c_str.upper() or "CÓD" in c_str.upper() or "TURNO" in c_str.upper() or "FUNÇÃO" in c_str.upper():
-                                continue
-                            
-                            match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', c_str)
-                            if match:
-                                d_str = match.group(0)
-                                if d_str not in datas_vistas:
-                                    datas_vistas.add(d_str)
-                                    cols_datas_reais.append(c_str) 
-                                    
-                                    if '-' in d_str:
-                                        ano, mes, dia = d_str.split('-')
-                                        opces_datas.append(f"{dia}/{mes}/{ano}")
-                                    else:
-                                        opces_datas.append(d_str)
+                        df_grafico['Texto_Cor'] = df_grafico['Cor_Barra'].apply(lambda color: "black" if color == C_AMARELO else "white")
                         
-                        if cols_datas_reais:
-                            st.markdown("#### 📅 Detalhamento Diário")
-                            data_escolhida_display = st.selectbox("Data Apuração", opces_datas, label_visibility="collapsed", key="sel_data_diario_alinhado")
-                            idx_escolha = opces_datas.index(data_escolhida_display)
-                            nome_coluna_real = cols_datas_reais[idx_escolha]
-                            col_index = list(df_uso_diario.columns).index(nome_coluna_real)
-                            
-                            try: val_1 = str(pessoa_d_row.iloc[col_index]).strip()
-                            except: val_1 = "0"
-                            try: val_2 = str(pessoa_d_row.iloc[col_index + 1]).strip()
-                            except: val_2 = "0"
-                            try: val_3 = str(pessoa_d_row.iloc[col_index + 2]).strip()
-                            except: val_3 = "0"
-                            try: val_4 = str(pessoa_d_row.iloc[col_index + 3]).strip()
-                            except: val_4 = "0"
-                            
-                            val_1 = val_1 if val_1 and val_1.lower() not in ['nan', 'none'] else "0"
-                            val_2 = val_2 if val_2 and val_2.lower() not in ['nan', 'none'] else "0"
-                            val_3 = val_3 if val_3 and val_3.lower() not in ['nan', 'none'] else "0"
-                            val_4 = val_4 if val_4 and val_4.lower() not in ['nan', 'none'] else "0"
-                            
-                            if "SEPARADOR" in cargo_p:
-                                try:
-                                    if val_4 and val_4.lower() not in ['nan', 'none']:
-                                        val_jl_num = float(val_4.replace(',', '.').replace('%', ''))
-                                        if val_jl_num <= 2.0 and "%" not in val_4: val_jl_num = val_jl_num * 100
-                                        jl_display = f"{val_jl_num:.1f}%".replace('.', ',') 
-                                    else: jl_display = "0,0%"
-                                except: jl_display = "0,0%"
-                                try: v_itens = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_itens = "0"
-                                try: v_veloc = f"{int(round(float(val_3.replace('.', '').replace(',', '.'))))}"
-                                except: v_veloc = "0"
-                                try:
-                                    horas_dec = float(val_2.replace('.', '').replace(',', '.'))
-                                    h = int(horas_dec)
-                                    m = int((horas_dec - h) * 60)
-                                    s = int((((horas_dec - h) * 60) - m) * 60)
-                                    v_horas = f"{h:02d}:{m:02d}:{s:02d}"
-                                except: v_horas = "00:00:00"
-                                c1, c2, c3 = st.columns(3)
-                                c1.metric("⏱️ Horas", v_horas)
-                                c2.metric("⚡ Itens/Hora", v_veloc)
-                                c3.metric("🎯 JL", jl_display)
-                                st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
-                            elif "CONFERENTE" in cargo_p:
-                                try: v_frac = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_frac = "0"
-                                try: v_grand = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_grand = "0"
-                                st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
-                                c1, c2 = st.columns(2)
-                                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
-                                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
-                            elif "OPERADOR" in cargo_p:
-                                try: v_horiz = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_horiz = "0"
-                                try: v_vert = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
-                                except: v_vert = "0"
-                                st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
-                                c1, c2 = st.columns(2)
-                                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
-                                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
-
-                kpis_ativos_pessoa = []
-                for k in kpis_mapeados:
-                    m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
-                    if pd.notna(m2) and m2 > 0:
-                        if k not in kpis_ativos_pessoa: kpis_ativos_pessoa.append(k) 
-
-                extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
-                extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
-                col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
-                df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
+                        fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
+                        fig.update_layout(showlegend=False, yaxis_title="<b>% do Volume Total</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
+                        fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
+                        
+                        fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor_Barra'].tolist(), line=dict(color='white', width=1)))
+                        fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
+                        fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("Nenhum indicador com meta estabelecida para gerar o gráfico.")
                 
-                if 'Tempo Médio' in df_tabela_mini.columns:
-                    df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
-                
-                config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
-                for col in df_tabela_mini.columns:
-                    if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
-                    elif "LÍQ" in col.upper(): config_colunas[col] = st.column_config.NumberColumn(col, format="%.1f%%")
-                    elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                    else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
-                
-                st.markdown("#### 📊 Matriz de Frequência")
-                st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=220, column_config=config_colunas)
+                with col_tabelas_frequencia:
+                    cargo_p = str(row.get('FUNÇÃO', '')).upper()
+                    turno_p = str(row.get('TURNO', '')).upper()
 
-    # =============================================================================
-    # 👥 VISÃO GERAL EQUIPE
-    # =============================================================================
-    else:
-        filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
+                    usa_diario = False
+                    df_uso_diario = pd.DataFrame()
+                    
+                    if "SEPARADOR" in cargo_p:
+                        usa_diario = True
+                        df_uso_diario = df_diario
+                    elif "OPERADOR" in cargo_p:
+                        usa_diario = True
+                        df_uso_diario = df_operador
+                    elif "CONFERENTE" in cargo_p:
+                        usa_diario = True
+                        df_uso_diario = df_conferente
 
-        if not filtros_ativos:
-            st.markdown("<br><br>", unsafe_allow_html=True)
-            st.markdown("<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
+                    if usa_diario and not df_uso_diario.empty:
+                        df_uso_diario['NOME_CLEAN'] = df_uso_diario['NOME'].astype(str).str.strip().str.upper()
+                        df_pessoa_diario = df_uso_diario[df_uso_diario['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
+                        
+                        if not df_pessoa_diario.empty:
+                            pessoa_d_row = df_pessoa_diario.iloc[0]
+                            cols_datas_reais = []
+                            opces_datas = []
+                            datas_vistas = set()
+                            
+                            for c in df_uso_diario.columns:
+                                c_str = str(c).strip()
+                                if "INICIO" in c_str.upper() or "NOME" in c_str.upper() or "CÓD" in c_str.upper() or "TURNO" in c_str.upper() or "FUNÇÃO" in c_str.upper():
+                                    continue
+                                
+                                match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', c_str)
+                                if match:
+                                    d_str = match.group(0)
+                                    if d_str not in datas_vistas:
+                                        datas_vistas.add(d_str)
+                                        cols_datas_reais.append(c_str) 
+                                        
+                                        if '-' in d_str:
+                                            ano, mes, dia = d_str.split('-')
+                                            opces_datas.append(f"{dia}/{mes}/{ano}")
+                                        else:
+                                            opces_datas.append(d_str)
+                            
+                            if cols_datas_reais:
+                                st.markdown("#### 📅 Detalhamento Diário")
+                                data_escolhida_display = st.selectbox("Data Apuração", opces_datas, label_visibility="collapsed", key="sel_data_diario_alinhado")
+                                idx_escolha = opces_datas.index(data_escolhida_display)
+                                nome_coluna_real = cols_datas_reais[idx_escolha]
+                                col_index = list(df_uso_diario.columns).index(nome_coluna_real)
+                                
+                                try: val_1 = str(pessoa_d_row.iloc[col_index]).strip()
+                                except: val_1 = "0"
+                                try: val_2 = str(pessoa_d_row.iloc[col_index + 1]).strip()
+                                except: val_2 = "0"
+                                try: val_3 = str(pessoa_d_row.iloc[col_index + 2]).strip()
+                                except: val_3 = "0"
+                                try: val_4 = str(pessoa_d_row.iloc[col_index + 3]).strip()
+                                except: val_4 = "0"
+                                
+                                val_1 = val_1 if val_1 and val_1.lower() not in ['nan', 'none'] else "0"
+                                val_2 = val_2 if val_2 and val_2.lower() not in ['nan', 'none'] else "0"
+                                val_3 = val_3 if val_3 and val_3.lower() not in ['nan', 'none'] else "0"
+                                val_4 = val_4 if val_4 and val_4.lower() not in ['nan', 'none'] else "0"
+                                
+                                if "SEPARADOR" in cargo_p:
+                                    try:
+                                        if val_4 and val_4.lower() not in ['nan', 'none']:
+                                            val_jl_num = float(val_4.replace(',', '.').replace('%', ''))
+                                            if val_jl_num <= 2.0 and "%" not in val_4: val_jl_num = val_jl_num * 100
+                                            jl_display = f"{val_jl_num:.1f}%".replace('.', ',') 
+                                        else: jl_display = "0,0%"
+                                    except: jl_display = "0,0%"
+                                    try: v_itens = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
+                                    except: v_itens = "0"
+                                    try: v_veloc = f"{int(round(float(val_3.replace('.', '').replace(',', '.'))))}"
+                                    except: v_veloc = "0"
+                                    try:
+                                        horas_dec = float(val_2.replace('.', '').replace(',', '.'))
+                                        h = int(horas_dec)
+                                        m = int((horas_dec - h) * 60)
+                                        s = int((((horas_dec - h) * 60) - m) * 60)
+                                        v_horas = f"{h:02d}:{m:02d}:{s:02d}"
+                                    except: v_horas = "00:00:00"
+                                    c1, c2, c3 = st.columns(3)
+                                    c1.metric("⏱️ Horas", v_horas)
+                                    c2.metric("⚡ Itens/Hora", v_veloc)
+                                    c3.metric("🎯 JL", jl_display)
+                                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>Itens Separados</h4><h2 style='margin:0; color: {C_AZUL};'>{v_itens}</h2></div>", unsafe_allow_html=True)
+                                elif "CONFERENTE" in cargo_p:
+                                    try: v_frac = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
+                                    except: v_frac = "0"
+                                    try: v_grand = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
+                                    except: v_grand = "0"
+                                    st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
+                                    c1, c2 = st.columns(2)
+                                    with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
+                                    with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
+                                elif "OPERADOR" in cargo_p:
+                                    try: v_horiz = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
+                                    except: v_horiz = "0"
+                                    try: v_vert = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
+                                    except: v_vert = "0"
+                                    st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
+                                    c1, c2 = st.columns(2)
+                                    with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
+                                    with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
-            c1, c2, c3 = st.columns(3)
-            with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>", unsafe_allow_html=True)
-            with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
-            with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identify gargalos.</p></div>", unsafe_allow_html=True)
+                    kpis_ativos_pessoa = []
+                    for k in kpis_mapeados:
+                        m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
+                        if pd.notna(m2) and m2 > 0:
+                            if k not in kpis_ativos_pessoa: kpis_ativos_pessoa.append(k) 
+
+                    extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
+                    extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
+                    col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
+                    df_tabela_mini = dados_pessoa[[c for c in col_uteis if c in df_filtrado.columns]].copy()
+                    
+                    if 'Tempo Médio' in df_tabela_mini.columns:
+                        df_tabela_mini['Tempo Médio'] = df_tabela_mini['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if pd.notna(s) else "00:00:00")
+                    
+                    config_colunas = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
+                    for col in df_tabela_mini.columns:
+                        if col in ['CÓD.', 'NOME', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                        elif "LÍQ" in col.upper(): config_colunas[col] = st.column_config.NumberColumn(col, format="%.1f%%")
+                        elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col: config_colunas[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                        else: config_colunas[col] = st.column_config.NumberColumn(col, format="%d")
+                    
+                    st.markdown("#### 📊 Matriz de Frequência")
+                    st.dataframe(df_tabela_mini, hide_index=True, use_container_width=True, height=220, column_config=config_colunas)
+
+        # =============================================================================
+        # 👥 VISÃO GERAL EQUIPE
+        # =============================================================================
         else:
-            cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
+            filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
 
-            for cargo_atual in cargos_render:
-                df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
-                if df_cargo.empty: continue
+            if not filtros_ativos:
+                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.markdown("<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>", unsafe_allow_html=True)
+                st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
 
-                st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
-                cols_eq = st.columns(4)
-                col_idx = 0
+                c1, c2, c3 = st.columns(3)
+                with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>", unsafe_allow_html=True)
+                with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
+                with c3: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identify gargalos.</p></div>", unsafe_allow_html=True)
+            else:
+                cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
-                for kpi in kpis_mapeados:
-                    if f"{kpi}_Meta2" in df_cargo.columns:
-                        col_rac = f"{kpi}_Racional"
-                        modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
-                        racional_temp = modos.iloc[0] if not modos.empty else 1
-                        
-                        if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo
-                        else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0] if 'Dias Trabalhados' in df_cargo.columns else df_cargo
+                for cargo_atual in cargos_render:
+                    df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
+                    if df_cargo.empty: continue
+
+                    st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
+                    cols_eq = st.columns(4)
+                    col_idx = 0
+
+                    for kpi in kpis_mapeados:
+                        if f"{kpi}_Meta2" in df_cargo.columns:
+                            col_rac = f"{kpi}_Racional"
+                            modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
+                            racional_temp = modos.iloc[0] if not modos.empty else 1
                             
-                        if df_kpi_valido.empty: continue
+                            if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo
+                            else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0] if 'Dias Trabalhados' in df_cargo.columns else df_cargo
+                                
+                            if df_kpi_valido.empty: continue
 
-                        df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0] if f"{kpi}_Meta2" in df_kpi_valido.columns else pd.DataFrame()
-                        
-                        if df_com_meta.empty: continue 
-
-                        meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
-                        meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
-                        meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
-                        
-                        real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
-                        soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
-
-                        cargo_atual_upper = str(cargo_atual).strip().upper()
-                        kpi_upper = str(kpi).strip().upper()
-                        
-                        is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
-                        is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
-                        is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
-
-                        if is_meta_unica:
-                            alvo_atual_med = 0.48 if is_meta_unica_dev else 0.07
-                            nome_alvo = "Meta Única"
+                            df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0] if f"{kpi}_Meta2" in df_kpi_valido.columns else pd.DataFrame()
                             
-                            if real_med <= alvo_atual_med:
-                                cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                                real_perc = 100.0
+                            if df_com_meta.empty: continue 
+
+                            meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
+                            meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
+                            meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
+                            
+                            real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
+                            soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
+
+                            cargo_atual_upper = str(cargo_atual).strip().upper()
+                            kpi_upper = str(kpi).strip().upper()
+                            
+                            is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
+                            is_meta_unica_ava = (kpi_upper == 'AVARIA') # AVARIA É GLOBAL META ÚNICA
+                            is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+
+                            if is_meta_unica:
+                                alvo_atual_med = 0.48 if is_meta_unica_dev else 0.07
+                                nome_alvo = "Meta Única"
+                                
+                                if real_med <= alvo_atual_med:
+                                    cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                                    real_perc = 100.0
+                                else:
+                                    cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                                    real_perc = (alvo_atual_med / real_med * 100) if real_med > 0 else 0
                             else:
-                                cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                                real_perc = (alvo_atual_med / real_med * 100) if real_med > 0 else 0
-                        else:
-                            if racional_temp == 1: 
-                                if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                                elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                                elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                                else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                                perc = (real_med / meta2_med) if meta2_med > 0 else 0
-                            else: 
-                                if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                                elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                                elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                                else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
-                                perc = (meta2_med / real_med) if real_med > 0 else 1.2
+                                if racional_temp == 1: 
+                                    if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                                    elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                                    elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                                    else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                                    perc = (real_med / meta2_med) if meta2_med > 0 else 0
+                                else: 
+                                    if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
+                                    elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
+                                    elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
+                                    else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                                    perc = (meta2_med / real_med) if real_med > 0 else 1.2
 
-                            real_perc = perc * 100
-                            if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                            elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                            elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                        
-                        if "Tempo" in str(kpi):
-                            v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                            t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                        elif "LÍQ" in str(kpi).upper():
-                            v_tela = f"{real_med:.1f}%".replace('.', ',')
-                            t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                            v_tela = f"{real_med:.2f}%".replace('.', ',')
-                            t_tela = f"{alvo_atual_med:.2f}%".replace('.', ',')
-                        else:
-                            v_tela = f"{real_med:,.0f}".replace(',', '.')
-                            t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
+                                real_perc = perc * 100
+                                if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
+                                elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
+                                elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
+                                else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                            
+                            if "Tempo" in str(kpi):
+                                v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                                t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                            elif "LÍQ" in str(kpi).upper():
+                                v_tela = f"{real_med:.1f}%".replace('.', ',')
+                                t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
+                            elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
+                                v_tela = f"{real_med:.2f}%".replace('.', ',')
+                                t_tela = f"{alvo_atual_med:.2f}%".replace('.', ',')
+                            else:
+                                v_tela = f"{real_med:,.0f}".replace(',', '.')
+                                t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
-                        metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
-                        eh_global = any(g in str(kpi).upper() for g in metricas_globais)
-                        
-                        titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
-                        alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
+                            metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
+                            eh_global = any(g in str(kpi).upper() for g in metricas_globais)
+                            
+                            titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
+                            alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
-                        val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
-                        html_dinheiro_med = ""
-                        
-                        # 🛡️ BLINDAGEM DO SEPARADOR G T2 PARA EQUIPE (Não exibir dinheiro)
-                        turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
-                        is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
-                        
-                        if not is_itens_t2_sepg and val_tot_equipe > 0:
-                            val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 16px;'>💰 Total Adquirido (Equipe): <b>R$ {val_tot_eq_str}</b></span></div>"
+                            val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
+                            html_dinheiro_med = ""
+                            
+                            turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
+                            is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
+                            
+                            if not is_itens_t2_sepg and val_tot_equipe > 0:
+                                val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 16px;'>💰 Total Adquirido (Equipe): <b>R$ {val_tot_eq_str}</b></span></div>"
 
-                        with cols_eq[col_idx % 4]:
-                            st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro_med}</div>", unsafe_allow_html=True)
-                        col_idx += 1
+                            with cols_eq[col_idx % 4]:
+                                st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro_med}</div>", unsafe_allow_html=True)
+                            col_idx += 1
 
-        # =============================================================================
-        # 📋 TABELA GERENCIAL CONSOLIDADA 
-        # =============================================================================
-        if filtros_ativos:
-            if 'cargos_render' in locals() and len(cargos_render) > 0: st.divider()
-            st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
-            
-            kpis_ativos_tabela = []
-            for kpi in kpis_mapeados:
-                if f"{kpi}_Meta2" in df_filtrado.columns:
-                    metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
-                    if metas_validas.sum() > 0:
-                        if kpi not in kpis_ativos_tabela: kpis_ativos_tabela.append(kpi)
+            # =============================================================================
+            # 📋 TABELA GERENCIAL CONSOLIDADA 
+            # =============================================================================
+            if filtros_ativos:
+                if 'cargos_render' in locals() and len(cargos_render) > 0: st.divider()
+                st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
+                
+                kpis_ativos_tabela = []
+                for kpi in kpis_mapeados:
+                    if f"{kpi}_Meta2" in df_filtrado.columns:
+                        metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
+                        if metas_validas.sum() > 0:
+                            if kpi not in kpis_ativos_tabela: kpis_ativos_tabela.append(kpi)
 
-            extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
-            extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
+                extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
+                extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
 
-            colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
-            df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
+                colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
+                df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
-            if 'Tempo Médio' in df_tabela.columns:
-                df_tabela['Tempo Médio'] = pd.to_numeric(df_tabela['Tempo Médio'], errors='coerce').fillna(0)
-                df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if s > 0 else "00:00:00")
+                if 'Tempo Médio' in df_tabela.columns:
+                    df_tabela['Tempo Médio'] = pd.to_numeric(df_tabela['Tempo Médio'], errors='coerce').fillna(0)
+                    df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if s > 0 else "00:00:00")
 
-            config = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
-            for col in df_tabela.columns:
-                if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
-                elif "LÍQ" in col.upper(): config[col] = st.column_config.NumberColumn(col, format="%.1f%%")
-                elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-                else: config[col] = st.column_config.NumberColumn(col, format="%d")
+                config = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
+                for col in df_tabela.columns:
+                    if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']: continue 
+                    elif "LÍQ" in col.upper(): config[col] = st.column_config.NumberColumn(col, format="%.1f%%")
+                    elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col: config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
+                    else: config[col] = st.column_config.NumberColumn(col, format="%d")
 
-            st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
+                st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
-except Exception as e:
-    st.error(f"⚠️ Erro ao renderizar painel: {e}")
+    except Exception as e:
+        st.error(f"⚠️ Erro ao renderizar painel: {e}")
