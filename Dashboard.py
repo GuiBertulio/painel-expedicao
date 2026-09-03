@@ -847,7 +847,7 @@ if ver_jornada:
             )
             
             df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
-            
+            df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
             
             def formatar_data_br(d_str):
                 d_str = str(d_str).strip()
@@ -902,7 +902,6 @@ if ver_jornada:
                 dados_tabela_jl.append({
                     "Matrícula": cod,
                     "Nome": nome,
-                    "Função": funcao,
                     "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
                     "Horas Separação": horas_sep_str
