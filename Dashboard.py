@@ -820,7 +820,6 @@ if ver_jornada:
                     else:
                         d_obj = datetime.datetime.strptime(d_str, '%d/%m/%Y').date()
                     
-                    # Checa se a data está no período aberto do site
                     if dt_inicio <= d_obj <= data_apuracao:
                         colunas_validas.append(c)
                 except Exception:
@@ -829,7 +828,6 @@ if ver_jornada:
         if not colunas_validas:
             st.warning(f"⚠️ Nenhuma data encontrada na planilha dentro do período de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}.")
         else:
-            # Função para formatar o nome feio da coluna para uma data limpa no Dropdown
             def formatar_data_dropdown(col_name):
                 match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(col_name))
                 if match:
@@ -840,7 +838,6 @@ if ver_jornada:
                     return d_str
                 return col_name
             
-            # Caixa de seleção (por padrão pega o último dia cadastrado na planilha dentro do ciclo)
             col_sel, col_vazia = st.columns([1, 3])
             data_selecionada = col_sel.selectbox(
                 "📅 Escolha o dia para analisar:", 
@@ -852,7 +849,6 @@ if ver_jornada:
             df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
             df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
             
-            # Formata a data para a busca no Ponto T3 ser infalível
             def formatar_data_br(d_str):
                 d_str = str(d_str).strip()
                 match = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
@@ -913,37 +909,14 @@ if ver_jornada:
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                # 💡 MÁGICA NOVA: Tabela em HTML com fonte grande (18px)
-                html_tabela = """
-                <style>
-                .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
-                .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
-                .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-                .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
-                </style>
-                <table class="tabela-jl">
-                    <tr>
-                        <th>Matrícula</th>
-                        <th>Nome</th>
-                        <th>Função</th>
-                        <th>Jornada Líquida (%)</th>
-                        <th>Horas Trabalhadas</th>
-                    </tr>
-                """
+                html_tabela = "<style>.tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; } .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; } .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); } .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }</style>"
+                html_tabela += "<table class='tabela-jl'><tr><th>Matrícula</th><th>Nome</th><th>Função</th><th>Jornada Líquida (%)</th><th>Horas Trabalhadas</th></tr>"
                 
                 for index, row_disp in df_display.iterrows():
-                    html_tabela += f"""
-                    <tr>
-                        <td>{row_disp['Matrícula']}</td>
-                        <td>{row_disp['Nome']}</td>
-                        <td>{row_disp['Função']}</td>
-                        <td><b style='color: #2ecc71;'>{row_disp['Jornada Líquida (%)']}</b></td>
-                        <td>{row_disp['Horas Trabalhadas']}</td>
-                    </tr>
-                    """
+                    html_tabela += f"<tr><td>{row_disp['Matrícula']}</td><td>{row_disp['Nome']}</td><td>{row_disp['Função']}</td><td><b style='color: #2ecc71;'>{row_disp['Jornada Líquida (%)']}</b></td><td>{row_disp['Horas Trabalhadas']}</td></tr>"
+                    
                 html_tabela += "</table><br><br>"
                 
-                # Renderiza a tabela grandona no painel
                 st.markdown(html_tabela, unsafe_allow_html=True)
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
