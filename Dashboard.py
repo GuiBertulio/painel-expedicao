@@ -900,7 +900,6 @@ if ver_jornada:
                         
                 # Montando a linha apenas com as colunas que você quer no print final
                 dados_tabela_jl.append({
-                    "Matrícula": cod,
                     "Nome": nome,
                     "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
