@@ -802,7 +802,7 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (TABELA INTERATIVA COM FILTROS)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (MATRIZ HTML E FILTRO DE DATA)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -898,8 +898,8 @@ if ver_jornada:
                             if h_sep.lower() not in ['nan', 'none', 'nat', '']:
                                 horas_sep_str = h_sep
                         
-                # Montando a linha apenas com as colunas que você quer no print final
                 dados_tabela_jl.append({
+                    "Matrícula": cod,
                     "Nome": nome,
                     "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
@@ -908,38 +908,37 @@ if ver_jornada:
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                # Ordena alfabeticamente pelo Nome
+                # 💡 ORDENAÇÃO ALFABÉTICA PELO NOME 
                 df_display = df_display.sort_values(by="Nome", ascending=True)
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                # CSS que amplia o tamanho da tabela de dados interativa para facilitar a leitura
-                st.markdown("""
-                    <style>
-                    [data-testid="stDataFrame"] {
-                        zoom: 1.25;
-                    }
-                    </style>
-                """, unsafe_allow_html=True)
+                # 💡 TABELA HTML ESTILIZADA SEM A COLUNA "FUNÇÃO"
+                html_tabela = """
+                <style>
+                .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
+                .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
+                .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                </style>
+                <table class="tabela-jl">
+                    <tr>
+                        <th>Matrícula</th>
+                        <th>Nome</th>
+                        <th>Jornada Líquida (%)</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Horas Separação</th>
+                    </tr>
+                """
                 
-                # Renderiza a tabela usando a formatação nativa do Streamlit
-                st.dataframe(
-                    df_display, 
-                    hide_index=True, 
-                    use_container_width=True,
-                    height=600,
-                    column_config={
-                        "Matrícula": st.column_config.TextColumn("Matrícula"),
-                        "Nome": st.column_config.TextColumn("Nome"),
-                        "Jornada Líquida (%)": st.column_config.NumberColumn(
-                            "Jornada Líquida (%)",
-                            format="%.1f%%"
-                        ),
-                        "Horas Trabalhadas": st.column_config.TextColumn("Horas Trabalhadas"),
-                        "Horas Separação": st.column_config.TextColumn("Horas Separação")
-                    }
-                )
+                for index, row_disp in df_display.iterrows():
+                    jl_formatado = f"{row_disp['Jornada Líquida (%)']:.1f}%".replace('.', ',')
+                    html_tabela += f"<tr><td>{row_disp['Matrícula']}</td><td>{row_disp['Nome']}</td><td><b style='color: #2ecc71;'>{jl_formatado}</b></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td></tr>"
+                    
+                html_tabela += "</table><br><br>"
+                
+                st.markdown(html_tabela, unsafe_allow_html=True)
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
