@@ -338,8 +338,6 @@ def carregar_diarios():
             
             headers = aba_bruta[header_idx]
             
-            # 💡 MUDANÇA AQUI: Removi a exclusão da aba Acompanhamento JL da regra de datas. 
-            # Agora ele junta as datas do cabeçalho normalmente.
             if header_idx > 0 and nome_aba not in ["Ponto T3"]:
                 linha_datas = []
                 for row_i in range(header_idx):
@@ -355,7 +353,6 @@ def carregar_diarios():
                         if match:
                             current_date = match.group(0)
                         
-                        # 💡 MUDANÇA AQUI: Se a coluna de baixo for vazia (Como na Acomp JL), o nome da coluna vira só a data!
                         if current_date and current_date not in str(headers[col_idx]):
                             val_head = str(headers[col_idx]).strip()
                             if val_head == "" or val_head == "None" or val_head == "nan":
@@ -804,32 +801,53 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (MATRIZ HTML E FILTRO DE DATA)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
     if df_acomp_jl.empty or df_ponto_t3.empty:
         st.warning("⚠️ As abas 'Acompanhamento JL' e/ou 'Ponto T3' não foram encontradas na sua planilha do Google.")
     else:
-        # Puxa todas as colunas que parecem datas 
-        colunas_data = [c for c in df_acomp_jl.columns if re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c))]
+        # 1. Filtra as datas disponíveis apenas para o "Período Apurado" atual
+        colunas_validas = []
+        for c in df_acomp_jl.columns:
+            match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c))
+            if match:
+                d_str = match.group(0)
+                try:
+                    if '-' in d_str:
+                        d_obj = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+                    else:
+                        d_obj = datetime.datetime.strptime(d_str, '%d/%m/%Y').date()
+                    
+                    # Checa se a data está no período aberto do site
+                    if dt_inicio <= d_obj <= data_apuracao:
+                        colunas_validas.append(c)
+                except Exception:
+                    pass
         
-        if not colunas_data:
-            st.warning("⚠️ Nenhuma data foi encontrada na aba 'Acompanhamento JL'.")
+        if not colunas_validas:
+            st.warning(f"⚠️ Nenhuma data encontrada na planilha dentro do período de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}.")
         else:
-            hoje = datetime.date.today()
-            ontem = hoje - datetime.timedelta(days=1)
-            ontem_str_1 = ontem.strftime("%d/%m/%Y")
-            ontem_str_2 = ontem.strftime("%Y-%m-%d")
+            # Função para formatar o nome feio da coluna para uma data limpa no Dropdown
+            def formatar_data_dropdown(col_name):
+                match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(col_name))
+                if match:
+                    d_str = match.group(0)
+                    if '-' in d_str:
+                        ano, mes, dia = d_str.split('-')
+                        return f"{dia}/{mes}/{ano}"
+                    return d_str
+                return col_name
             
-            default_idx = len(colunas_data) - 1
-            for i, c in enumerate(colunas_data):
-                if ontem_str_1 in c or ontem_str_2 in c:
-                    default_idx = i
-                    break
-            
+            # Caixa de seleção (por padrão pega o último dia cadastrado na planilha dentro do ciclo)
             col_sel, col_vazia = st.columns([1, 3])
-            data_selecionada = col_sel.selectbox("📅 Escolha o dia para analisar:", colunas_data, index=default_idx)
+            data_selecionada = col_sel.selectbox(
+                "📅 Escolha o dia para analisar:", 
+                colunas_validas, 
+                index=len(colunas_validas)-1,
+                format_func=formatar_data_dropdown
+            )
             
             df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
             df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
@@ -890,12 +908,43 @@ if ver_jornada:
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                df_display = df_display.sort_values(by="_jl_float", ascending=False).drop(columns=["_jl_float"])
+                df_display = df_display.sort_values(by="_jl_float", ascending=False)
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                st.dataframe(df_display, hide_index=True, use_container_width=True)
+                # 💡 MÁGICA NOVA: Tabela em HTML com fonte grande (18px)
+                html_tabela = """
+                <style>
+                .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
+                .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
+                .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                </style>
+                <table class="tabela-jl">
+                    <tr>
+                        <th>Matrícula</th>
+                        <th>Nome</th>
+                        <th>Função</th>
+                        <th>Jornada Líquida (%)</th>
+                        <th>Horas Trabalhadas</th>
+                    </tr>
+                """
+                
+                for index, row_disp in df_display.iterrows():
+                    html_tabela += f"""
+                    <tr>
+                        <td>{row_disp['Matrícula']}</td>
+                        <td>{row_disp['Nome']}</td>
+                        <td>{row_disp['Função']}</td>
+                        <td><b style='color: #2ecc71;'>{row_disp['Jornada Líquida (%)']}</b></td>
+                        <td>{row_disp['Horas Trabalhadas']}</td>
+                    </tr>
+                    """
+                html_tabela += "</table><br><br>"
+                
+                # Renderiza a tabela grandona no painel
+                st.markdown(html_tabela, unsafe_allow_html=True)
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
