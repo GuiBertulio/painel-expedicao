@@ -229,7 +229,6 @@ def conectar_planilha():
 def carregar_dados():
     try:
         planilha = conectar_planilha()
-        # Lendo direto a aba Aux Calc via gspread para se livrar do link CSV!
         aba_bruta = planilha.worksheet("Aux Calc").get_all_values()
     except Exception as e:
         st.error(f"Erro ao carregar a aba Aux Calc: {e}")
@@ -345,8 +344,8 @@ def carregar_diarios():
             
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
-                val_upper = [str(cell).strip().upper() for cell in row_vals]
-                if "NOME" in val_upper or "NOMECOMPLETO" in val_upper or "CÓD." in val_upper:
+                # Usando um verificador mais forte para o header do Ponto T3
+                if any("NOME" in str(cell).upper() or "CÓD" in str(cell).upper() or "CONTRATO" in str(cell).upper() for cell in row_vals):
                     header_idx = i
                     break
             
@@ -369,7 +368,10 @@ def carregar_diarios():
                         
                         if current_date and current_date not in str(headers[col_idx]):
                             val_head = str(headers[col_idx]).strip()
-                            headers[col_idx] = f"{current_date} - {val_head}"
+                            if val_head == "" or val_head == "None" or val_head == "nan":
+                                headers[col_idx] = current_date
+                            else:
+                                headers[col_idx] = f"{current_date} - {val_head}"
 
             df_aba = pd.DataFrame(aba_bruta[header_idx+1:], columns=headers)
             df_aba.columns = [str(c).strip() for c in df_aba.columns]
@@ -812,7 +814,7 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (TABELA HTML + FILTROS EXTERNOS)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (HTML ESTILIZADO + FILTROS EXTERNOS)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -860,18 +862,23 @@ if ver_jornada:
             df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
             
             def formatar_data_br(d_str):
-                d_str = str(d_str).strip()
-                match = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
-                if match:
-                    return f"{match.group(3)}/{match.group(2)}/{match.group(1)}"
+                d_str = str(d_str).strip().split(" ")[0]
+                match_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
+                if match_iso:
+                    return f"{match_iso.group(3)}/{match_iso.group(2)}/{match_iso.group(1)}"
+                match_br = re.search(r'(\d{2})/(\d{2})/(\d{4})', d_str)
+                if match_br:
+                    return f"{match_br.group(1)}/{match_br.group(2)}/{match_br.group(3)}"
                 return d_str
             
             data_busca_limpa = formatar_data_br(data_selecionada)
             
-            if 'DATA_BUSCA' not in df_ponto_t3.columns:
+            if not df_ponto_t3.empty and 'DATAAPURACAO' in df_ponto_t3.columns:
                 df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].apply(formatar_data_br)
-                
-            df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_busca_limpa]
+                df_ponto_t3['CONTRATO_LIMPO'] = df_ponto_t3['CONTRATO'].astype(str).str.replace('.0', '', regex=False).str.strip()
+                df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_busca_limpa]
+            else:
+                df_ponto_filt = pd.DataFrame()
             
             col_sep = next((c for c in df_ponto_filt.columns if 'SEPARA' in str(c).upper()), None)
             
@@ -880,7 +887,7 @@ if ver_jornada:
             qtd_validos = 0
             
             for _, row in df_jl_separadores.iterrows():
-                cod = str(row.get('CÓD.', '')).strip()
+                cod = str(row.get('CÓD.', '')).replace('.0', '').strip()
                 nome = str(row.get('NOME', '')).strip()
                 
                 val_jl_raw = str(row.get(data_selecionada, '0')).strip()
@@ -898,8 +905,8 @@ if ver_jornada:
                     
                 horas_str = "—"
                 horas_sep_str = "—"
-                if not df_ponto_filt.empty and 'CONTRATO' in df_ponto_filt.columns:
-                    match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO'].astype(str).str.strip() == cod]
+                if not df_ponto_filt.empty and 'CONTRATO_LIMPO' in df_ponto_filt.columns:
+                    match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
                     if not match_ponto.empty:
                         horas_str = str(match_ponto.iloc[0].get('JORNADA', '—')).strip()
                         if col_sep:
@@ -911,16 +918,14 @@ if ver_jornada:
                     "Nome": nome,
                     "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
-                    "Horas Separação": horas_sep_str
+                    "Horas Separação": horas_sep_str,
+                    "_jl_float": jl_float 
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
                 
-                media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
-                st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
-                
-                # 💡 NOVO: PAINEL DE FILTROS INTERATIVOS ACIMA DA TABELA HTML
+                # 💡 PAINEL DE FILTROS EXTERNOS (MANTÉM O VISUAL BONITO DO HTML INTACTO)
                 st.markdown("#### 🔍 Filtrar e Ordenar")
                 col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
                 busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
@@ -929,25 +934,28 @@ if ver_jornada:
                 # 💡 ORDEM CRESCENTE POR PADRÃO COMO VOCÊ PEDIU
                 ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Crescente (Menor JL)", "Ordem Decrescente (Maior JL)", "Nome (A-Z)"])
                 
-                # Aplicando os filtros
+                # Aplicando os filtros matematicamente no DataFrame
                 if busca_texto:
                     df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
                 
                 if jl_min > 0:
-                    df_display = df_display[df_display['Jornada Líquida (%)'] >= jl_min]
+                    df_display = df_display[df_display['_jl_float'] >= jl_min]
                     
-                # Aplicando a ordenação
+                # Aplicando a ordenação escolhida no menu
                 if ordenacao == "Ordem Crescente (Menor JL)":
-                    df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=True)
+                    df_display = df_display.sort_values(by="_jl_float", ascending=True)
                 elif ordenacao == "Ordem Decrescente (Maior JL)":
-                    df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=False)
+                    df_display = df_display.sort_values(by="_jl_float", ascending=False)
                 elif ordenacao == "Nome (A-Z)":
                     df_display = df_display.sort_values(by="Nome", ascending=True)
+
+                media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
+                st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
 
                 if df_display.empty:
                     st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                 else:
-                    # Renderiza a Tabela HTML Bonita com os dados filtrados
+                    # Renderiza a Tabela HTML Customizada com os dados já filtrados e ordenados
                     html_tabela = """
                     <style>
                     .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
@@ -965,7 +973,7 @@ if ver_jornada:
                     """
                     
                     for index, row_disp in df_display.iterrows():
-                        jl_formatado = f"{row_disp['Jornada Líquida (%)']:.1f}%".replace('.', ',')
+                        jl_formatado = f"{row_disp['_jl_float']:.1f}%".replace('.', ',')
                         html_tabela += f"<tr><td>{row_disp['Nome']}</td><td><b style='color: #2ecc71;'>{jl_formatado}</b></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td></tr>"
                         
                     html_tabela += "</table><br><br>"
