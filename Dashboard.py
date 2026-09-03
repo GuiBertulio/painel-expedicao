@@ -227,11 +227,24 @@ def conectar_planilha():
 
 @st.cache_data(ttl=60) 
 def carregar_dados():
-    link_csv = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDct-pz8fIwAXk-GX5Zcd-dknBBq4Dy4B0pbz6W8vDIvwjdWE2_e7ZQfefMRQcKG4-tvqdQR1Z4zMp/pub?gid=0&single=true&output=csv"
+    try:
+        planilha = conectar_planilha()
+        # Lendo direto a aba Aux Calc via gspread para se livrar do link CSV!
+        aba_bruta = planilha.worksheet("Aux Calc").get_all_values()
+    except Exception as e:
+        st.error(f"Erro ao carregar a aba Aux Calc: {e}")
+        return pd.DataFrame()
     
-    df = pd.read_csv(link_csv, decimal=',', thousands='.')
+    header_idx = 0
+    for i, row_vals in enumerate(aba_bruta):
+        val_upper = [str(cell).strip().upper() for cell in row_vals]
+        if "NOME" in val_upper or "CÓD." in val_upper:
+            header_idx = i
+            break
+            
+    df = pd.DataFrame(aba_bruta[header_idx+1:], columns=aba_bruta[header_idx])
     df.columns = df.columns.astype(str).str.strip()
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')] 
+    df = df.loc[:, df.columns != '']
     
     colunas = list(df.columns)
     for i, col in enumerate(colunas):
@@ -356,10 +369,7 @@ def carregar_diarios():
                         
                         if current_date and current_date not in str(headers[col_idx]):
                             val_head = str(headers[col_idx]).strip()
-                            if val_head == "" or val_head == "None" or val_head == "nan":
-                                headers[col_idx] = current_date
-                            else:
-                                headers[col_idx] = f"{current_date} - {val_head}"
+                            headers[col_idx] = f"{current_date} - {val_head}"
 
             df_aba = pd.DataFrame(aba_bruta[header_idx+1:], columns=headers)
             df_aba.columns = [str(c).strip() for c in df_aba.columns]
@@ -898,58 +908,69 @@ if ver_jornada:
                                 horas_sep_str = h_sep
                         
                 dados_tabela_jl.append({
-                    "Matrícula": cod,
                     "Nome": nome,
+                    "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
-                    "Horas Separação": horas_sep_str,
-                    "_jl_float": jl_float 
+                    "Horas Separação": horas_sep_str
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
                 
-                # 💡 NOVA OPÇÃO DE ORDENAÇÃO EXTERNA (Não quebra o visual HTML)
-                ordem = st.radio(
-                    "↕️ Ordenar tabela por:", 
-                    ["Ordem Crescente (Menor JL primeiro)", "Ordem Decrescente (Maior JL primeiro)", "Ordem Alfabética (A-Z)"],
-                    index=0, # Deixando como Crescente por padrão como você pediu
-                    horizontal=True
-                )
-                
-                if ordem == "Ordem Crescente (Menor JL primeiro)":
-                    df_display = df_display.sort_values(by="_jl_float", ascending=True)
-                elif ordem == "Ordem Decrescente (Maior JL primeiro)":
-                    df_display = df_display.sort_values(by="_jl_float", ascending=False)
-                else:
-                    df_display = df_display.sort_values(by="Nome", ascending=True)
-                
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                # 💡 TABELA HTML ESTILIZADA INTACTA
-                html_tabela = """
-                <style>
-                .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
-                .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
-                .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-                .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
-                </style>
-                <table class="tabela-jl">
-                    <tr>
-                        <th>Nome</th>
-                        <th>Jornada Líquida (%)</th>
-                        <th>Horas Trabalhadas</th>
-                        <th>Horas Separação</th>
-                    </tr>
-                """
+                # 💡 NOVO: PAINEL DE FILTROS INTERATIVOS ACIMA DA TABELA HTML
+                st.markdown("#### 🔍 Filtrar e Ordenar")
+                col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
+                busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
+                jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
                 
-                for index, row_disp in df_display.iterrows():
-                    jl_formatado = f"{row_disp['_jl_float']:.1f}%".replace('.', ',')
-                    html_tabela += f"<tr><td>{row_disp['Nome']}</td><td><b style='color: #2ecc71;'>{jl_formatado}</b></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td></tr>"
+                # 💡 ORDEM CRESCENTE POR PADRÃO COMO VOCÊ PEDIU
+                ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Crescente (Menor JL)", "Ordem Decrescente (Maior JL)", "Nome (A-Z)"])
+                
+                # Aplicando os filtros
+                if busca_texto:
+                    df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
+                
+                if jl_min > 0:
+                    df_display = df_display[df_display['Jornada Líquida (%)'] >= jl_min]
                     
-                html_tabela += "</table><br><br>"
-                
-                st.markdown(html_tabela, unsafe_allow_html=True)
+                # Aplicando a ordenação
+                if ordenacao == "Ordem Crescente (Menor JL)":
+                    df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=True)
+                elif ordenacao == "Ordem Decrescente (Maior JL)":
+                    df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=False)
+                elif ordenacao == "Nome (A-Z)":
+                    df_display = df_display.sort_values(by="Nome", ascending=True)
+
+                if df_display.empty:
+                    st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
+                else:
+                    # Renderiza a Tabela HTML Bonita com os dados filtrados
+                    html_tabela = """
+                    <style>
+                    .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
+                    .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
+                    .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                    .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                    </style>
+                    <table class="tabela-jl">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Jornada Líquida (%)</th>
+                            <th>Horas Trabalhadas</th>
+                            <th>Horas Separação</th>
+                        </tr>
+                    """
+                    
+                    for index, row_disp in df_display.iterrows():
+                        jl_formatado = f"{row_disp['Jornada Líquida (%)']:.1f}%".replace('.', ',')
+                        html_tabela += f"<tr><td>{row_disp['Nome']}</td><td><b style='color: #2ecc71;'>{jl_formatado}</b></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td></tr>"
+                        
+                    html_tabela += "</table><br><br>"
+                    
+                    st.markdown(html_tabela, unsafe_allow_html=True)
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
