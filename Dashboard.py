@@ -176,6 +176,7 @@ USUARIOS = {
     "rh": {"senha": "rh#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "andreus": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "gabriel": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": ["T1", "T2"]},
     "flamarion": {"senha": "sub#26", "perfil": "Líder", "turno_acesso": ["T1", "T2"]}, 
     "guilherme": {"senha": "estag#26", "perfil": "Gerente", "turno_acesso": "Todos"},
     "adriano": {"senha": "Adriano@26TAF", "perfil": "Líder", "turno_acesso": "T1"},
@@ -863,7 +864,6 @@ if ver_jornada:
                 
             df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_busca_limpa]
             
-            # 💡 Busca a coluna de Horas Separação dinamicamente
             col_sep = next((c for c in df_ponto_filt.columns if 'SEPARA' in str(c).upper()), None)
             
             dados_tabela_jl = []
@@ -873,7 +873,6 @@ if ver_jornada:
             for _, row in df_jl_separadores.iterrows():
                 cod = str(row.get('CÓD.', '')).strip()
                 nome = str(row.get('NOME', '')).strip()
-                funcao = str(row.get('FUNÇÃO', '')).strip()
                 
                 val_jl_raw = str(row.get(data_selecionada, '0')).strip()
                 try:
@@ -899,6 +898,7 @@ if ver_jornada:
                             if h_sep.lower() not in ['nan', 'none', 'nat', '']:
                                 horas_sep_str = h_sep
                         
+                # Montando a linha apenas com as colunas que você quer no print final
                 dados_tabela_jl.append({
                     "Matrícula": cod,
                     "Nome": nome,
@@ -909,12 +909,13 @@ if ver_jornada:
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=False)
+                # Ordena alfabeticamente pelo Nome
+                df_display = df_display.sort_values(by="Nome", ascending=True)
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                # 💡 Truque de CSS para dar zoom na tabela interativa do Streamlit
+                # CSS que amplia o tamanho da tabela de dados interativa para facilitar a leitura
                 st.markdown("""
                     <style>
                     [data-testid="stDataFrame"] {
@@ -923,6 +924,7 @@ if ver_jornada:
                     </style>
                 """, unsafe_allow_html=True)
                 
+                # Renderiza a tabela usando a formatação nativa do Streamlit
                 st.dataframe(
                     df_display, 
                     hide_index=True, 
@@ -930,6 +932,7 @@ if ver_jornada:
                     height=600,
                     column_config={
                         "Matrícula": st.column_config.TextColumn("Matrícula"),
+                        "Nome": st.column_config.TextColumn("Nome"),
                         "Jornada Líquida (%)": st.column_config.NumberColumn(
                             "Jornada Líquida (%)",
                             format="%.1f%%"
