@@ -801,7 +801,7 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (MATRIZ HTML E FILTRO DE DATA)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (TABELA INTERATIVA COM FILTROS)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -863,6 +863,9 @@ if ver_jornada:
                 
             df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_busca_limpa]
             
+            # 💡 Busca a coluna de Horas Separação dinamicamente
+            col_sep = next((c for c in df_ponto_filt.columns if 'SEPARA' in str(c).upper()), None)
+            
             dados_tabela_jl = []
             soma_jl_flt = 0.0
             qtd_validos = 0
@@ -877,47 +880,65 @@ if ver_jornada:
                     val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
                     if val_num <= 2.0 and '%' not in val_jl_raw: 
                         val_num *= 100
-                    jl_str = f"{val_num:.1f}%".replace('.', ',')
                     jl_float = val_num
                     
                     if val_num > 0:
                         soma_jl_flt += val_num
                         qtd_validos += 1
                 except:
-                    jl_str = val_jl_raw if val_jl_raw else "0,0%"
                     jl_float = 0.0
                     
                 horas_str = "—"
+                horas_sep_str = "—"
                 if not df_ponto_filt.empty and 'CONTRATO' in df_ponto_filt.columns:
                     match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO'].astype(str).str.strip() == cod]
                     if not match_ponto.empty:
                         horas_str = str(match_ponto.iloc[0].get('JORNADA', '—')).strip()
+                        if col_sep:
+                            h_sep = str(match_ponto.iloc[0].get(col_sep, '—')).strip()
+                            if h_sep.lower() not in ['nan', 'none', 'nat', '']:
+                                horas_sep_str = h_sep
                         
                 dados_tabela_jl.append({
                     "Matrícula": cod,
                     "Nome": nome,
                     "Função": funcao,
-                    "Jornada Líquida (%)": jl_str,
+                    "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
-                    "_jl_float": jl_float 
+                    "Horas Separação": horas_sep_str
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                df_display = df_display.sort_values(by="_jl_float", ascending=False)
+                df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=False)
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                html_tabela = "<style>.tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; } .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; } .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); } .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }</style>"
-                html_tabela += "<table class='tabela-jl'><tr><th>Matrícula</th><th>Nome</th><th>Função</th><th>Jornada Líquida (%)</th><th>Horas Trabalhadas</th></tr>"
+                # 💡 Truque de CSS para dar zoom na tabela interativa do Streamlit
+                st.markdown("""
+                    <style>
+                    [data-testid="stDataFrame"] {
+                        zoom: 1.25;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
                 
-                for index, row_disp in df_display.iterrows():
-                    html_tabela += f"<tr><td>{row_disp['Matrícula']}</td><td>{row_disp['Nome']}</td><td>{row_disp['Função']}</td><td><b style='color: #2ecc71;'>{row_disp['Jornada Líquida (%)']}</b></td><td>{row_disp['Horas Trabalhadas']}</td></tr>"
-                    
-                html_tabela += "</table><br><br>"
-                
-                st.markdown(html_tabela, unsafe_allow_html=True)
+                st.dataframe(
+                    df_display, 
+                    hide_index=True, 
+                    use_container_width=True,
+                    height=600,
+                    column_config={
+                        "Matrícula": st.column_config.TextColumn("Matrícula"),
+                        "Jornada Líquida (%)": st.column_config.NumberColumn(
+                            "Jornada Líquida (%)",
+                            format="%.1f%%"
+                        ),
+                        "Horas Trabalhadas": st.column_config.TextColumn("Horas Trabalhadas"),
+                        "Horas Separação": st.column_config.TextColumn("Horas Separação")
+                    }
+                )
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
