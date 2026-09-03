@@ -802,14 +802,13 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (MATRIZ HTML + PAINEL DE FILTROS INTERATIVO)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (TABELA INTERATIVA + ESTILO DE CORES)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
     if df_acomp_jl.empty or df_ponto_t3.empty:
         st.warning("⚠️ As abas 'Acompanhamento JL' e/ou 'Ponto T3' não foram encontradas na sua planilha do Google.")
     else:
-        # 1. Filtra as datas disponíveis apenas para o "Período Apurado" atual
         colunas_validas = []
         for c in df_acomp_jl.columns:
             match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c))
@@ -901,69 +900,47 @@ if ver_jornada:
                 dados_tabela_jl.append({
                     "Matrícula": cod,
                     "Nome": nome,
+                    "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
-                    "Horas Separação": horas_sep_str,
-                    "_jl_float": jl_float 
+                    "Horas Separação": horas_sep_str
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
+                # O padrão inicial é Ordem Alfabética, mas a tabela permite o gestor reordenar ao clicar nos títulos
+                df_display = df_display.sort_values(by="Nome", ascending=True)
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                # 💡 NOVO: PAINEL DE FILTROS INTERATIVOS ACIMA DA TABELA HTML
-                st.markdown("#### 🔍 Filtrar e Ordenar")
-                col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
-                busca_texto = col_f1.text_input("Buscar Nome ou Matrícula:", "", placeholder="Digite para pesquisar...")
-                jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
-                ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Nome (A-Z)", "Maior JL", "Menor JL"])
-                
-                # Aplicando os filtros matematicamente no DataFrame
-                if busca_texto:
-                    mask = df_display['Nome'].str.contains(busca_texto, case=False, na=False) | \
-                           df_display['Matrícula'].astype(str).str.contains(busca_texto, case=False, na=False)
-                    df_display = df_display[mask]
-                
-                if jl_min > 0:
-                    df_display = df_display[df_display['_jl_float'] >= jl_min]
-                    
-                # Aplicando a ordenação escolhida no menu
-                if ordenacao == "Maior JL":
-                    df_display = df_display.sort_values(by="_jl_float", ascending=False)
-                elif ordenacao == "Menor JL":
-                    df_display = df_display.sort_values(by="_jl_float", ascending=True)
-                elif ordenacao == "Nome (A-Z)":
-                    df_display = df_display.sort_values(by="Nome", ascending=True)
-
-                if df_display.empty:
-                    st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
-                else:
-                    # Renderiza a Tabela HTML Customizada com os dados já filtrados e ordenados
-                    html_tabela = """
+                # 💡 HACK CSS: Aumenta o tamanho das fontes e linhas da tabela nativa do Streamlit
+                st.markdown("""
                     <style>
-                    .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
-                    .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
-                    .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-                    .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                    [data-testid="stDataFrame"] {
+                        zoom: 1.35;
+                    }
                     </style>
-                    <table class="tabela-jl">
-                        <tr>
-                            <th>Matrícula</th>
-                            <th>Nome</th>
-                            <th>Jornada Líquida (%)</th>
-                            <th>Horas Trabalhadas</th>
-                            <th>Horas Separação</th>
-                        </tr>
-                    """
-                    
-                    for index, row_disp in df_display.iterrows():
-                        jl_formatado = f"{row_disp['_jl_float']:.1f}%".replace('.', ',')
-                        html_tabela += f"<tr><td>{row_disp['Matrícula']}</td><td>{row_disp['Nome']}</td><td><b style='color: #2ecc71;'>{jl_formatado}</b></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td></tr>"
-                        
-                    html_tabela += "</table><br><br>"
-                    
-                    st.markdown(html_tabela, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
+                # 💡 MÁGICA: Injeta o estilo verde vibrante na coluna JL sem perder o poder de filtro/ordenação
+                styled_df = df_display.style.map(
+                    lambda _: 'color: #2ecc71; font-weight: bold;', subset=['Jornada Líquida (%)']
+                ).format({
+                    'Jornada Líquida (%)': lambda x: f"{x:.1f}%".replace('.', ',')
+                })
+                
+                st.dataframe(
+                    styled_df, 
+                    hide_index=True, 
+                    use_container_width=True,
+                    height=600,
+                    column_config={
+                        "Matrícula": st.column_config.TextColumn("Matrícula"),
+                        "Nome": st.column_config.TextColumn("Nome"),
+                        "Horas Trabalhadas": st.column_config.TextColumn("Horas Trabalhadas"),
+                        "Horas Separação": st.column_config.TextColumn("Horas Separação")
+                    }
+                )
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
