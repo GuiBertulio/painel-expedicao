@@ -345,8 +345,8 @@ def carregar_diarios():
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
                 val_upper = [str(cell).strip().upper() for cell in row_vals]
-                # Ponto e Acomp usam NOME, Base Separação geralmente usa header 0 e tem "OPERADOR" ou "BOX"
-                if "NOME" in val_upper or "NOMECOMPLETO" in val_upper or "CÓD." in val_upper or "BOX" in val_upper or "OPERADOR" in val_upper:
+                # Leitura flexível para todas as abas
+                if any(k in val_upper for k in ["NOME", "NOMECOMPLETO", "CÓD.", "BOX", "OPERADOR"]):
                     header_idx = i
                     break
             
@@ -817,7 +817,24 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL COM CRUZAMENTO DA BASE DE SEPARAÇÃO E PONTO T3
+# FUNÇÃO AUXILIAR PARA SOMAR HORÁRIOS DA BASE SEPARAÇÃO
+def sum_time_strings(time_series):
+    total_seconds = 0
+    for t_str in time_series:
+        t_str = str(t_str).strip()
+        if t_str and t_str.count(':') >= 1:
+            try:
+                parts = t_str.split(':')
+                if len(parts) == 3:
+                    h, m, s = map(int, parts)
+                elif len(parts) == 2:
+                    h, m = map(int, parts)
+                    s = 0
+                total_seconds += h*3600 + m*60 + s
+            except: pass
+    return total_seconds
+
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (TABELA NATIVA DO STREAMLIT COM HACK DE ZOOM)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -864,7 +881,7 @@ if ver_jornada:
             df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
             df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
             
-            # Limpadores de Busca para garantir o Cruzamento com o Ponto
+            # Limpeza cirúrgica das datas para garantir o cruzamento
             def formatar_data_br(d_str):
                 d_str = str(d_str).strip().split(" ")[0]
                 match_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
@@ -877,6 +894,12 @@ if ver_jornada:
             
             data_busca_limpa = formatar_data_br(data_selecionada)
             
+            # 💡 HACK PARA O TURNO DA NOITE: Agrupar tudo das 15:00 de ontem até as 14:59 de hoje
+            dt_busca = datetime.datetime.strptime(data_busca_limpa, '%d/%m/%Y')
+            dt_inicio_turno = dt_busca - datetime.timedelta(days=1)
+            dt_inicio_turno = dt_inicio_turno.replace(hour=15, minute=0, second=0)
+            dt_fim_turno = dt_busca.replace(hour=14, minute=59, second=59)
+
             if not df_ponto_t3.empty and 'DATAAPURACAO' in df_ponto_t3.columns:
                 df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].apply(formatar_data_br)
                 df_ponto_t3['CONTRATO_LIMPO'] = df_ponto_t3['CONTRATO'].astype(str).str.replace('.0', '', regex=False).str.strip()
@@ -886,14 +909,14 @@ if ver_jornada:
             
             col_sep = next((c for c in df_ponto_filt.columns if 'SEPARA' in str(c).upper()), None)
             
-            # Preparar leitura dos Itens Hora no Relatorio Diario
-            idx_data_diario = -1
-            if not df_diario.empty:
-                for i, c in enumerate(df_diario.columns):
-                    if data_busca_limpa in str(c):
-                        idx_data_diario = i
-                        break
-            
+            # Preparar o filtro da Base Separacao com o agrupamento do turno da noite
+            df_base_turno = pd.DataFrame()
+            if not df_base_sep.empty and 'dtaAntes' in df_base_sep.columns:
+                df_base_sep['dtaAntes_dt'] = pd.to_datetime(df_base_sep['dtaAntes'], dayfirst=True, errors='coerce')
+                df_base_sep['dtaDepois_dt'] = pd.to_datetime(df_base_sep['dtaDepois'], dayfirst=True, errors='coerce')
+                mask_data = (df_base_sep['dtaAntes_dt'] >= dt_inicio_turno) & (df_base_sep['dtaAntes_dt'] <= dt_fim_turno)
+                df_base_turno = df_base_sep[mask_data].copy()
+
             dados_tabela_jl = []
             soma_jl_flt = 0.0
             qtd_validos = 0
@@ -902,7 +925,7 @@ if ver_jornada:
                 cod = str(row.get('CÓD.', '')).replace('.0', '').strip()
                 nome = str(row.get('NOME', '')).strip()
                 
-                # 1. Puxando Jornada Líquida
+                # 1. Puxando Jornada Líquida original
                 val_jl_raw = str(row.get(data_selecionada, '0')).strip()
                 try:
                     val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
@@ -921,149 +944,118 @@ if ver_jornada:
                 if not df_ponto_filt.empty and 'CONTRATO_LIMPO' in df_ponto_filt.columns:
                     match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
                     if not match_ponto.empty:
-                        horas_str = str(match_ponto.iloc[0].get('JORNADA', '—')).strip()
+                        h_trab = str(match_ponto.iloc[0].get('JORNADA', '—')).strip()
+                        if h_trab.lower() not in ['nan', 'none', 'nat', '']: horas_str = h_trab
+                        
                         if col_sep:
                             h_sep = str(match_ponto.iloc[0].get(col_sep, '—')).strip()
                             if h_sep.lower() not in ['nan', 'none', 'nat', '']:
                                 horas_sep_str = h_sep
                 
-                # 3. Puxando Itens e Velocidade do Relatório Diário Original
+                # 3. Puxando Bipes e Metricas direto da Fonte (Base Separacao)
                 v_itens = 0
                 v_veloc = 0.0
-                if idx_data_diario != -1 and not df_diario.empty:
-                    df_diario['COD_LIMPO'] = df_diario['CÓD.'].astype(str).str.replace('.0', '', regex=False).str.strip()
-                    match_diario = df_diario[df_diario['COD_LIMPO'] == cod]
-                    if not match_diario.empty:
-                        try: v_itens = int(float(str(match_diario.iloc[0, idx_data_diario]).replace('.', '').replace(',', '.')))
-                        except: v_itens = 0
-                        try: v_veloc = round(float(str(match_diario.iloc[0, idx_data_diario + 2]).replace('.', '').replace(',', '.')), 1)
-                        except: v_veloc = 0.0
-                
-                # 4. Puxando os Bipes e Janta da Base de Separação
                 primeiro_bipe = "—"
                 ultimo_bipe = "—"
                 tempo_janta = "—"
                 
-                if not df_base_sep.empty:
-                    # Garantindo que a data seja encontrada (removendo zeros das pontas)
-                    if 'DATA_LIMPA' not in df_base_sep.columns and 'dtaAntes' in df_base_sep.columns:
-                        df_base_sep['DATA_LIMPA'] = df_base_sep['dtaAntes'].astype(str).apply(formatar_data_br)
+                if not df_base_turno.empty:
+                    primeiro_nome = nome.split()[0].upper() if nome else ""
                     
-                    # Localizando o operador pelo CÓD (garantindo que se for a nova coluna, não puxe vazio)
-                    mask_op = pd.Series(False, index=df_base_sep.index)
-                    if 'codOperador' in df_base_sep.columns:
-                        mask_op = df_base_sep['codOperador'].astype(str).str.replace('.0', '', regex=False).str.strip() == cod
-                    elif 'CÓD.' in df_base_sep.columns:
-                        mask_op = df_base_sep['CÓD.'].astype(str).str.replace('.0', '', regex=False).str.strip() == cod
-                    elif 'operador' in df_base_sep.columns:
-                        primeiro_nome = nome.split()[0].upper()
-                        mask_op = df_base_sep['operador'].astype(str).str.upper().str.contains(primeiro_nome)
+                    # Filtra o operador exato
+                    col_cod_base = next((c for c in df_base_turno.columns if 'CÓD' in str(c).upper() or 'CODOPERADOR' in str(c).upper()), None)
+                    col_op_base = next((c for c in df_base_turno.columns if 'OPERADOR' in str(c).upper() and 'COD' not in str(c).upper()), None)
                     
-                    df_base_filt = df_base_sep[mask_op & (df_base_sep['DATA_LIMPA'] == data_busca_limpa)]
+                    mask_op = pd.Series(False, index=df_base_turno.index)
+                    if col_cod_base:
+                        mask_op = mask_op | (df_base_turno[col_cod_base].astype(str).str.replace('.0', '', regex=False).str.strip() == cod)
+                    if col_op_base:
+                        mask_op = mask_op | (df_base_turno[col_op_base].astype(str).str.upper().str.contains(primeiro_nome))
+                        
+                    df_base_filt = df_base_turno[mask_op]
                     
                     if not df_base_filt.empty:
-                        # Extraindo o menor horário da coluna dtaAntes
-                        try:
-                            datas_a = pd.to_datetime(df_base_filt['dtaAntes'], errors='coerce').dropna()
-                            if not datas_a.empty:
-                                primeiro_bipe = datas_a.min().strftime('%H:%M:%S')
-                        except: pass
+                        # Extrai Bipes Corretos (Protegidos do Turno da Noite)
+                        min_dt = df_base_filt['dtaAntes_dt'].min()
+                        if pd.notna(min_dt): primeiro_bipe = min_dt.strftime('%H:%M:%S')
                         
-                        # Extraindo o maior horário da coluna dtaDepois
-                        try:
-                            datas_d = pd.to_datetime(df_base_filt['dtaDepois'], errors='coerce').dropna()
-                            if not datas_d.empty:
-                                ultimo_bipe = datas_d.max().strftime('%H:%M:%S')
-                        except: pass
+                        max_dt = df_base_filt['dtaDepois_dt'].max()
+                        if pd.notna(max_dt): ultimo_bipe = max_dt.strftime('%H:%M:%S')
                         
-                        # Somando o Intervalo de Janta
+                        # Extrai Quantidade Total
+                        col_qtd = next((c for c in df_base_filt.columns if 'QTDITENS' in str(c).upper() or 'QTD' in str(c).upper()), None)
+                        if col_qtd:
+                            v_itens = int(pd.to_numeric(df_base_filt[col_qtd], errors='coerce').fillna(0).sum())
+                            
+                        # Extrai Itens/Hora Baseado na JL Total Real (Soma de tempo)
+                        col_jl = next((c for c in df_base_filt.columns if str(c).strip().upper() == 'JL'), None)
+                        if col_jl:
+                            jl_seconds = sum_time_strings(df_base_filt[col_jl])
+                            if jl_seconds > 0:
+                                v_veloc = round(v_itens / (jl_seconds / 3600.0), 1)
+
+                        # Extrai o Tempo Exato de Janta
                         col_almoco = next((c for c in df_base_filt.columns if 'ALMOÇO' in str(c).upper() or 'JANTA' in str(c).upper()), None)
-                        if col_almoco and 'Intervalo' in df_base_filt.columns:
+                        col_intervalo = next((c for c in df_base_filt.columns if 'INTERVALO' in str(c).upper() and 'P' not in str(c).upper()), None)
+                        
+                        if col_almoco and col_intervalo:
                             janta_df = df_base_filt[df_base_filt[col_almoco].astype(str).str.strip().str.upper() == 'S']
-                            try:
-                                tempo_td = pd.to_timedelta(janta_df['Intervalo'].astype(str), errors='coerce').sum()
-                                if pd.notna(tempo_td) and tempo_td.total_seconds() > 0:
-                                    total_s = int(tempo_td.total_seconds())
-                                    h, rem = divmod(total_s, 3600)
-                                    m, s = divmod(rem, 60)
-                                    tempo_janta = f"{h:02d}:{m:02d}:{s:02d}"
-                            except: pass
+                            janta_seconds = sum_time_strings(janta_df[col_intervalo])
+                            if janta_seconds > 0:
+                                h, rem = divmod(janta_seconds, 3600)
+                                m, s = divmod(rem, 60)
+                                tempo_janta = f"{h:02d}:{m:02d}:{s:02d}"
 
                 dados_tabela_jl.append({
                     "Nome": nome,
-                    "Jornada Líquida (%)": jl_float,
-                    "Horas Trabalhadas": horas_str,
-                    "Horas Separação": horas_sep_str,
+                    "Jornada Líquida": jl_float,
+                    "Horas Trab.": horas_str,
+                    "Horas Sep.": horas_sep_str,
                     "Qtd Itens": v_itens,
                     "Itens/Hora": v_veloc,
                     "1º Bipe": primeiro_bipe,
                     "Último Bipe": ultimo_bipe,
-                    "Tempo Janta": tempo_janta,
-                    "_jl_float": jl_float 
+                    "Tempo Janta": tempo_janta
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
+                # O padrão inicial é Crescente pela Jornada Líquida, como você pediu!
+                df_display = df_display.sort_values(by="Jornada Líquida", ascending=True)
                 
-                # 💡 PAINEL DE FILTROS EXTERNOS MANTIDO
-                st.markdown("#### 🔍 Filtrar e Ordenar")
-                col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
-                busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
-                jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
-                ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Crescente (Menor JL)", "Ordem Decrescente (Maior JL)", "Nome (A-Z)"])
-                
-                if busca_texto: df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
-                if jl_min > 0: df_display = df_display[df_display['_jl_float'] >= jl_min]
-                    
-                if ordenacao == "Ordem Crescente (Menor JL)": df_display = df_display.sort_values(by="_jl_float", ascending=True)
-                elif ordenacao == "Ordem Decrescente (Maior JL)": df_display = df_display.sort_values(by="_jl_float", ascending=False)
-                elif ordenacao == "Nome (A-Z)": df_display = df_display.sort_values(by="Nome", ascending=True)
-
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
-
-                if df_display.empty:
-                    st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
-                else:
-                    # 💡 A TABELA HTML ESTILIZADA AGORA CONTÉM TODOS OS INDICADORES DIRETOS DA BASE
-                    html_tabela = """
+                
+                # 💡 CSS HACK: Aumenta o tamanho da tabela nativa do Streamlit para manter as letras grandes e legíveis
+                st.markdown("""
                     <style>
-                    .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 16px; color: #e0e0e0; }
-                    .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 10px 12px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; white-space: nowrap; }
-                    .tabela-jl td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-                    .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                    [data-testid="stDataFrame"] {
+                        zoom: 1.35;
+                    }
                     </style>
-                    <table class="tabela-jl">
-                        <tr>
-                            <th>Nome</th>
-                            <th>Jornada Líquida</th>
-                            <th>Horas Trab.</th>
-                            <th>Horas Sep.</th>
-                            <th>Qtd Itens</th>
-                            <th>Itens/Hora</th>
-                            <th>1º Bipe</th>
-                            <th>Último Bipe</th>
-                            <th>Tempo Janta</th>
-                        </tr>
-                    """
-                    
-                    for index, row_disp in df_display.iterrows():
-                        jl_formatado = f"{row_disp['_jl_float']:.1f}%".replace('.', ',')
-                        html_tabela += f"""<tr>
-                            <td>{row_disp['Nome']}</td>
-                            <td><b style='color: #2ecc71;'>{jl_formatado}</b></td>
-                            <td>{row_disp['Horas Trabalhadas']}</td>
-                            <td>{row_disp['Horas Separação']}</td>
-                            <td>{row_disp['Qtd Itens']}</td>
-                            <td>{row_disp['Itens/Hora']}</td>
-                            <td style='color: #ffca28;'>{row_disp['1º Bipe']}</td>
-                            <td style='color: #ffca28;'>{row_disp['Último Bipe']}</td>
-                            <td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td>
-                        </tr>"""
-                        
-                    html_tabela += "</table><br><br>"
-                    
-                    st.markdown(html_tabela, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
+                # 💡 Tabela Nativa: Clicável, Ordenável e com a barra visual na JL!
+                st.dataframe(
+                    df_display, 
+                    hide_index=True, 
+                    use_container_width=True,
+                    height=650,
+                    column_config={
+                        "Nome": st.column_config.TextColumn("Nome do Colaborador"),
+                        "Jornada Líquida": st.column_config.NumberColumn(
+                            "Jornada Líquida",
+                            format="%.1f%%"
+                        ),
+                        "Horas Trab.": st.column_config.TextColumn("Horas Trab."),
+                        "Horas Sep.": st.column_config.TextColumn("Horas Sep."),
+                        "Qtd Itens": st.column_config.NumberColumn("Qtd Itens"),
+                        "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%.1f"),
+                        "1º Bipe": st.column_config.TextColumn("1º Bipe"),
+                        "Último Bipe": st.column_config.TextColumn("Último Bipe"),
+                        "Tempo Janta": st.column_config.TextColumn("Tempo Janta")
+                    }
+                )
             else:
                 st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
 
