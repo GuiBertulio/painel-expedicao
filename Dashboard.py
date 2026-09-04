@@ -334,7 +334,7 @@ def carregar_dados():
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame(), 'base_sep': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
         
@@ -344,14 +344,15 @@ def carregar_diarios():
             
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
-                # Usando um verificador mais forte para o header do Ponto T3
-                if any("NOME" in str(cell).upper() or "CÓD" in str(cell).upper() or "CONTRATO" in str(cell).upper() for cell in row_vals):
+                val_upper = [str(cell).strip().upper() for cell in row_vals]
+                # Ponto e Acomp usam NOME, Base Separação geralmente usa header 0 e tem "OPERADOR" ou "BOX"
+                if "NOME" in val_upper or "NOMECOMPLETO" in val_upper or "CÓD." in val_upper or "BOX" in val_upper or "OPERADOR" in val_upper:
                     header_idx = i
                     break
             
             headers = aba_bruta[header_idx]
             
-            if header_idx > 0 and nome_aba not in ["Ponto T3"]:
+            if header_idx > 0 and nome_aba not in ["Ponto T3", "Base Separacao"]:
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
@@ -389,18 +390,20 @@ def carregar_diarios():
         except: pass
         try: dfs['ponto_t3'] = processar_aba("Ponto T3")
         except: pass
+        try: dfs['base_sep'] = processar_aba("Base Separacao")
+        except: pass
 
     except Exception as e:
         print(f"Erro ao carregar abas diárias: {e}")
         pass
     
-    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl'], dfs['ponto_t3']
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl'], dfs['ponto_t3'], dfs['base_sep']
 
 # =============================================================================
 # 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
-df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl, df_ponto_t3 = carregar_diarios()
+df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl, df_ponto_t3, df_base_sep = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
@@ -814,7 +817,7 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (HTML ESTILIZADO + FILTROS EXTERNOS)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL COM CRUZAMENTO DA BASE DE SEPARAÇÃO E PONTO T3
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -861,6 +864,7 @@ if ver_jornada:
             df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
             df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
             
+            # Limpadores de Busca para garantir o Cruzamento com o Ponto
             def formatar_data_br(d_str):
                 d_str = str(d_str).strip().split(" ")[0]
                 match_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
@@ -882,6 +886,14 @@ if ver_jornada:
             
             col_sep = next((c for c in df_ponto_filt.columns if 'SEPARA' in str(c).upper()), None)
             
+            # Preparar leitura dos Itens Hora no Relatorio Diario
+            idx_data_diario = -1
+            if not df_diario.empty:
+                for i, c in enumerate(df_diario.columns):
+                    if data_busca_limpa in str(c):
+                        idx_data_diario = i
+                        break
+            
             dados_tabela_jl = []
             soma_jl_flt = 0.0
             qtd_validos = 0
@@ -890,19 +902,20 @@ if ver_jornada:
                 cod = str(row.get('CÓD.', '')).replace('.0', '').strip()
                 nome = str(row.get('NOME', '')).strip()
                 
+                # 1. Puxando Jornada Líquida
                 val_jl_raw = str(row.get(data_selecionada, '0')).strip()
                 try:
                     val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
                     if val_num <= 2.0 and '%' not in val_jl_raw: 
                         val_num *= 100
                     jl_float = val_num
-                    
                     if val_num > 0:
                         soma_jl_flt += val_num
                         qtd_validos += 1
                 except:
                     jl_float = 0.0
                     
+                # 2. Puxando Horas do Ponto T3
                 horas_str = "—"
                 horas_sep_str = "—"
                 if not df_ponto_filt.empty and 'CONTRATO_LIMPO' in df_ponto_filt.columns:
@@ -913,41 +926,98 @@ if ver_jornada:
                             h_sep = str(match_ponto.iloc[0].get(col_sep, '—')).strip()
                             if h_sep.lower() not in ['nan', 'none', 'nat', '']:
                                 horas_sep_str = h_sep
+                
+                # 3. Puxando Itens e Velocidade do Relatório Diário Original
+                v_itens = 0
+                v_veloc = 0.0
+                if idx_data_diario != -1 and not df_diario.empty:
+                    df_diario['COD_LIMPO'] = df_diario['CÓD.'].astype(str).str.replace('.0', '', regex=False).str.strip()
+                    match_diario = df_diario[df_diario['COD_LIMPO'] == cod]
+                    if not match_diario.empty:
+                        try: v_itens = int(float(str(match_diario.iloc[0, idx_data_diario]).replace('.', '').replace(',', '.')))
+                        except: v_itens = 0
+                        try: v_veloc = round(float(str(match_diario.iloc[0, idx_data_diario + 2]).replace('.', '').replace(',', '.')), 1)
+                        except: v_veloc = 0.0
+                
+                # 4. Puxando os Bipes e Janta da Base de Separação
+                primeiro_bipe = "—"
+                ultimo_bipe = "—"
+                tempo_janta = "—"
+                
+                if not df_base_sep.empty:
+                    # Garantindo que a data seja encontrada (removendo zeros das pontas)
+                    if 'DATA_LIMPA' not in df_base_sep.columns and 'dtaAntes' in df_base_sep.columns:
+                        df_base_sep['DATA_LIMPA'] = df_base_sep['dtaAntes'].astype(str).apply(formatar_data_br)
+                    
+                    # Localizando o operador pelo CÓD (garantindo que se for a nova coluna, não puxe vazio)
+                    mask_op = pd.Series(False, index=df_base_sep.index)
+                    if 'codOperador' in df_base_sep.columns:
+                        mask_op = df_base_sep['codOperador'].astype(str).str.replace('.0', '', regex=False).str.strip() == cod
+                    elif 'CÓD.' in df_base_sep.columns:
+                        mask_op = df_base_sep['CÓD.'].astype(str).str.replace('.0', '', regex=False).str.strip() == cod
+                    elif 'operador' in df_base_sep.columns:
+                        primeiro_nome = nome.split()[0].upper()
+                        mask_op = df_base_sep['operador'].astype(str).str.upper().str.contains(primeiro_nome)
+                    
+                    df_base_filt = df_base_sep[mask_op & (df_base_sep['DATA_LIMPA'] == data_busca_limpa)]
+                    
+                    if not df_base_filt.empty:
+                        # Extraindo o menor horário da coluna dtaAntes
+                        try:
+                            datas_a = pd.to_datetime(df_base_filt['dtaAntes'], errors='coerce').dropna()
+                            if not datas_a.empty:
+                                primeiro_bipe = datas_a.min().strftime('%H:%M:%S')
+                        except: pass
                         
+                        # Extraindo o maior horário da coluna dtaDepois
+                        try:
+                            datas_d = pd.to_datetime(df_base_filt['dtaDepois'], errors='coerce').dropna()
+                            if not datas_d.empty:
+                                ultimo_bipe = datas_d.max().strftime('%H:%M:%S')
+                        except: pass
+                        
+                        # Somando o Intervalo de Janta
+                        col_almoco = next((c for c in df_base_filt.columns if 'ALMOÇO' in str(c).upper() or 'JANTA' in str(c).upper()), None)
+                        if col_almoco and 'Intervalo' in df_base_filt.columns:
+                            janta_df = df_base_filt[df_base_filt[col_almoco].astype(str).str.strip().str.upper() == 'S']
+                            try:
+                                tempo_td = pd.to_timedelta(janta_df['Intervalo'].astype(str), errors='coerce').sum()
+                                if pd.notna(tempo_td) and tempo_td.total_seconds() > 0:
+                                    total_s = int(tempo_td.total_seconds())
+                                    h, rem = divmod(total_s, 3600)
+                                    m, s = divmod(rem, 60)
+                                    tempo_janta = f"{h:02d}:{m:02d}:{s:02d}"
+                            except: pass
+
                 dados_tabela_jl.append({
                     "Nome": nome,
                     "Jornada Líquida (%)": jl_float,
                     "Horas Trabalhadas": horas_str,
                     "Horas Separação": horas_sep_str,
+                    "Qtd Itens": v_itens,
+                    "Itens/Hora": v_veloc,
+                    "1º Bipe": primeiro_bipe,
+                    "Último Bipe": ultimo_bipe,
+                    "Tempo Janta": tempo_janta,
                     "_jl_float": jl_float 
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
                 
-                # 💡 PAINEL DE FILTROS EXTERNOS (MANTÉM O VISUAL BONITO DO HTML INTACTO)
+                # 💡 PAINEL DE FILTROS EXTERNOS MANTIDO
                 st.markdown("#### 🔍 Filtrar e Ordenar")
                 col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
                 busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
                 jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
-                
-                # 💡 ORDEM CRESCENTE POR PADRÃO COMO VOCÊ PEDIU
                 ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Crescente (Menor JL)", "Ordem Decrescente (Maior JL)", "Nome (A-Z)"])
                 
-                # Aplicando os filtros matematicamente no DataFrame
-                if busca_texto:
-                    df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
-                
-                if jl_min > 0:
-                    df_display = df_display[df_display['_jl_float'] >= jl_min]
+                if busca_texto: df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
+                if jl_min > 0: df_display = df_display[df_display['_jl_float'] >= jl_min]
                     
-                # Aplicando a ordenação escolhida no menu
-                if ordenacao == "Ordem Crescente (Menor JL)":
-                    df_display = df_display.sort_values(by="_jl_float", ascending=True)
-                elif ordenacao == "Ordem Decrescente (Maior JL)":
-                    df_display = df_display.sort_values(by="_jl_float", ascending=False)
-                elif ordenacao == "Nome (A-Z)":
-                    df_display = df_display.sort_values(by="Nome", ascending=True)
+                if ordenacao == "Ordem Crescente (Menor JL)": df_display = df_display.sort_values(by="_jl_float", ascending=True)
+                elif ordenacao == "Ordem Decrescente (Maior JL)": df_display = df_display.sort_values(by="_jl_float", ascending=False)
+                elif ordenacao == "Nome (A-Z)": df_display = df_display.sort_values(by="Nome", ascending=True)
 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
@@ -955,26 +1025,41 @@ if ver_jornada:
                 if df_display.empty:
                     st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                 else:
-                    # Renderiza a Tabela HTML Customizada com os dados já filtrados e ordenados
+                    # 💡 A TABELA HTML ESTILIZADA AGORA CONTÉM TODOS OS INDICADORES DIRETOS DA BASE
                     html_tabela = """
                     <style>
-                    .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; }
-                    .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; }
-                    .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                    .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 16px; color: #e0e0e0; }
+                    .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 10px 12px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; white-space: nowrap; }
+                    .tabela-jl td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
                     .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
                     </style>
                     <table class="tabela-jl">
                         <tr>
                             <th>Nome</th>
-                            <th>Jornada Líquida (%)</th>
-                            <th>Horas Trabalhadas</th>
-                            <th>Horas Separação</th>
+                            <th>Jornada Líquida</th>
+                            <th>Horas Trab.</th>
+                            <th>Horas Sep.</th>
+                            <th>Qtd Itens</th>
+                            <th>Itens/Hora</th>
+                            <th>1º Bipe</th>
+                            <th>Último Bipe</th>
+                            <th>Tempo Janta</th>
                         </tr>
                     """
                     
                     for index, row_disp in df_display.iterrows():
                         jl_formatado = f"{row_disp['_jl_float']:.1f}%".replace('.', ',')
-                        html_tabela += f"<tr><td>{row_disp['Nome']}</td><td><b style='color: #2ecc71;'>{jl_formatado}</b></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td></tr>"
+                        html_tabela += f"""<tr>
+                            <td>{row_disp['Nome']}</td>
+                            <td><b style='color: #2ecc71;'>{jl_formatado}</b></td>
+                            <td>{row_disp['Horas Trabalhadas']}</td>
+                            <td>{row_disp['Horas Separação']}</td>
+                            <td>{row_disp['Qtd Itens']}</td>
+                            <td>{row_disp['Itens/Hora']}</td>
+                            <td style='color: #ffca28;'>{row_disp['1º Bipe']}</td>
+                            <td style='color: #ffca28;'>{row_disp['Último Bipe']}</td>
+                            <td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td>
+                        </tr>"""
                         
                     html_tabela += "</table><br><br>"
                     
