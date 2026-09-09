@@ -52,6 +52,15 @@ st.markdown("""
         font-weight: 900; 
         margin-bottom: 5px; 
     }
+    
+    /* 💡 CSS PARA DEIXAR A TABELA NATIVA MAIOR E MAIS BONITA */
+    [data-testid="stDataFrame"] {
+        zoom: 1.35;
+    }
+    [data-testid="stDataFrame"] th {
+        background-color: rgba(59, 130, 246, 0.1) !important;
+        font-size: 14px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -343,15 +352,15 @@ def carregar_diarios():
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
                 val_upper = [str(cell).strip().upper() for cell in row_vals]
-                # Leitura flexível para achar a linha de cabeçalho
+                # Acha o cabeçalho base
                 if any(k in val_upper for k in ["NOME", "NOMECOMPLETO", "CÓD.", "BOX", "OPERADOR"]):
                     header_idx = i
                     break
             
             headers = aba_bruta[header_idx]
             
-            # Puxa a data do topo das colunas se existir, garantindo a associação correta
-            if header_idx > 0:
+            # Formatação das datas para o Relatório Diário e Auxiliares
+            if header_idx > 0 and nome_aba not in ["Acompanhamento JL"]:
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
@@ -372,6 +381,18 @@ def carregar_diarios():
                                 headers[col_idx] = current_date
                             else:
                                 headers[col_idx] = f"{current_date} - {val_head}"
+                                
+            # 💡 LEITURA PERFEITA DA ABA ACOMPANHAMENTO JL
+            if nome_aba == "Acompanhamento JL":
+                # Como sabemos que a data está em cima de JL (linha 1 ou 2), pegamos as datas do topo para identificar o período
+                for row_i in range(header_idx):
+                    for col_idx, c_val in enumerate(aba_bruta[row_i]):
+                        match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c_val))
+                        if match:
+                            # Se achar uma data na coluna, injeta ela no nome do cabeçalho original 
+                            # ex: "JL" vira "26/08/2026 - JL"
+                            if headers[col_idx]:
+                                headers[col_idx] = f"{match.group(0)} - {headers[col_idx]}"
 
             df_aba = pd.DataFrame(aba_bruta[header_idx+1:], columns=headers)
             df_aba.columns = [str(c).strip() for c in df_aba.columns]
@@ -807,10 +828,31 @@ if st.session_state["perfil"] == "Gerente":
             mime="text/csv", type="primary", use_container_width=True, key="btn_rh_sistema"
         )
 
-
 # =============================================================================
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
+
+# FUNÇÃO AUXILIAR PARA FORMATAR HORAS (Converte decimal como 9,13 ou mantém 09:13:00)
+def parse_time(val):
+    val = str(val).strip()
+    if val in ["", "nan", "None", "0", "0,00", "0.00", "00:00:00", "—", "-"]: return "—"
+    if ":" in val:
+        if " " in val: val = val.split(" ")[-1]
+        return val
+    try:
+        v = float(val.replace(',', '.'))
+        if v < 1.0: 
+            total_s = int(round(v * 24 * 3600))
+            h, rem = divmod(total_s, 3600)
+            m, s = divmod(rem, 60)
+            return f"{h:02d}:{m:02d}:{s:02d}"
+        else:
+            h = int(v)
+            m = int(round((v - h) * 100))
+            if m >= 60: m = int(round((v - h) * 60))
+            return f"{h:02d}:{m:02d}:00"
+    except:
+        return val
 
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
@@ -818,7 +860,6 @@ if ver_jornada:
     if df_acomp_jl.empty:
         st.warning("⚠️ A aba 'Acompanhamento JL' não foi encontrada na sua planilha do Google.")
     else:
-        # Acha a linha em que as datas estão armazenadas e cria a lista única de datas
         datas_disponiveis = set()
         for c in df_acomp_jl.columns:
             match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c))
@@ -827,12 +868,10 @@ if ver_jornada:
                 try:
                     if '-' in d_str: d_obj = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
                     else: d_obj = datetime.datetime.strptime(d_str, '%d/%m/%Y').date()
-                    
                     if dt_inicio <= d_obj <= data_apuracao:
                         datas_disponiveis.add(d_str)
                 except Exception: pass
         
-        # Ordena cronologicamente
         colunas_validas = sorted(list(datas_disponiveis), key=lambda x: datetime.datetime.strptime(x, '%d/%m/%Y' if '/' in x else '%Y-%m-%d'))
         
         if not colunas_validas:
@@ -856,17 +895,17 @@ if ver_jornada:
                 format_func=formatar_data_dropdown
             )
             
-            # Localiza todas as colunas que pertencem a data selecionada
             col_nome = next((c for c in df_acomp_jl.columns if "NOME" in str(c).upper()), None)
-            col_funcao = next((c for c in df_acomp_jl.columns if "FUNÇÃO" in str(c).upper()), None)
+            col_funcao = next((c for c in df_acomp_jl.columns if "FUNÇÃO" in str(c).upper() or "FUNCAO" in str(c).upper()), None)
             
-            # Usando Upper() para blindar contra maiúsculas e minúsculas vindas do Excel
+            # Mapeamento dinâmico e flexível (Funciona independentemente se a data prefixou a coluna)
             col_jl = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'JL' in str(c).upper()), None)
             col_hr_trab = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'TRAB' in str(c).upper()), None)
             col_hr_sep = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'SEP' in str(c).upper()), None)
             col_qtd = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'QTD' in str(c).upper()), None)
-            col_itens_hr = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'HORA' in str(c).upper()), None)
-            col_bipe1 = next((c for c in df_acomp_jl.columns if data_selecionada in c and '1º' in str(c).upper()), None)
+            col_kg = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'KG' in str(c).upper()), None)
+            col_itens_hr = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'HORA' in str(c).upper() and 'TRAB' not in str(c).upper()), None)
+            col_bipe1 = next((c for c in df_acomp_jl.columns if data_selecionada in c and '1' in str(c).upper()), None)
             col_bipe_ult = next((c for c in df_acomp_jl.columns if data_selecionada in c and ('ULTIMO' in str(c).upper() or 'ÚLTIMO' in str(c).upper())), None)
             col_janta = next((c for c in df_acomp_jl.columns if data_selecionada in c and 'JANTA' in str(c).upper()), None)
 
@@ -878,97 +917,73 @@ if ver_jornada:
                 nome = str(row.get(col_nome, '')).strip()
                 funcao = str(row.get(col_funcao, '')).strip().upper()
                 
-                # Ignora linhas em branco, cabeçalhos perdidos e pega SÓ SEPARADOR
                 if not nome or nome in ["nan", "None", "NOME"] or "SEPARADOR" not in funcao: continue
                 
-                # JL 
                 val_jl_raw = str(row.get(col_jl, '0')).strip()
                 try:
-                    val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
-                    if val_num <= 2.0 and '%' not in val_jl_raw: val_num *= 100
-                    jl_float = val_num
-                    if val_num > 0:
-                        soma_jl_flt += val_num
+                    v_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
+                    if v_num <= 2.0 and '%' not in val_jl_raw: v_num *= 100
+                    jl_float = v_num
+                    if jl_float > 0:
+                        soma_jl_flt += jl_float
                         qtd_validos += 1
                 except: jl_float = 0.0
                 
-                # Horas Trabalhadas
-                hr_trab = str(row.get(col_hr_trab, '—')).strip()
-                if hr_trab in ["nan", "None", "0", "0,00", "0.00", "00:00:00", ""]: hr_trab = "—"
+                hr_trab = parse_time(row.get(col_hr_trab, '—'))
+                hr_sep = parse_time(row.get(col_hr_sep, '—'))
+                bipe1 = parse_time(row.get(col_bipe1, '—'))
+                bipe_ult = parse_time(row.get(col_bipe_ult, '—'))
+                tempo_janta = parse_time(row.get(col_janta, '—'))
                 
-                # Horas Separação
-                hr_sep = str(row.get(col_hr_sep, '—')).strip()
-                if hr_sep in ["nan", "None", "0", "0,00", "0.00", "00:00:00", ""]: hr_sep = "—"
+                try: qtd = int(float(str(row.get(col_qtd, '0')).replace('.', '').replace(',', '.')))
+                except: qtd = 0
                 
-                # Qtd Itens
-                qtd_raw = str(row.get(col_qtd, '0')).strip()
-                try: qtd_itens = int(float(qtd_raw.replace('.', '').replace(',', '.')))
-                except: qtd_itens = 0
+                try: kg = round(float(str(row.get(col_kg, '0')).replace('.', '').replace(',', '.')), 2)
+                except: kg = 0.0
                 
-                # Itens/Hora
-                ih_raw = str(row.get(col_itens_hr, '0')).strip()
-                try: itens_hora = round(float(ih_raw.replace('.', '').replace(',', '.')), 2)
-                except: itens_hora = 0.0
+                try: ih = round(float(str(row.get(col_itens_hr, '0')).replace('.', '').replace(',', '.')), 2)
+                except: ih = 0.0
                 
-                # Bipes e Janta
-                b1 = str(row.get(col_bipe1, '—')).strip()
-                if b1 in ["nan", "None", "0", "00:00:00", ""]: b1 = "—"
-                
-                bu = str(row.get(col_bipe_ult, '—')).strip()
-                if bu in ["nan", "None", "0", "00:00:00", ""]: bu = "—"
-                
-                tj = str(row.get(col_janta, '—')).strip()
-                if tj in ["nan", "None", "0", "00:00:00", ""]: tj = "—"
-                
-                if jl_float == 0.0 and hr_trab == "—" and hr_sep == "—" and qtd_itens == 0:
+                if jl_float == 0.0 and hr_trab == "—" and hr_sep == "—" and qtd == 0:
                     continue
 
                 dados_tabela_jl.append({
                     "Nome": nome,
-                    "Jornada Líquida (%)": jl_float,
+                    "Jornada Líquida (%)": jl_float / 100.0, # Passa em formato numérico puro para o Streamlit renderizar o %
                     "Horas Trab.": hr_trab,
                     "Horas Sep.": hr_sep,
-                    "Qtd Itens": qtd_itens,
-                    "Itens/Hora": itens_hora,
-                    "1º Bipe": b1,
-                    "Último Bipe": bu,
-                    "Tempo Janta": tj
+                    "Qtd Itens": qtd,
+                    "KG": kg,
+                    "Itens/Hora": ih,
+                    "1º Bipe": bipe1,
+                    "Último Bipe": bipe_ult,
+                    "Tempo Janta": tempo_janta
                 })
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                # Garante que abre sempre na ordem Crescente da Jornada Líquida
+                # Ordem padrão Crescente
                 df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=True)
                 
                 media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                 st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                 
-                # 💡 CSS HACK PARA A TABELA FICAR MAIOR
-                st.markdown("""
-                    <style>
-                    [data-testid="stDataFrame"] {
-                        zoom: 1.35;
-                    }
-                    </style>
-                """, unsafe_allow_html=True)
-                
-                # 💡 Tabela Interativa Original Streamlit (com ProgressColumn e Clicável)
+                # Renderizando a tabela interativa, sem barrinha, com formato numérico corrigido, e zoom visual!
                 st.dataframe(
                     df_display, 
                     hide_index=True, 
                     use_container_width=True,
                     height=650,
                     column_config={
-                        "Nome": st.column_config.TextColumn("Nome"),
-                        "Jornada Líquida (%)": st.column_config.ProgressColumn(
-                            "Jornada Líquida (%)",
-                            format="%.1f%%",
-                            min_value=0,
-                            max_value=100
+                        "Nome": st.column_config.TextColumn("Nome", width="medium"),
+                        "Jornada Líquida (%)": st.column_config.NumberColumn(
+                            "Jornada Líquida",
+                            format="%.1f%%"
                         ),
                         "Horas Trab.": st.column_config.TextColumn("Horas Trab."),
                         "Horas Sep.": st.column_config.TextColumn("Horas Sep."),
                         "Qtd Itens": st.column_config.NumberColumn("Qtd Itens", format="%d"),
+                        "KG": st.column_config.NumberColumn("KG", format="%.2f"),
                         "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%.2f"),
                         "1º Bipe": st.column_config.TextColumn("1º Bipe"),
                         "Último Bipe": st.column_config.TextColumn("Último Bipe"),
