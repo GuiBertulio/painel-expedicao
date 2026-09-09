@@ -86,23 +86,27 @@ def parse_time(val):
     except:
         return val
 
+def formatar_data_br(d_str):
+    d_str = str(d_str).strip().split(" ")[0]
+    match_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
+    if match_iso:
+        return f"{match_iso.group(3)}/{match_iso.group(2)}/{match_iso.group(1)}"
+    match_br = re.search(r'(\d{2})/(\d{2})/(\d{4})', d_str)
+    if match_br:
+        return f"{match_br.group(1)}/{match_br.group(2)}/{match_br.group(3)}"
+    return d_str
+
 def extrair_inteiro(val):
     try:
         if pd.isna(val): return 0
     except ValueError:
         return 0
-    
     v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
-    
     v_str = re.sub(r'[^\d.,]', '', v_str)
     if not v_str: return 0
-    
-    if ',' in v_str:
-        v_str = v_str.split(',')[0]
-        
+    if ',' in v_str: v_str = v_str.split(',')[0]
     v_str = v_str.replace('.', '')
-    
     try: return int(v_str)
     except: return 0
 
@@ -213,9 +217,6 @@ USUARIOS = {
     "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T3"} 
 }
 
-# =============================================================================
-# 🚪 TELA DE LOGIN
-# =============================================================================
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
@@ -224,11 +225,9 @@ if not st.session_state["logado"]:
     with col2:
         st.markdown("<br><br><br>", unsafe_allow_html=True) 
         st.title("🔐 Login - Dashboard Logístico")
-        
         usuario = st.text_input("Usuário").strip().lower() 
         senha = st.text_input("Senha", type="password").strip() 
         btn_entrar = st.button("Entrar", type="primary", use_container_width=True)
-        
         if btn_entrar:
             if usuario in USUARIOS and USUARIOS[usuario]["senha"] == senha:
                 st.session_state["logado"] = True
@@ -246,8 +245,7 @@ if not st.session_state["logado"]:
 def conectar_planilha():
     cred_dict = dict(st.secrets["gcp_service_account"]) 
     client = gspread.service_account_from_dict(cred_dict)
-    planilha = client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
-    return planilha
+    return client.open_by_url("https://docs.google.com/spreadsheets/d/1pA4PYhyMi57YlK5qwLJZ9BSmpdyTz7frtmtTiG-CaLU/edit?usp=sharing")
 
 @st.cache_data(ttl=60) 
 def carregar_dados():
@@ -288,13 +286,10 @@ def carregar_dados():
     
     def achar_coluna(nome_exato, palavras_chave):
         for c in colunas_atuais:
-            if str(c).strip().upper() == nome_exato.upper():
-                return c
-        
+            if str(c).strip().upper() == nome_exato.upper(): return c
         for c in reversed(colunas_atuais):
             nome_limpo = " ".join(str(c).upper().split())
-            if any(p in nome_limpo for p in palavras_chave):
-                return c
+            if any(p in nome_limpo for p in palavras_chave): return c
         return None
 
     c_corr = achar_coluna("DIAS CORRIDOS", ["DIAS CORR"])
@@ -304,29 +299,19 @@ def carregar_dados():
     c_fim = achar_coluna("DATA FIM", ["DATA FIM", "DATA APURA"])
     c_erro = achar_coluna("ERROS", ["ERRO"])
 
-    if c_corr: df['Dias Corridos'] = pd.to_numeric(df[c_corr], errors='coerce').fillna(0).astype(int)
-    else: df['Dias Corridos'] = 0
-
-    if c_trab: df['Dias Trabalhados'] = pd.to_numeric(df[c_trab], errors='coerce').fillna(0).astype(int)
-    else: df['Dias Trabalhados'] = 0
-        
-    if c_meta: df['Dias Meta'] = pd.to_numeric(df[c_meta], errors='coerce').fillna(0).astype(int)
-    else: df['Dias Meta'] = 0
-        
+    df['Dias Corridos'] = pd.to_numeric(df[c_corr], errors='coerce').fillna(0).astype(int) if c_corr else 0
+    df['Dias Trabalhados'] = pd.to_numeric(df[c_trab], errors='coerce').fillna(0).astype(int) if c_trab else 0
+    df['Dias Meta'] = pd.to_numeric(df[c_meta], errors='coerce').fillna(0).astype(int) if c_meta else 0
     if c_ini: df['Data Inicio'] = df[c_ini]
     if c_fim: df['Data Fim'] = df[c_fim]
-        
-    if c_erro: df['ERROS'] = pd.to_numeric(df[c_erro], errors='coerce').fillna(0).astype(int)
-    else: df['ERROS'] = 0
+    df['ERROS'] = pd.to_numeric(df[c_erro], errors='coerce').fillna(0).astype(int) if c_erro else 0
 
     df = df.loc[:, ~df.columns.duplicated()].copy()
-
     if 'NOME' in df.columns: df = df.dropna(subset=['NOME'])
     if 'FUNÇÃO' in df.columns: df['FUNÇÃO'] = df['FUNÇÃO'].astype(str).str.upper().str.strip()
     if 'TURNO' in df.columns: df['TURNO'] = df['TURNO'].astype(str).str.upper().str.strip()
     
     colunas_texto = ["CÓD.", "NOME", "TURNO", "FUNÇÃO", "Data Inicio", "Data Fim"]
-    
     for col in df.columns:
         if col not in colunas_texto:
             if col in ["Tempo Médio", "Tempo Médio_Meta1", "Tempo Médio_Meta2", "Tempo Médio_Meta3"]:
@@ -341,64 +326,50 @@ def carregar_dados():
                     df[col] = pd.to_numeric(s_numerico, errors="coerce").fillna(0)
                 
     df['Penalidade_Texto'] = ""
-
     for idx, row in df.iterrows():
         cargo_e = str(row.get('FUNÇÃO', '')).upper()
         erros_e = float(row.get('ERROS', 0))
-        
         if erros_e > 0:
             if 'SEPARADOR' in cargo_e:
-                desc = erros_e * 20
-                df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Itens"
+                df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 20)} Itens"
             elif 'OPERADOR' in cargo_e:
-                desc = erros_e * 10
-                df.at[idx, 'Penalidade_Texto'] = f"-{int(desc)} Mov."
-
+                df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 10)} Mov."
     return df
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
-        
         def processar_aba(nome_aba):
             aba_bruta = planilha.worksheet(nome_aba).get_all_values()
             if not aba_bruta: return pd.DataFrame()
-            
             if nome_aba == "Acompanhamento JL":
                 return pd.DataFrame(aba_bruta)
             
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
                 val_upper = [str(cell).strip().upper() for cell in row_vals]
-                if any(k in val_upper for k in ["NOME", "NOMECOMPLETO", "CÓD.", "BOX", "OPERADOR"]):
+                if any(k in val_upper for k in ["NOME", "NOMECOMPLETO", "CÓD.", "BOX", "OPERADOR", "CONTRATO"]):
                     header_idx = i
                     break
             
             headers = aba_bruta[header_idx]
-            
-            if header_idx > 0:
+            if header_idx > 0 and nome_aba not in ["Ponto T3"]:
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
                         linha_datas = aba_bruta[row_i]
                         break
-                
                 if linha_datas:
                     current_date = ""
                     for col_idx in range(len(headers)):
                         val_data = str(linha_datas[col_idx]).strip() if col_idx < len(linha_datas) else ""
                         match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', val_data)
-                        if match:
-                            current_date = match.group(0)
-                        
+                        if match: current_date = match.group(0)
                         if current_date and current_date not in str(headers[col_idx]):
                             val_head = str(headers[col_idx]).strip()
-                            if val_head == "" or val_head == "None" or val_head == "nan":
-                                headers[col_idx] = current_date
-                            else:
-                                headers[col_idx] = f"{current_date} - {val_head}"
+                            headers[col_idx] = current_date if val_head in ["", "None", "nan"] else f"{current_date} - {val_head}"
 
             df_aba = pd.DataFrame(aba_bruta[header_idx+1:], columns=headers)
             df_aba.columns = [str(c).strip() for c in df_aba.columns]
@@ -414,18 +385,18 @@ def carregar_diarios():
         except: pass
         try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
         except: pass
+        try: dfs['ponto_t3'] = processar_aba("Ponto T3")
+        except: pass
 
     except Exception as e:
         print(f"Erro ao carregar abas diárias: {e}")
-        pass
-    
-    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl']
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl'], dfs['ponto_t3']
 
 # =============================================================================
 # 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
-df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl = carregar_diarios()
+df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl, df_ponto_t3 = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
@@ -458,28 +429,18 @@ for turno in ['T2', 'T3']:
                 prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
 
                 if turno == 'T3':
-                    if pos == 1: val_base = 250.0
-                    elif pos == 2: val_base = 200.0
-                    elif pos == 3: val_base = 100.0
-                    else: val_base = 0.0
+                    val_base = 250.0 if pos == 1 else (200.0 if pos == 2 else (100.0 if pos == 3 else 0.0))
                 elif turno == 'T2':
-                    if pos == 1: val_base = 150.0
-                    elif pos == 2: val_base = 100.0
-                    elif pos == 3: val_base = 80.0
-                    else: val_base = 0.0
-                else:
-                    val_base = 0.0
+                    val_base = 150.0 if pos == 1 else (100.0 if pos == 2 else (80.0 if pos == 3 else 0.0))
+                else: val_base = 0.0
                 
-                if val_base > 0:
-                    df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
+                if val_base > 0: df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
                 pos += 1
 
         elif 'CONFERENTE' in cargo_str and turno == 'T3':
             metrica_rank = next((k for k in kpis if 'ITENS CONF' in k.upper()), None)
             if not metrica_rank: continue
-            
             racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
-            
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
             df_eq = df_eq.sort_values(by=metrica_rank, ascending=(racional != 1))
             
@@ -487,19 +448,13 @@ for turno in ['T2', 'T3']:
             for idx, row_eq in df_eq.iterrows():
                 val_kpi = float(row_eq.get(metrica_rank, 0))
                 if val_kpi <= 0: continue
-                
                 df.at[idx, 'Posicao Ranking'] = pos
-                
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
                 d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
                 prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
-
-                if pos == 1: 
-                    df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
-                
+                if pos == 1: df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                 cat_name = "Grandeza" if "GRANDEZA" in cargo_str else "Fracionado"
                 df.at[idx, 'Ranking_Categoria'] = f"{cat_name} ({val_kpi:,.0f})".replace(',', '.')
-                
                 pos += 1
 
         elif 'OPERADOR' in cargo_str and turno == 'T3':
@@ -512,13 +467,10 @@ for turno in ['T2', 'T3']:
             for idx, row_eq in df_eq.iterrows():
                 if float(row_eq.get(metrica_rank, 0)) <= 0: continue
                 df.at[idx, 'Posicao Ranking'] = pos
-                
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
                 d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
                 prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
-
-                if pos == 1: 
-                    df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
+                if pos == 1: df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                 pos += 1
 
 colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
@@ -540,31 +492,20 @@ if st.sidebar.button("Sair / Logout", use_container_width=True):
     st.session_state["logado"] = False
     st.rerun()
 
-# =============================================================================
-# 📥 BOTÃO DE AUDITORIA E FILTROS
-# =============================================================================
 st.sidebar.markdown("---")
 st.sidebar.title("🔍 Filtros do Painel")
-
 ver_jornada = st.sidebar.checkbox("⏱️ Acompanhamento Jornada Líquida (T3)", help="Exibe a matriz de horas diárias dos separadores")
 
 if st.session_state.get("usuario") in ["guilherme", "nilo"]:
     is_fechado = (dt_inicio.day == 26 and data_apuracao.day == 25)
-    
     if is_fechado:
         df_auditoria = []
         kpis_gerais = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c]
-        
         for idx, row in df.iterrows():
-            cod = row.get('CÓD.', '')
-            nome = row.get('NOME', '')
-            funcao = row.get('FUNÇÃO', '')
-            turno = row.get('TURNO', '')
-            
+            cod, nome, funcao, turno = row.get('CÓD.', ''), row.get('NOME', ''), row.get('FUNÇÃO', ''), row.get('TURNO', '')
             d_corridos = float(row.get('Dias Corridos', 0))
             d_trab = float(row.get('Dias Trabalhados', 0))
             d_meta = float(row.get('Dias Meta', 0))
-            
             funcao_upper = str(funcao).strip().upper()
             
             for kpi in kpis_gerais:
@@ -589,17 +530,10 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     else:
                         if meta1 <= 0: meta1 = meta2
                         if meta3 <= 0: meta3 = meta2
-                        
                         if racional == 1: 
-                            if real < meta1: faixa_meta = "0%"
-                            elif real < meta2: faixa_meta = "50%"
-                            elif real < meta3: faixa_meta = "100%"
-                            else: faixa_meta = "120%"
+                            faixa_meta = "0%" if real < meta1 else ("50%" if real < meta2 else ("100%" if real < meta3 else "120%"))
                         else: 
-                            if real > meta1: faixa_meta = "0%"
-                            elif real > meta2: faixa_meta = "50%"
-                            elif real > meta3: faixa_meta = "100%"
-                            else: faixa_meta = "120%"
+                            faixa_meta = "0%" if real > meta1 else ("50%" if real > meta2 else ("100%" if real > meta3 else "120%"))
                     
                     def formata(v):
                         if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
@@ -614,15 +548,10 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     })
             
             pos = int(row.get('Posicao Ranking', 0))
-            
             if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno == 'T3') or ('OPERADOR' in funcao_upper and turno == 'T3')):
                 val_rank = float(row.get('Valor Ranking', 0))
                 cat_rank = row.get('Ranking_Categoria', '')
-                
-                txt_indicador = "Ranking"
-                if 'CONFERENTE' in funcao_upper and cat_rank:
-                    txt_indicador = f"Ranking ({cat_rank})"
-                    
+                txt_indicador = f"Ranking ({cat_rank})" if ('CONFERENTE' in funcao_upper and cat_rank) else "Ranking"
                 df_auditoria.append({
                     "CÓD.": cod, "NOME": nome, "TURNO": turno, "FUNÇÃO": funcao,
                     "DIAS CORRIDOS": int(d_corridos), "DIAS TRAB.": int(d_trab), "DIAS META": int(d_meta),
@@ -633,16 +562,12 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             df_export.to_excel(writer, index=False, sheet_name='Auditoria_Fechamento', header=False, startrow=1)
-            workbook  = writer.book
-            worksheet = writer.sheets['Auditoria_Fechamento']
-            
+            workbook, worksheet = writer.book, writer.sheets['Auditoria_Fechamento']
             formato_moeda = workbook.add_format({'num_format': 'R$ #,##0.00'})
             formato_central = workbook.add_format({'align': 'center'})
-            
             (max_row, max_col) = df_export.shape
             col_settings = [{'header': column} for column in df_export.columns]
             worksheet.add_table(0, 0, max_row, max_col - 1, {'columns': col_settings, 'style': 'Table Style Medium 2'})
-            
             worksheet.set_column('A:A', 10, formato_central) 
             worksheet.set_column('B:B', 38)                  
             worksheet.set_column('C:C', 12, formato_central) 
@@ -661,7 +586,6 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
         st.sidebar.button("🔒 Fechamento (Auditoria)", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
 
 turno_logado = st.session_state["turno_acesso"]
-
 if turno_logado == "Todos":
     lista_turnos = ["Todos"] + sorted(df['TURNO'].dropna().unique().tolist())
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
@@ -670,10 +594,7 @@ elif isinstance(turno_logado, list):
     st.sidebar.info(f"🔒 Acesso restrito aos Turnos: **{', '.join(turno_logado)}**")
     lista_turnos = ["Todos Permitidos"] + turno_logado
     turno_selecionado = st.sidebar.selectbox("1. Turno:", lista_turnos)
-    if turno_selecionado == "Todos Permitidos":
-        df_filtrado = df[df['TURNO'].isin(turno_logado)].copy()
-    else:
-        df_filtrado = df[df['TURNO'] == turno_selecionado].copy()
+    df_filtrado = df[df['TURNO'].isin(turno_logado)].copy() if turno_selecionado == "Todos Permitidos" else df[df['TURNO'] == turno_selecionado].copy()
 else:
     turno_selecionado = turno_logado
     st.sidebar.info(f"🔒 Acesso restrito ao Turno: **{turno_selecionado}**")
@@ -695,14 +616,10 @@ if st.session_state["perfil"] == "Gerente":
     st.sidebar.markdown("### 🗃️ Fechamento RH")
 
     if not df_filtrado.empty:
-        potencial_max_list = []
-        motivos_list = []
-        
-        if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
-            df_aux_jl_clean = df_aux_jl.copy()
+        potencial_max_list, motivos_list = [], []
+        df_aux_jl_clean = df_aux_jl.copy() if (not df_aux_jl.empty and 'NOME' in df_aux_jl.columns) else pd.DataFrame()
+        if not df_aux_jl_clean.empty:
             df_aux_jl_clean['NOME_CLEAN'] = df_aux_jl_clean['NOME'].astype(str).str.strip().str.upper()
-        else:
-            df_aux_jl_clean = pd.DataFrame()
 
         kpis_mapeados_rh = [c.replace('_Racional', '') for c in df_filtrado.columns if '_Racional' in c]
 
@@ -717,24 +634,14 @@ if st.session_state["perfil"] == "Gerente":
             for k in kpis_mapeados_rh:
                 if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0:
                     v_base = obter_valor_100(row['TURNO'], row['FUNÇÃO'], k)
-                    
                     kpi_upper = str(k).strip().upper()
-                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
-                    
-                    if is_meta_unica_dev or is_meta_unica_ava:
-                        potencial += v_base 
-                    else:
-                        potencial += v_base * 1.2
+                    is_meta_unica = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
+                    potencial += v_base if is_meta_unica else v_base * 1.2
             
             if 'SEPARADOR' in cargo_str:
-                if turno_str == 'T3': potencial += 250
-                elif turno_str == 'T2': potencial += 150
-            elif 'CONFERENTE' in cargo_str and turno_str == 'T3':
-                potencial += 200
-            elif 'OPERADOR' in cargo_str and turno_str == 'T3':
-                potencial += 200
-                
+                potencial += 250 if turno_str == 'T3' else (150 if turno_str == 'T2' else 0)
+            elif 'CONFERENTE' in cargo_str and turno_str == 'T3': potencial += 200
+            elif 'OPERADOR' in cargo_str and turno_str == 'T3': potencial += 200
             potencial_max_list.append(potencial)
             
             motivo = "-"
@@ -745,50 +652,24 @@ if st.session_state["perfil"] == "Gerente":
                     if not dados_aux.empty:
                         linha_aux = dados_aux.iloc[0]
                         valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
-                        
-                        qtd_fi = valores_aux.count('FI')
-                        qtd_ad = valores_aux.count('AD')
-                        qtd_fe = valores_aux.count('FE')
-                        qtd_at = valores_aux.count('AT')
-                        qtd_nt = valores_aux.count('NT')
-                        
-                        if qtd_fi > 0 and qtd_ad > 0:
-                            motivo = "Falta Injustif. + Advertência"
-                            achou_motivo = True
-                        elif qtd_fi > 0:
-                            motivo = "Falta Injustificada"
-                            achou_motivo = True
-                        elif qtd_ad > 0:
-                            motivo = "Advertência"
-                            achou_motivo = True
-                        elif qtd_fe > 0:
-                            motivo = "Férias"
-                            achou_motivo = True
-                        elif qtd_at > 0:
-                            motivo = "Atestado"
-                            achou_motivo = True
-                        elif qtd_nt > 0 and d_trab <= 0:
-                            motivo = "Não Trabalhado (NT)"
-                            achou_motivo = True
-                
+                        qtd_fi, qtd_ad, qtd_fe, qtd_at, qtd_nt = valores_aux.count('FI'), valores_aux.count('AD'), valores_aux.count('FE'), valores_aux.count('AT'), valores_aux.count('NT')
+                        if qtd_fi > 0 and qtd_ad > 0: motivo, achou_motivo = "Falta Injustif. + Advertência", True
+                        elif qtd_fi > 0: motivo, achou_motivo = "Falta Injustificada", True
+                        elif qtd_ad > 0: motivo, achou_motivo = "Advertência", True
+                        elif qtd_fe > 0: motivo, achou_motivo = "Férias", True
+                        elif qtd_at > 0: motivo, achou_motivo = "Atestado", True
+                        elif qtd_nt > 0 and d_trab <= 0: motivo, achou_motivo = "Não Trabalhado (NT)", True
                 if not achou_motivo:
-                    if d_trab <= 0:
-                        motivo = "Dias Trabalhados Zerados"
-                    else:
-                        motivo = "Não atingiu a meta mínima"
-                        
+                    motivo = "Dias Trabalhados Zerados" if d_trab <= 0 else "Não atingiu a meta mínima"
             motivos_list.append(motivo)
 
         df_rh = df_filtrado[['CÓD.', 'NOME', 'FUNÇÃO', 'TURNO', 'Valor Final']].copy()
         df_rh['Potencial Máx. (R$)'] = potencial_max_list
         df_rh['Motivo'] = motivos_list
-        
         df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
         df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
         df_rh['Potencial Máx. (R$)'] = df_rh['Potencial Máx. (R$)'].round(2)
-        
-        df_rh = df_rh[['Matrícula', 'Nome', 'FUNÇÃO', 'TURNO', 'Potencial Máx. (R$)', 'Premiação (R$)', 'Motivo']]
-        df_rh = df_rh.drop_duplicates(subset=['Matrícula', 'Nome']).sort_values(by='Nome')
+        df_rh = df_rh[['Matrícula', 'Nome', 'FUNÇÃO', 'TURNO', 'Potencial Máx. (R$)', 'Premiação (R$)', 'Motivo']].drop_duplicates(subset=['Matrícula', 'Nome']).sort_values(by='Nome')
         
         config_rh = {
             "Matrícula": st.column_config.TextColumn("Matrícula"), 
@@ -806,39 +687,25 @@ if st.session_state["perfil"] == "Gerente":
         try:
             ultimo_dia = calendar.monthrange(data_apuracao.year, data_apuracao.month)[1]
             data_fim_mes = f"{ultimo_dia:02d}/{data_apuracao.month:02d}/{data_apuracao.year}"
-        except:
-            data_fim_mes = dt_inicio.strftime('%d/%m/%Y')
+        except: data_fim_mes = dt_inicio.strftime('%d/%m/%Y')
             
         df_rh_sistema = pd.DataFrame({
-            'CONTRATO': df_rh['Matrícula'],
-            'VDB': 2601,
-            'DESCRIÇÃO VDB': 'Adicional Produtividade',
-            'REFERENCIA FOLHA_1': 0,
-            'VALOR': df_rh['Premiação (R$)'].apply(lambda x: f"{x:.2f}".replace('.', ',')),
-            'REFERENCIA FOLHA_2': 11,
-            'ULTIMO DIA DO MÊS_1': data_fim_mes,
-            'ULTIMO DIA DO MÊS_2': data_fim_mes
+            'CONTRATO': df_rh['Matrícula'], 'VDB': 2601, 'DESCRIÇÃO VDB': 'Adicional Produtividade',
+            'REFERENCIA FOLHA_1': 0, 'VALOR': df_rh['Premiação (R$)'].apply(lambda x: f"{x:.2f}".replace('.', ',')),
+            'REFERENCIA FOLHA_2': 11, 'ULTIMO DIA DO MÊS_1': data_fim_mes, 'ULTIMO DIA DO MÊS_2': data_fim_mes
         })
         csv_sistema = df_rh_sistema.to_csv(index=False, header=False, sep=';').encode('utf-8-sig')
 
         st.sidebar.markdown("<p style='font-size: 14px; margin-bottom: 5px;'>1. Visualização Padrão</p>", unsafe_allow_html=True)
-        st.sidebar.download_button(
-            label="📊 Baixar Planilha Visual (Excel)", data=csv_rh,
-            file_name=f"Fechamento_RH_Visual_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
-            mime="text/csv", use_container_width=True, key="btn_rh_visual"
-        )
+        st.sidebar.download_button(label="📊 Baixar Planilha Visual (Excel)", data=csv_rh, file_name=f"Fechamento_RH_Visual_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv", mime="text/csv", use_container_width=True, key="btn_rh_visual")
         st.sidebar.markdown("<p style='font-size: 14px; margin-bottom: 5px; margin-top: 10px;'>2. Importação do Sistema (Layout Folha)</p>", unsafe_allow_html=True)
-        st.sidebar.download_button(
-            label="⚙️ Baixar Arq. do Sistema (.CSV)", data=csv_sistema,
-            file_name=f"Importacao_Sistema_Folha_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv",
-            mime="text/csv", type="primary", use_container_width=True, key="btn_rh_sistema"
-        )
+        st.sidebar.download_button(label="⚙️ Baixar Arq. do Sistema (.CSV)", data=csv_sistema, file_name=f"Importacao_Sistema_Folha_{dt_inicio.strftime('%d-%m')}a{data_apuracao.strftime('%d-%m')}.csv", mime="text/csv", type="primary", use_container_width=True, key="btn_rh_sistema")
 
 # =============================================================================
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL (TABELA HTML ESTILIZADA + FILTROS EXTERNOS DE NAVEGAÇÃO)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (VISUAL HTML ROBUSTO + HORAS CORRIGIDAS)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -855,6 +722,7 @@ if ver_jornada:
         if idx_header == -1:
             st.warning("⚠️ O formato da aba 'Acompanhamento JL' está incorreto. Não foi possível achar a linha de cabeçalhos (NOME, JL).")
         else:
+            # 1. Catálogo exato das datas presentes no topo
             datas_indices = {}
             for row_idx in range(idx_header):
                 for col_idx, val in enumerate(df_acomp_jl.iloc[row_idx].values):
@@ -867,6 +735,7 @@ if ver_jornada:
                         if d_str not in datas_indices:
                             datas_indices[d_str] = col_idx 
             
+            # 2. Filtra as datas disponíveis no período apurado
             colunas_validas = []
             for d_str in datas_indices.keys():
                 try:
@@ -881,28 +750,21 @@ if ver_jornada:
                 st.warning(f"⚠️ Nenhuma data válida encontrada na planilha dentro do período de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}.")
             else:
                 col_sel, col_vazia = st.columns([1, 3])
-                data_selecionada = col_sel.selectbox(
-                    "📅 Escolha o dia para analisar:", 
-                    colunas_validas, 
-                    index=len(colunas_validas)-1
-                )
+                data_selecionada = col_sel.selectbox("📅 Escolha o dia para analisar:", colunas_validas, index=len(colunas_validas)-1)
                 
-                # Encontra a posição exata das colunas baseadas na data selecionada
                 idx_col_inicio = datas_indices[data_selecionada]
-                
                 headers_vals = [str(x).upper().strip() for x in df_acomp_jl.iloc[idx_header].values]
                 
-                # Mapeia colunas Globais
                 idx_nome = headers_vals.index("NOME") if "NOME" in headers_vals else -1
                 idx_turno = headers_vals.index("TURNO") if "TURNO" in headers_vals else -1
                 idx_funcao = headers_vals.index("FUNÇÃO") if "FUNÇÃO" in headers_vals else (headers_vals.index("FUNCAO") if "FUNCAO" in headers_vals else -1)
+                idx_cod = headers_vals.index("CÓD.") if "CÓD." in headers_vals else (headers_vals.index("COD") if "COD" in headers_vals else 0)
                 
-                # Mapeador super blindado que só procura colunas DENTRO do espaço do dia selecionado
+                # Mapeador de colunas relativo à data
                 sorted_starts = sorted(datas_indices.values())
                 current_idx = sorted_starts.index(idx_col_inicio)
                 end_col = sorted_starts[current_idx + 1] if current_idx + 1 < len(sorted_starts) else len(headers_vals)
-
-                search_start = max(0, idx_col_inicio - 2)
+                search_start = max(0, idx_col_inicio - 1)
                 
                 def find_col(keywords):
                     for i in range(search_start, end_col):
@@ -922,6 +784,15 @@ if ver_jornada:
                 idx_bu = find_col(['ULTIMO', 'ÚLTIMO'])
                 idx_tj = find_col(['JANTA', 'ALMOÇO'])
                 
+                # Preparar fallback em Ponto T3 caso a jornada venha vazia no Acompanhamento JL
+                if not df_ponto_t3.empty and 'DATAAPURACAO' in df_ponto_t3.columns:
+                    df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].astype(str).apply(formatar_data_br)
+                    col_contrato = next((c for c in df_ponto_t3.columns if 'CONTRATO' in str(c).upper() or 'CÓD' in str(c).upper()), None)
+                    df_ponto_t3['CONTRATO_LIMPO'] = df_ponto_t3[col_contrato].astype(str).str.replace('.0', '', regex=False).str.strip() if col_contrato else ""
+                    df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_selecionada]
+                else:
+                    df_ponto_filt = pd.DataFrame()
+
                 dados_tabela_jl = []
                 soma_jl_flt = 0.0
                 qtd_validos = 0
@@ -932,6 +803,7 @@ if ver_jornada:
                     nome = str(linha[idx_nome]).strip() if idx_nome != -1 and idx_nome < len(linha) else ""
                     funcao = str(linha[idx_funcao]).strip().upper() if idx_funcao != -1 and idx_funcao < len(linha) else ""
                     turno = str(linha[idx_turno]).strip().upper() if idx_turno != -1 and idx_turno < len(linha) else ""
+                    cod = str(linha[idx_cod]).replace('.0', '').strip() if idx_cod < len(linha) else ""
                     
                     if not nome or nome in ["nan", "None", "NOME"] or "SEPARADOR" not in funcao or "T3" not in turno:
                         continue
@@ -946,7 +818,6 @@ if ver_jornada:
                     bu_val = str(linha[idx_bu]).strip() if idx_bu != -1 else "00:00:00"
                     tj_val = str(linha[idx_tj]).strip() if idx_tj != -1 else "00:00:00"
                     
-                    # Tratamentos numéricos e de horas
                     try:
                         v_num = float(jl_val.replace('%', '').replace(',', '.'))
                         if v_num <= 2.0 and '%' not in jl_val: v_num *= 100
@@ -971,14 +842,29 @@ if ver_jornada:
                     bu_format = parse_time(bu_val)
                     tj_format = parse_time(tj_val)
                     
+                    # 💡 RESGATE AUTOMÁTICO DAS HORAS TRABALHADAS NA PONTO T3 (CASO VENHA ZERADO)
+                    if (ht_format in ["00:00:00", "—"]) and not df_ponto_filt.empty:
+                        row_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
+                        if row_ponto.empty and nome:
+                            primeiro_nome = nome.split()[0].upper()
+                            col_nome_ponto = next((c for c in df_ponto_filt.columns if 'NOME' in str(c).upper()), None)
+                            if col_nome_ponto:
+                                row_ponto = df_ponto_filt[df_ponto_filt[col_nome_ponto].astype(str).str.upper().str.contains(primeiro_nome)]
+                        if not row_ponto.empty:
+                            col_jornada = next((c for c in row_ponto.columns if 'JORNADA' in str(c).upper()), None)
+                            if col_jornada:
+                                p_jornada = str(row_ponto.iloc[0][col_jornada]).strip()
+                                if p_jornada not in ["", "nan", "None", "0", "00:00:00"]:
+                                    ht_format = parse_time(p_jornada)
+                    
                     if jl_float == 0.0 and ht_format == "00:00:00" and hs_format == "00:00:00" and qtd_int == 0:
                         continue
                         
                     dados_tabela_jl.append({
                         "Nome": nome,
                         "Jornada Líquida (%)": jl_float, 
-                        "Horas Trabalhadas": ht_format,
-                        "Horas Separação": hs_format,
+                        "Horas Trab.": ht_format,
+                        "Horas Sep.": hs_format,
                         "Qtd Itens": qtd_int,
                         "KG": kg_float,
                         "Itens/Hora": ih_float,
@@ -990,13 +876,11 @@ if ver_jornada:
                 if dados_tabela_jl:
                     df_display = pd.DataFrame(dados_tabela_jl)
                     
-                    # 💡 MENU DE FILTROS SUPERIORES 
+                    # 💡 MENU DE FILTROS SUPERIORES (NATIVO E LIMPO)
                     st.markdown("#### 🔍 Filtrar e Ordenar")
                     col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
                     busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
                     jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
-                    
-                    # 💡 PADRÃO DECRESCENTE (MAIOR JL PRIMEIRO) COMO NA SUA IMAGEM B60AD0
                     ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Decrescente (Maior JL)", "Ordem Crescente (Menor JL)", "Nome (A-Z)"])
                     
                     if busca_texto: df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
@@ -1012,12 +896,12 @@ if ver_jornada:
                     if df_display.empty:
                         st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                     else:
-                        # 💡 GERADOR DA TABELA HTML CUSTOMIZADA (Grande, bonita, formato % limpo)
+                        # 💡 GERADOR DA TABELA HTML COM FONTES GRANDES E DADOS EM NEGRITO
                         html_tabela = """
                         <style>
-                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; font-weight: bold; }
-                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 14px 15px; text-align: left; border-bottom: 2px solid #3b82f6; color: #fff; font-size: 16px; white-space: nowrap; }
-                        .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; }
+                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 14px 15px; text-align: left; border-bottom: 2px solid #3b82f6; color: #ffffff; font-size: 16px; font-weight: 800; white-space: nowrap; }
+                        .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.08); }
                         .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
                         </style>
                         <table class="tabela-jl">
@@ -1043,9 +927,9 @@ if ver_jornada:
                             
                             html_tabela += f"""<tr>
                                 <td>{row_disp['Nome']}</td>
-                                <td><span style='color: #2ecc71; font-size: 20px;'>{jl_formatado}</span></td>
-                                <td>{row_disp['Horas Trabalhadas']}</td>
-                                <td>{row_disp['Horas Separação']}</td>
+                                <td><span style='color: #2ecc71; font-size: 20px; font-weight: 900;'>{jl_formatado}</span></td>
+                                <td>{row_disp['Horas Trab.']}</td>
+                                <td>{row_disp['Horas Sep.']}</td>
                                 <td>{qtd_formatado}</td>
                                 <td>{kg_formatado}</td>
                                 <td>{ih_formatado}</td>
@@ -1055,7 +939,6 @@ if ver_jornada:
                             </tr>"""
                             
                         html_tabela += "</table><br><br>"
-                        
                         st.markdown(html_tabela, unsafe_allow_html=True)
                 else:
                     st.info(f"Não houve operação de separação na data {data_selecionada}.")
@@ -1172,11 +1055,9 @@ else:
 
             if not dados_pessoa.empty:
                 row = dados_pessoa.iloc[0]
-                
                 d_corridos_p = int(row.get('Dias Corridos', 0))
                 d_trab_p = int(row.get('Dias Trabalhados', 0))
                 d_meta_p = int(row.get('Dias Meta', 0))
-                
                 pos = int(row.get('Posicao Ranking', 0))
                 val_rank = row.get('Valor Ranking', 0)
                 cargo_p = str(row.get('FUNÇÃO', '')).strip().upper()
@@ -1192,20 +1073,9 @@ else:
                     dados_aux = df_aux_jl[df_aux_jl['NOME_CLEAN'] == str(pessoa_selecionada).strip().upper()]
                     if not dados_aux.empty:
                         linha_aux = dados_aux.iloc[0]
-                        
                         valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
-                        
-                        qtd_nt = valores_aux.count('NT')
-                        qtd_fc = valores_aux.count('FC')
-                        qtd_fe = valores_aux.count('FE')
-                        qtd_at = valores_aux.count('AT')
-                        qtd_fi = valores_aux.count('FI')
-                        qtd_ad = valores_aux.count('AD')
-                        
-                        qtd_sa = valores_aux.count('SA') 
-                        qtd_fb = valores_aux.count('FB') 
-                        qtd_aa = valores_aux.count('AA') 
-                        
+                        qtd_nt, qtd_fc, qtd_fe, qtd_at, qtd_fi, qtd_ad = valores_aux.count('NT'), valores_aux.count('FC'), valores_aux.count('FE'), valores_aux.count('AT'), valores_aux.count('FI'), valores_aux.count('AD')
+                        qtd_sa, qtd_fb, qtd_aa = valores_aux.count('SA'), valores_aux.count('FB'), valores_aux.count('AA')
                         if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
                         if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
                         if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
@@ -1221,38 +1091,21 @@ else:
                 
                 erros_qtd = int(row.get('ERROS', 0))
                 penalidade_txt = str(row.get('Penalidade_Texto', ''))
-                
                 if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
                     st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
                 
                 is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
-                
                 if is_ranking_cargo:
                     funcao_original = row.get('FUNÇÃO', '')
                     cat_rank = str(row.get('Ranking_Categoria', '')).strip()
-                    
-                    texto_funcao_rank = funcao_original
-                    if cat_rank and 'CONFERENTE' in cargo_p:
-                        texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>"
-                        
+                    texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
                     total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
-                    
-                    if pos == 1: medalha, cor_rank = "🥇", "#ffd700" 
-                    elif pos == 2: medalha, cor_rank = "🥈", "#c0c0c0" 
-                    elif pos == 3: medalha, cor_rank = "🥉", "#cd7f32" 
-                    elif pos > 0: medalha, cor_rank = "🏅", "#555555"
-                    else: medalha, cor_rank = "📋", "#333333"          
-                    
-                    if val_rank > 0:
-                        val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                        texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>"
-                    else:
-                        texto_premio_rank = f" | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
-                    
+                    medalha, cor_rank = ("🥇", "#ffd700") if pos == 1 else (("🥈", "#c0c0c0") if pos == 2 else (("🥉", "#cd7f32") if pos == 3 else ("🏅", "#555555")))
+                    val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>" if val_rank > 0 else " | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
                     txt_posicao = f"<b>{medalha} Posição:</b> {pos}º lugar de {total_eq}" if pos > 0 else f"<b>{medalha} Análise da Equipe</b> ({total_eq} pessoas)"
                     st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
-                # --- RENDERIZA OS CARTÕES DAS MÉTRICAS ---
                 cols_meta = st.columns(4) 
                 col_idx = 0
                 grafico_dados = []
@@ -1261,7 +1114,6 @@ else:
                     meta2 = row.get(f"{kpi}_Meta2", 0)
                     try: meta2_val = float(meta2)
                     except: meta2_val = 0
-                    
                     if meta2_val <= 0: continue
 
                     realizado = float(row.get(kpi, 0))
@@ -1270,80 +1122,40 @@ else:
                     valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
-                    is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+                    is_meta_unica = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
 
                     if is_meta_unica:
-                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
+                        alvo_atual = 0.48 if ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %') else 0.07
                         nome_alvo = "Meta Única"
-                        
-                        if realizado <= alvo_atual:
-                            cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                            real_perc = 100.0
-                        else:
-                            cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                            real_perc = (alvo_atual / realizado * 100) if realizado > 0 else 0
+                        cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado <= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
+                        real_perc = 100.0 if realizado <= alvo_atual else ((alvo_atual / realizado * 100) if realizado > 0 else 0)
                     else:
                         if racional == 1: 
                             perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
-                            if realizado < meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                            elif realizado < meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                            elif realizado < meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                            else: alvo_atual, nome_alvo = meta3, "Meta Máx"
-                            
-                            if realizado >= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                            elif realizado >= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                            elif realizado >= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                            alvo_atual, nome_alvo = (meta1, "Meta 1") if realizado < meta1 else ((meta2_val, "Meta 2") if realizado < meta2_val else ((meta3, "Meta 3") if realizado < meta3 else (meta3, "Meta Máx")))
+                            cor, icone, status = (C_AZUL, "🔵", "Superou") if realizado >= meta3 else ((C_VERDE, "🟢", "Atingiu") if realizado >= meta2_val else ((C_AMARELO, "🟡", "Parcial") if realizado >= meta1 else (C_VERMELHO, "🔴", "Abaixo")))
                         else: 
                             perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
-                            if realizado > meta1: alvo_atual, nome_alvo = meta1, "Meta 1"
-                            elif realizado > meta2_val: alvo_atual, nome_alvo = meta2_val, "Meta 2"
-                            elif realizado > meta3: alvo_atual, nome_alvo = meta3, "Meta 3"
-                            else: alvo_atual, nome_alvo = meta3, "Meta Máx"
-
-                            if realizado <= meta3: cor, icone, status = C_AZUL, "🔵", "Superou"
-                            elif realizado <= meta2_val: cor, icone, status = C_VERDE, "🟢", "Atingiu"
-                            elif realizado <= meta1: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                            else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-
+                            alvo_atual, nome_alvo = (meta1, "Meta 1") if realizado > meta1 else ((meta2_val, "Meta 2") if realizado > meta2_val else ((meta3, "Meta 3") if realizado > meta3 else (meta3, "Meta Máx")))
+                            cor, icone, status = (C_AZUL, "🔵", "Superou") if realizado <= meta3 else ((C_VERDE, "🟢", "Atingiu") if realizado <= meta2_val else ((C_AMARELO, "🟡", "Parcial") if realizado <= meta1 else (C_VERMELHO, "🔴", "Abaixo")))
                         real_perc = perc_atingimento * 100
                     
                     grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
-                    
                     html_tabela_premios = ""
                     v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
                     
                     if v_100_base > 0:
                         if is_meta_unica:
                             v_unica_str = f"{v_100_base:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
-    <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
-    <div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
-    <div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div>
-    </div></div>"""
+                            html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div></div></div>"""
                         else:
-                            v_m1 = v_100_base * 0.5
-                            v_m2 = v_100_base * 1.0
-                            v_m3 = v_100_base * 1.2
-                            
-                            v_m1_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            v_m2_str = f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            v_m3_str = f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            
-                            html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'>
-    <div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div>
-    <div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'>
-    <div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div>
-    <div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div>
-    <div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div>
-    </div></div>"""
+                            v_m1, v_m2, v_m3 = v_100_base * 0.5, v_100_base * 1.0, v_100_base * 1.2
+                            v_m1_str, v_m2_str, v_m3_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            html_tabela_premios = f"""<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div><div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div><div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div></div></div>"""
                     
                     html_dinheiro = ""
                     val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
-                    
                     if valor_reais > 0:
                         html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
                     elif v_100_base > 0:
@@ -1363,33 +1175,21 @@ else:
                         alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
 
                     alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
-                    
-                    aviso_erro = ""
-                    if erros_qtd > 0:
-                        if 'SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper():
-                            aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
-                        elif 'OPERADOR' in cargo_p and 'MOV' in str(kpi).upper():
-                            aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>"
+                    aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>" if (erros_qtd > 0 and (('SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper()) or ('OPERADOR' in cargo_p and 'MOV' in str(kpi).upper()))) else ""
 
                     with cols_meta[col_idx % 4]:
                         st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios}{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
                     col_idx += 1
 
-                # --- SOMA FINAL ---
                 valor_final_total = row.get('Valor Final', 0)
                 if valor_final_total > 0:
                     val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}")
-
                 st.divider()
 
-                # =============================================================================
-                # 🗣️ GESTÃO E FEEDBACK INDIVIDUAL
-                # =============================================================================
                 nome_c = row.get('NOME', pessoa_selecionada)
                 cod_c = row.get('CÓD.', '')
-
                 st.markdown(f"### 🗣️ Ações de Gestão: {nome_c}")
                 col_feed_ind, col_trein_ind = st.columns(2) 
                 
@@ -1423,42 +1223,25 @@ else:
 
                 st.divider()
                 st.markdown(f"### 📊 Análise de {pessoa_selecionada}")
-
                 col_grafico, col_tabelas_frequencia = st.columns([1.2, 1])
                 
                 with col_grafico:
                     if grafico_dados:
                         df_grafico = pd.DataFrame(grafico_dados)
-                        
                         df_grafico['Texto_Cor'] = df_grafico['Cor_Barra'].apply(lambda color: "black" if color == C_AMARELO else "white")
-                        
                         fig = px.bar(df_grafico, x='Indicador', y='Atingimento (%)', text=df_grafico['Real'].apply(lambda x: f"<b>{x:.1f}%</b>"))
                         fig.update_layout(showlegend=False, yaxis_title="<b>% do Volume Total</b>", xaxis_title=None, plot_bgcolor="rgba(0,0,0,0)", height=350, margin=dict(t=15, b=0, l=0, r=0))
                         fig.add_hline(y=100, line_dash="dash", line_color="lightgray", annotation_text="<b>Meta 100%</b>", annotation_font_color="lightgray")
-                        
                         fig.update_traces(textfont=dict(size=24, color=df_grafico['Texto_Cor'].tolist()), marker=dict(color=df_grafico['Cor_Barra'].tolist(), line=dict(color='white', width=1)))
                         fig.update_xaxes(tickfont=dict(size=20, color="lightgray", family="Arial Black"))
                         fig.update_yaxes(tickfont=dict(size=14, color="lightgray"), title_font=dict(color="lightgray"))
                         st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.info("Nenhum indicador com meta estabelecida para gerar o gráfico.")
+                    else: st.info("Nenhum indicador com meta estabelecida para gerar o gráfico.")
                 
                 with col_tabelas_frequencia:
                     cargo_p = str(row.get('FUNÇÃO', '')).upper()
-                    turno_p = str(row.get('TURNO', '')).upper()
-
-                    usa_diario = False
-                    df_uso_diario = pd.DataFrame()
-                    
-                    if "SEPARADOR" in cargo_p:
-                        usa_diario = True
-                        df_uso_diario = df_diario
-                    elif "OPERADOR" in cargo_p:
-                        usa_diario = True
-                        df_uso_diario = df_operador
-                    elif "CONFERENTE" in cargo_p:
-                        usa_diario = True
-                        df_uso_diario = df_conferente
+                    usa_diario = ("SEPARADOR" in cargo_p) or ("OPERADOR" in cargo_p) or ("CONFERENTE" in cargo_p)
+                    df_uso_diario = df_diario if "SEPARADOR" in cargo_p else (df_operador if "OPERADOR" in cargo_p else df_conferente)
 
                     if usa_diario and not df_uso_diario.empty:
                         df_uso_diario['NOME_CLEAN'] = df_uso_diario['NOME'].astype(str).str.strip().str.upper()
@@ -1466,27 +1249,21 @@ else:
                         
                         if not df_pessoa_diario.empty:
                             pessoa_d_row = df_pessoa_diario.iloc[0]
-                            cols_datas_reais = []
-                            opces_datas = []
-                            datas_vistas = set()
+                            cols_datas_reais, opces_datas, datas_vistas = [], [], set()
                             
                             for c in df_uso_diario.columns:
                                 c_str = str(c).strip()
-                                if "INICIO" in c_str.upper() or "NOME" in c_str.upper() or "CÓD" in c_str.upper() or "TURNO" in c_str.upper() or "FUNÇÃO" in c_str.upper():
-                                    continue
-                                
+                                if any(k in c_str.upper() for k in ["INICIO", "NOME", "CÓD", "TURNO", "FUNÇÃO"]): continue
                                 match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', c_str)
                                 if match:
                                     d_str = match.group(0)
                                     if d_str not in datas_vistas:
                                         datas_vistas.add(d_str)
                                         cols_datas_reais.append(c_str) 
-                                        
                                         if '-' in d_str:
                                             ano, mes, dia = d_str.split('-')
                                             opces_datas.append(f"{dia}/{mes}/{ano}")
-                                        else:
-                                            opces_datas.append(d_str)
+                                        else: opces_datas.append(d_str)
                             
                             if cols_datas_reais:
                                 st.markdown("#### 📅 Detalhamento Diário")
@@ -1495,38 +1272,26 @@ else:
                                 nome_coluna_real = cols_datas_reais[idx_escolha]
                                 col_index = list(df_uso_diario.columns).index(nome_coluna_real)
                                 
-                                try: val_1 = str(pessoa_d_row.iloc[col_index]).strip()
-                                except: val_1 = "0"
-                                try: val_2 = str(pessoa_d_row.iloc[col_index + 1]).strip()
-                                except: val_2 = "0"
-                                try: val_3 = str(pessoa_d_row.iloc[col_index + 2]).strip()
-                                except: val_3 = "0"
-                                try: val_4 = str(pessoa_d_row.iloc[col_index + 3]).strip()
-                                except: val_4 = "0"
-                                
-                                val_1 = val_1 if val_1 and val_1.lower() not in ['nan', 'none'] else "0"
-                                val_2 = val_2 if val_2 and val_2.lower() not in ['nan', 'none'] else "0"
-                                val_3 = val_3 if val_3 and val_3.lower() not in ['nan', 'none'] else "0"
-                                val_4 = val_4 if val_4 and val_4.lower() not in ['nan', 'none'] else "0"
+                                val_1 = str(pessoa_d_row.iloc[col_index]).strip() if col_index < len(pessoa_d_row) else "0"
+                                val_2 = str(pessoa_d_row.iloc[col_index + 1]).strip() if col_index + 1 < len(pessoa_d_row) else "0"
+                                val_3 = str(pessoa_d_row.iloc[col_index + 2]).strip() if col_index + 2 < len(pessoa_d_row) else "0"
+                                val_4 = str(pessoa_d_row.iloc[col_index + 3]).strip() if col_index + 3 < len(pessoa_d_row) else "0"
                                 
                                 if "SEPARADOR" in cargo_p:
                                     try:
-                                        if val_4 and val_4.lower() not in ['nan', 'none']:
-                                            val_jl_num = float(val_4.replace(',', '.').replace('%', ''))
-                                            if val_jl_num <= 2.0 and "%" not in val_4: val_jl_num = val_jl_num * 100
-                                            jl_display = f"{val_jl_num:.1f}%".replace('.', ',') 
-                                        else: jl_display = "0,0%"
+                                        v_num = float(val_4.replace(',', '.').replace('%', '')) if (val_4 and val_4.lower() not in ['nan', 'none']) else 0
+                                        if v_num <= 2.0 and "%" not in val_4: v_num *= 100
+                                        jl_display = f"{v_num:.1f}%".replace('.', ',') 
                                     except: jl_display = "0,0%"
                                     try: v_itens = f"{float(val_1.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                     except: v_itens = "0"
                                     try: v_veloc = f"{int(round(float(val_3.replace('.', '').replace(',', '.'))))}"
                                     except: v_veloc = "0"
                                     try:
-                                        horas_dec = float(val_2.replace('.', '').replace(',', '.'))
-                                        h = int(horas_dec)
-                                        m = int((horas_dec - h) * 60)
-                                        s = int((((horas_dec - h) * 60) - m) * 60)
-                                        v_horas = f"{h:02d}:{m:02d}:{s:02d}"
+                                        h_dec = float(val_2.replace('.', '').replace(',', '.'))
+                                        h, rem = int(h_dec), int((h_dec - int(h_dec)) * 60)
+                                        s = int((((h_dec - h) * 60) - rem) * 60)
+                                        v_horas = f"{h:02d}:{rem:02d}:{s:02d}"
                                     except: v_horas = "00:00:00"
                                     c1, c2, c3 = st.columns(3)
                                     c1.metric("⏱️ Horas", v_horas)
@@ -1538,7 +1303,6 @@ else:
                                     except: v_frac = "0"
                                     try: v_grand = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                     except: v_grand = "0"
-                                    st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Métricas de Conferência</p>", unsafe_allow_html=True)
                                     c1, c2 = st.columns(2)
                                     with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Fracionado</h4><h2 style='margin:0; color: {C_AZUL};'>{v_frac}</h2></div>", unsafe_allow_html=True)
                                     with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>📦 Grandeza</h4><h2 style='margin:0; color: {C_VERDE};'>{v_grand}</h2></div>", unsafe_allow_html=True)
@@ -1547,17 +1311,11 @@ else:
                                     except: v_horiz = "0"
                                     try: v_vert = f"{float(val_2.replace('.', '').replace(',', '.')):,.0f}".replace(',', '.')
                                     except: v_vert = "0"
-                                    st.markdown("<p style='color: #888; font-size: 14px; margin-bottom: -10px;'>Movimentações</p>", unsafe_allow_html=True)
                                     c1, c2 = st.columns(2)
                                     with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_AZUL}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↔️ Mov. Horizontal</h4><h2 style='margin:0; color: {C_AZUL};'>{v_horiz}</h2></div>", unsafe_allow_html=True)
                                     with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 5px solid {C_VERDE}; margin-top: 15px; margin-bottom: 15px;'><h4 style='margin:0; color: #888;'>↕️ Mov. Vertical</h4><h2 style='margin:0; color: {C_VERDE};'>{v_vert}</h2></div>", unsafe_allow_html=True)
 
-                    kpis_ativos_pessoa = []
-                    for k in kpis_mapeados:
-                        m2 = pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce')
-                        if pd.notna(m2) and m2 > 0:
-                            if k not in kpis_ativos_pessoa: kpis_ativos_pessoa.append(k) 
-
+                    kpis_ativos_pessoa = [k for k in kpis_mapeados if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0]
                     extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_pessoa]
                     extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_pessoa and c not in extras_ind]
                     col_uteis = ['CÓD.', 'NOME', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_pessoa
@@ -1587,7 +1345,6 @@ else:
                 st.markdown("<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>", unsafe_allow_html=True)
                 st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
-
                 c1, c2, c3 = st.columns(3)
                 with c1: st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>", unsafe_allow_html=True)
                 with c2: st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
@@ -1608,85 +1365,55 @@ else:
                             col_rac = f"{kpi}_Racional"
                             modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
                             racional_temp = modos.iloc[0] if not modos.empty else 1
-                            
-                            if racional_temp == 1: df_kpi_valido = df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo
-                            else: df_kpi_valido = df_cargo[df_cargo['Dias Trabalhados'] > 0] if 'Dias Trabalhados' in df_cargo.columns else df_cargo
-                                
+                            df_kpi_valido = (df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo) if racional_temp == 1 else (df_cargo[df_cargo['Dias Trabalhados'] > 0] if 'Dias Trabalhados' in df_cargo.columns else df_cargo)
                             if df_kpi_valido.empty: continue
 
                             df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0] if f"{kpi}_Meta2" in df_kpi_valido.columns else pd.DataFrame()
-                            
                             if df_com_meta.empty: continue 
 
                             meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
                             meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
                             meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
-                            
                             real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
                             soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
 
                             cargo_atual_upper = str(cargo_atual).strip().upper()
                             kpi_upper = str(kpi).strip().upper()
-                            
-                            is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
-                            is_meta_unica_ava = (kpi_upper == 'AVARIA') 
-                            is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+                            is_meta_unica = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
 
                             if is_meta_unica:
-                                alvo_atual_med = 0.48 if is_meta_unica_dev else 0.07
+                                alvo_atual_med = 0.48 if ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %') else 0.07
                                 nome_alvo = "Meta Única"
-                                
-                                if real_med <= alvo_atual_med:
-                                    cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                                    real_perc = 100.0
-                                else:
-                                    cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
-                                    real_perc = (alvo_atual_med / real_med * 100) if real_med > 0 else 0
+                                cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
+                                real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
                             else:
                                 if racional_temp == 1: 
-                                    if real_med < meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                                    elif real_med < meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                                    elif real_med < meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                                    else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                                    alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med < meta1_med else ((meta2_med, "Meta 2") if real_med < meta2_med else ((meta3_med, "Meta 3") if real_med < meta3_med else (meta3_med, "Meta Máx")))
                                     perc = (real_med / meta2_med) if meta2_med > 0 else 0
                                 else: 
-                                    if real_med > meta1_med: alvo_atual_med, nome_alvo = meta1_med, "Meta 1"
-                                    elif real_med > meta2_med: alvo_atual_med, nome_alvo = meta2_med, "Meta 2"
-                                    elif real_med > meta3_med: alvo_atual_med, nome_alvo = meta3_med, "Meta 3"
-                                    else: alvo_atual_med, nome_alvo = meta3_med, "Meta Máx"
+                                    alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med > meta1_med else ((meta2_med, "Meta 2") if real_med > meta2_med else ((meta3_med, "Meta 3") if real_med > meta3_med else (meta3_med, "Meta Máx")))
                                     perc = (meta2_med / real_med) if real_med > 0 else 1.2
 
                                 real_perc = perc * 100
-                                if real_perc >= 120: cor, icone, status = C_AZUL, "🔵", "Superando"
-                                elif real_perc >= 100: cor, icone, status = C_VERDE, "🟢", "Na Meta"
-                                elif real_perc >= 50: cor, icone, status = C_AMARELO, "🟡", "Parcial"
-                                else: cor, icone, status = C_VERMELHO, "🔴", "Abaixo"
+                                cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
                             
                             if "Tempo" in str(kpi):
-                                v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                                t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                                v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
-                                v_tela = f"{real_med:.1f}%".replace('.', ',')
-                                t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
+                                v_tela, t_tela = f"{real_med:.1f}%".replace('.', ','), f"{alvo_atual_med:.1f}%".replace('.', ',')
                             elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                                v_tela = f"{real_med:.2f}%".replace('.', ',')
-                                t_tela = f"{alvo_atual_med:.2f}%".replace('.', ',')
+                                v_tela, t_tela = f"{real_med:.2f}%".replace('.', ','), f"{alvo_atual_med:.2f}%".replace('.', ',')
                             else:
-                                v_tela = f"{real_med:,.0f}".replace(',', '.')
-                                t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
+                                v_tela, t_tela = f"{real_med:,.0f}".replace(',', '.'), f"{alvo_atual_med:,.0f}".replace(',', '.')
 
-                            metricas_globais = ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET']
-                            eh_global = any(g in str(kpi).upper() for g in metricas_globais)
-                            
+                            eh_global = any(g in str(kpi).upper() for g in ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET'])
                             titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
                             alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
-
                             val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                             html_dinheiro_med = ""
                             
                             turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
                             is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
-                            
                             if not is_itens_t2_sepg and val_tot_equipe > 0:
                                 val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                                 html_dinheiro_med = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 16px;'>💰 Total Adquirido (Equipe): <b>R$ {val_tot_eq_str}</b></span></div>"
@@ -1695,23 +1422,12 @@ else:
                                 st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_dinheiro_med}</div>", unsafe_allow_html=True)
                             col_idx += 1
 
-            # =============================================================================
-            # 📋 TABELA GERENCIAL CONSOLIDADA 
-            # =============================================================================
             if filtros_ativos:
                 if 'cargos_render' in locals() and len(cargos_render) > 0: st.divider()
                 st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
-                
-                kpis_ativos_tabela = []
-                for kpi in kpis_mapeados:
-                    if f"{kpi}_Meta2" in df_filtrado.columns:
-                        metas_validas = pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0)
-                        if metas_validas.sum() > 0:
-                            if kpi not in kpis_ativos_tabela: kpis_ativos_tabela.append(kpi)
-
+                kpis_ativos_tabela = [kpi for kpi in kpis_mapeados if f"{kpi}_Meta2" in df_filtrado.columns and pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0).sum() > 0]
                 extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
-
                 colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
                 df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
