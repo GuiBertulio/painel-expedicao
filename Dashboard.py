@@ -334,7 +334,7 @@ def carregar_dados():
 
 @st.cache_data(ttl=60)
 def carregar_diarios():
-    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame(), 'base_sep': pd.DataFrame()}
+    dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
         
@@ -345,14 +345,15 @@ def carregar_diarios():
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
                 val_upper = [str(cell).strip().upper() for cell in row_vals]
-                # Leitura flexível para todas as abas
+                # Leitura flexível para achar a linha de cabeçalho
                 if any(k in val_upper for k in ["NOME", "NOMECOMPLETO", "CÓD.", "BOX", "OPERADOR"]):
                     header_idx = i
                     break
             
             headers = aba_bruta[header_idx]
             
-            if header_idx > 0 and nome_aba not in ["Ponto T3", "Base Separacao"]:
+            # Se for as planilhas velhas que a data fica numa linha acima (Relatorios Diários antigos)
+            if header_idx > 0 and nome_aba not in ["Acompanhamento JL"]:
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
@@ -386,24 +387,22 @@ def carregar_diarios():
         except: pass
         try: dfs['aux_jl'] = processar_aba("Aux Absent")
         except: pass
+        
+        # 💡 Puxando a nova aba criada diretamente do Sheets
         try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
-        except: pass
-        try: dfs['ponto_t3'] = processar_aba("Ponto T3")
-        except: pass
-        try: dfs['base_sep'] = processar_aba("Base Separacao")
         except: pass
 
     except Exception as e:
         print(f"Erro ao carregar abas diárias: {e}")
         pass
     
-    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl'], dfs['ponto_t3'], dfs['base_sep']
+    return dfs['sep'], dfs['op'], dfs['conf'], dfs['aux_jl'], dfs['acomp_jl']
 
 # =============================================================================
 # 🚀 CARREGAMENTO E ATUALIZAÇÃO GERAL DO RANKING
 # =============================================================================
 df = carregar_dados()
-df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl, df_ponto_t3, df_base_sep = carregar_diarios()
+df_diario, df_operador, df_conferente, df_aux_jl, df_acomp_jl = carregar_diarios()
 
 df['Valor Ranking'] = 0.0
 df['Posicao Ranking'] = 0
@@ -817,49 +816,34 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# FUNÇÃO AUXILIAR PARA SOMAR HORÁRIOS DA BASE SEPARAÇÃO
-def sum_time_strings(time_series):
-    total_seconds = 0
-    for t_str in time_series:
-        t_str = str(t_str).strip()
-        if t_str and t_str.count(':') >= 1:
-            try:
-                parts = t_str.split(':')
-                if len(parts) == 3:
-                    h, m, s = map(int, parts)
-                elif len(parts) == 2:
-                    h, m = map(int, parts)
-                    s = 0
-                total_seconds += h*3600 + m*60 + s
-            except: pass
-    return total_seconds
-
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (TABELA NATIVA DO STREAMLIT COM HACK DE ZOOM)
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL MODO "LEVE" (LENDO TUDO DIRETO DA PLANILHA)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
-    if df_acomp_jl.empty or df_ponto_t3.empty:
-        st.warning("⚠️ As abas 'Acompanhamento JL' e/ou 'Ponto T3' não foram encontradas na sua planilha do Google.")
+    if df_acomp_jl.empty:
+        st.warning("⚠️ A aba 'Acompanhamento JL' não foi encontrada na sua planilha do Google.")
     else:
+        # Acha a linha em que as datas estão armazenadas (normalmente a primeira linha, index 0)
+        linha_datas = df_acomp_jl.columns.tolist()
+        
+        # Filtra quais colunas parecem datas e estão dentro do ciclo atual
         colunas_validas = []
-        for c in df_acomp_jl.columns:
+        for c in linha_datas:
             match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c))
             if match:
                 d_str = match.group(0)
                 try:
-                    if '-' in d_str:
-                        d_obj = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
-                    else:
-                        d_obj = datetime.datetime.strptime(d_str, '%d/%m/%Y').date()
+                    if '-' in d_str: d_obj = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+                    else: d_obj = datetime.datetime.strptime(d_str, '%d/%m/%Y').date()
                     
                     if dt_inicio <= d_obj <= data_apuracao:
                         colunas_validas.append(c)
-                except Exception:
-                    pass
+                except Exception: pass
         
         if not colunas_validas:
-            st.warning(f"⚠️ Nenhuma data encontrada na planilha dentro do período de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}.")
+            st.warning(f"⚠️ Nenhuma data válida encontrada na planilha dentro do período de {dt_inicio.strftime('%d/%m/%Y')} até {data_apuracao.strftime('%d/%m/%Y')}.")
         else:
+            # Menu Suspenso de Datas
             def formatar_data_dropdown(col_name):
                 match = re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(col_name))
                 if match:
@@ -878,141 +862,79 @@ if ver_jornada:
                 format_func=formatar_data_dropdown
             )
             
-            df_jl_separadores = df_acomp_jl[df_acomp_jl['TURNO'].astype(str).str.strip().str.upper() == 'T3']
-            df_jl_separadores = df_jl_separadores[df_jl_separadores['FUNÇÃO'].astype(str).str.strip().str.upper().str.contains('SEPARADOR')]
+            # Acha o índice da coluna que o usuário selecionou
+            idx_data_selecionada = linha_datas.index(data_selecionada)
             
-            # Limpeza cirúrgica das datas para garantir o cruzamento
-            def formatar_data_br(d_str):
-                d_str = str(d_str).strip().split(" ")[0]
-                match_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
-                if match_iso:
-                    return f"{match_iso.group(3)}/{match_iso.group(2)}/{match_iso.group(1)}"
-                match_br = re.search(r'(\d{2})/(\d{2})/(\d{4})', d_str)
-                if match_br:
-                    return f"{match_br.group(1)}/{match_br.group(2)}/{match_br.group(3)}"
-                return d_str
+            # Extrai os dados apenas das colunas que importam
+            col_nome = next((c for c in linha_datas if "NOME" in str(c).upper()), None)
             
-            data_busca_limpa = formatar_data_br(data_selecionada)
-            
-            # 💡 HACK PARA O TURNO DA NOITE: Agrupar tudo das 15:00 de ontem até as 14:59 de hoje
-            dt_busca = datetime.datetime.strptime(data_busca_limpa, '%d/%m/%Y')
-            dt_inicio_turno = dt_busca - datetime.timedelta(days=1)
-            dt_inicio_turno = dt_inicio_turno.replace(hour=15, minute=0, second=0)
-            dt_fim_turno = dt_busca.replace(hour=14, minute=59, second=59)
-
-            if not df_ponto_t3.empty and 'DATAAPURACAO' in df_ponto_t3.columns:
-                df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].apply(formatar_data_br)
-                df_ponto_t3['CONTRATO_LIMPO'] = df_ponto_t3['CONTRATO'].astype(str).str.replace('.0', '', regex=False).str.strip()
-                df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_busca_limpa]
-            else:
-                df_ponto_filt = pd.DataFrame()
-            
-            col_sep = next((c for c in df_ponto_filt.columns if 'SEPARA' in str(c).upper()), None)
-            
-            # Preparar o filtro da Base Separacao com o agrupamento do turno da noite
-            df_base_turno = pd.DataFrame()
-            if not df_base_sep.empty and 'dtaAntes' in df_base_sep.columns:
-                df_base_sep['dtaAntes_dt'] = pd.to_datetime(df_base_sep['dtaAntes'], dayfirst=True, errors='coerce')
-                df_base_sep['dtaDepois_dt'] = pd.to_datetime(df_base_sep['dtaDepois'], dayfirst=True, errors='coerce')
-                mask_data = (df_base_sep['dtaAntes_dt'] >= dt_inicio_turno) & (df_base_sep['dtaAntes_dt'] <= dt_fim_turno)
-                df_base_turno = df_base_sep[mask_data].copy()
+            # As colunas mastigadas vão ficar logo à direita da data selecionada
+            col_jl = linha_datas[idx_data_selecionada]
+            col_hr_trab = linha_datas[idx_data_selecionada + 1] if idx_data_selecionada + 1 < len(linha_datas) else None
+            col_hr_sep = linha_datas[idx_data_selecionada + 2] if idx_data_selecionada + 2 < len(linha_datas) else None
+            col_qtd_itens = linha_datas[idx_data_selecionada + 3] if idx_data_selecionada + 3 < len(linha_datas) else None
+            col_kg = linha_datas[idx_data_selecionada + 4] if idx_data_selecionada + 4 < len(linha_datas) else None # Vamos pular no print
+            col_itens_hr = linha_datas[idx_data_selecionada + 5] if idx_data_selecionada + 5 < len(linha_datas) else None
+            col_1_bipe = linha_datas[idx_data_selecionada + 6] if idx_data_selecionada + 6 < len(linha_datas) else None
+            col_ult_bipe = linha_datas[idx_data_selecionada + 7] if idx_data_selecionada + 7 < len(linha_datas) else None
+            col_tempo_janta = linha_datas[idx_data_selecionada + 8] if idx_data_selecionada + 8 < len(linha_datas) else None
 
             dados_tabela_jl = []
-            soma_jl_flt = 0.0
-            qtd_validos = 0
             
-            for _, row in df_jl_separadores.iterrows():
-                cod = str(row.get('CÓD.', '')).replace('.0', '').strip()
-                nome = str(row.get('NOME', '')).strip()
+            # Pula a primeira linha (que tem os cabeçalhos de texto como 'Horas Trabalhadas', 'JL', etc.) e itera
+            for idx, row in df_acomp_jl.iloc[1:].iterrows():
+                nome = str(row.get(col_nome, '')).strip()
+                if not nome or nome == "nan" or nome == "None": continue
                 
-                # 1. Puxando Jornada Líquida original
-                val_jl_raw = str(row.get(data_selecionada, '0')).strip()
+                # JL 
+                val_jl_raw = str(row.get(col_jl, '0')).strip()
                 try:
                     val_num = float(val_jl_raw.replace('%', '').replace(',', '.'))
-                    if val_num <= 2.0 and '%' not in val_jl_raw: 
-                        val_num *= 100
+                    if val_num <= 2.0 and '%' not in val_jl_raw: val_num *= 100
                     jl_float = val_num
-                    if val_num > 0:
-                        soma_jl_flt += val_num
-                        qtd_validos += 1
-                except:
-                    jl_float = 0.0
-                    
-                # 2. Puxando Horas do Ponto T3
-                horas_str = "—"
-                horas_sep_str = "—"
-                if not df_ponto_filt.empty and 'CONTRATO_LIMPO' in df_ponto_filt.columns:
-                    match_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
-                    if not match_ponto.empty:
-                        h_trab = str(match_ponto.iloc[0].get('JORNADA', '—')).strip()
-                        if h_trab.lower() not in ['nan', 'none', 'nat', '']: horas_str = h_trab
-                        
-                        if col_sep:
-                            h_sep = str(match_ponto.iloc[0].get(col_sep, '—')).strip()
-                            if h_sep.lower() not in ['nan', 'none', 'nat', '']:
-                                horas_sep_str = h_sep
+                except: jl_float = 0.0
                 
-                # 3. Puxando Bipes e Metricas direto da Fonte (Base Separacao)
-                v_itens = 0
-                v_veloc = 0.0
-                primeiro_bipe = "—"
-                ultimo_bipe = "—"
-                tempo_janta = "—"
+                # Horas Trabalhadas
+                hr_trab = str(row.get(col_hr_trab, '—')).strip()
+                if hr_trab in ["nan", "None", "0", "0,00", "0.00", "00:00:00"]: hr_trab = "—"
                 
-                if not df_base_turno.empty:
-                    primeiro_nome = nome.split()[0].upper() if nome else ""
-                    
-                    # Filtra o operador exato
-                    col_cod_base = next((c for c in df_base_turno.columns if 'CÓD' in str(c).upper() or 'CODOPERADOR' in str(c).upper()), None)
-                    col_op_base = next((c for c in df_base_turno.columns if 'OPERADOR' in str(c).upper() and 'COD' not in str(c).upper()), None)
-                    
-                    mask_op = pd.Series(False, index=df_base_turno.index)
-                    if col_cod_base:
-                        mask_op = mask_op | (df_base_turno[col_cod_base].astype(str).str.replace('.0', '', regex=False).str.strip() == cod)
-                    if col_op_base:
-                        mask_op = mask_op | (df_base_turno[col_op_base].astype(str).str.upper().str.contains(primeiro_nome))
-                        
-                    df_base_filt = df_base_turno[mask_op]
-                    
-                    if not df_base_filt.empty:
-                        # Extrai Bipes Corretos (Protegidos do Turno da Noite)
-                        min_dt = df_base_filt['dtaAntes_dt'].min()
-                        if pd.notna(min_dt): primeiro_bipe = min_dt.strftime('%H:%M:%S')
-                        
-                        max_dt = df_base_filt['dtaDepois_dt'].max()
-                        if pd.notna(max_dt): ultimo_bipe = max_dt.strftime('%H:%M:%S')
-                        
-                        # Extrai Quantidade Total
-                        col_qtd = next((c for c in df_base_filt.columns if 'QTDITENS' in str(c).upper() or 'QTD' in str(c).upper()), None)
-                        if col_qtd:
-                            v_itens = int(pd.to_numeric(df_base_filt[col_qtd], errors='coerce').fillna(0).sum())
-                            
-                        # Extrai Itens/Hora Baseado na JL Total Real (Soma de tempo)
-                        col_jl = next((c for c in df_base_filt.columns if str(c).strip().upper() == 'JL'), None)
-                        if col_jl:
-                            jl_seconds = sum_time_strings(df_base_filt[col_jl])
-                            if jl_seconds > 0:
-                                v_veloc = round(v_itens / (jl_seconds / 3600.0), 1)
+                # Horas Separação
+                hr_sep = str(row.get(col_hr_sep, '—')).strip()
+                if hr_sep in ["nan", "None", "0", "0,00", "0.00", "00:00:00"]: hr_sep = "—"
+                
+                # Qtd Itens
+                qtd_raw = str(row.get(col_qtd_itens, '0')).strip()
+                try: qtd_itens = int(float(qtd_raw.replace('.', '').replace(',', '.')))
+                except: qtd_itens = 0
+                
+                # Itens/Hora
+                itens_hr_raw = str(row.get(col_itens_hr, '0')).strip()
+                try: itens_hora = round(float(itens_hr_raw.replace('.', '').replace(',', '.')), 2)
+                except: itens_hora = 0.0
+                
+                # 1 Bipe
+                primeiro_bipe = str(row.get(col_1_bipe, '—')).strip()
+                if primeiro_bipe in ["nan", "None", "0", "00:00:00"]: primeiro_bipe = "—"
+                
+                # Último Bipe
+                ultimo_bipe = str(row.get(col_ult_bipe, '—')).strip()
+                if ultimo_bipe in ["nan", "None", "0", "00:00:00"]: ultimo_bipe = "—"
+                
+                # Tempo Janta
+                tempo_janta = str(row.get(col_tempo_janta, '—')).strip()
+                if tempo_janta in ["nan", "None", "0", "00:00:00"]: tempo_janta = "—"
 
-                        # Extrai o Tempo Exato de Janta
-                        col_almoco = next((c for c in df_base_filt.columns if 'ALMOÇO' in str(c).upper() or 'JANTA' in str(c).upper()), None)
-                        col_intervalo = next((c for c in df_base_filt.columns if 'INTERVALO' in str(c).upper() and 'P' not in str(c).upper()), None)
-                        
-                        if col_almoco and col_intervalo:
-                            janta_df = df_base_filt[df_base_filt[col_almoco].astype(str).str.strip().str.upper() == 'S']
-                            janta_seconds = sum_time_strings(janta_df[col_intervalo])
-                            if janta_seconds > 0:
-                                h, rem = divmod(janta_seconds, 3600)
-                                m, s = divmod(rem, 60)
-                                tempo_janta = f"{h:02d}:{m:02d}:{s:02d}"
+                # Se todas as colunas de "Trabalho" do dia estiverem vazias, o cara faltou/não trabalhou, ignora ele na tabela para limpar a visão
+                if jl_float == 0.0 and hr_trab == "—" and hr_sep == "—" and qtd_itens == 0:
+                    continue
 
                 dados_tabela_jl.append({
                     "Nome": nome,
-                    "Jornada Líquida": jl_float,
-                    "Horas Trab.": horas_str,
-                    "Horas Sep.": horas_sep_str,
-                    "Qtd Itens": v_itens,
-                    "Itens/Hora": v_veloc,
+                    "Jornada Líquida (%)": jl_float,
+                    "Horas Trabalhadas": hr_trab,
+                    "Horas Separação": hr_sep,
+                    "Qtd Itens": qtd_itens,
+                    "Itens/Hora": itens_hora,
                     "1º Bipe": primeiro_bipe,
                     "Último Bipe": ultimo_bipe,
                     "Tempo Janta": tempo_janta
@@ -1020,13 +942,8 @@ if ver_jornada:
                 
             if dados_tabela_jl:
                 df_display = pd.DataFrame(dados_tabela_jl)
-                # O padrão inicial é Crescente pela Jornada Líquida, como você pediu!
-                df_display = df_display.sort_values(by="Jornada Líquida", ascending=True)
                 
-                media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
-                st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
-                
-                # 💡 CSS HACK: Aumenta o tamanho da tabela nativa do Streamlit para manter as letras grandes e legíveis
+                # 💡 CSS HACK PARA A TABELA FICAR MAIOR E LEGÍVEL
                 st.markdown("""
                     <style>
                     [data-testid="stDataFrame"] {
@@ -1035,29 +952,31 @@ if ver_jornada:
                     </style>
                 """, unsafe_allow_html=True)
                 
-                # 💡 Tabela Nativa: Clicável, Ordenável e com a barra visual na JL!
+                # 💡 Tabela Interativa Original Streamlit (com ProgressColumn)
                 st.dataframe(
                     df_display, 
                     hide_index=True, 
                     use_container_width=True,
                     height=650,
                     column_config={
-                        "Nome": st.column_config.TextColumn("Nome do Colaborador"),
-                        "Jornada Líquida": st.column_config.NumberColumn(
-                            "Jornada Líquida",
-                            format="%.1f%%"
+                        "Nome": st.column_config.TextColumn("Nome"),
+                        "Jornada Líquida (%)": st.column_config.ProgressColumn(
+                            "Jornada Líquida (%)",
+                            format="%.1f%%",
+                            min_value=0,
+                            max_value=100
                         ),
-                        "Horas Trab.": st.column_config.TextColumn("Horas Trab."),
-                        "Horas Sep.": st.column_config.TextColumn("Horas Sep."),
-                        "Qtd Itens": st.column_config.NumberColumn("Qtd Itens"),
-                        "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%.1f"),
+                        "Horas Trabalhadas": st.column_config.TextColumn("Horas Trabalhadas"),
+                        "Horas Separação": st.column_config.TextColumn("Horas Separação"),
+                        "Qtd Itens": st.column_config.NumberColumn("Qtd Itens", format="%d"),
+                        "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%.2f"),
                         "1º Bipe": st.column_config.TextColumn("1º Bipe"),
                         "Último Bipe": st.column_config.TextColumn("Último Bipe"),
                         "Tempo Janta": st.column_config.TextColumn("Tempo Janta")
                     }
                 )
             else:
-                st.info(f"Nenhum Separador do T3 foi encontrado para a data {data_selecionada}.")
+                st.info(f"Não houve operação de separação na data {data_selecionada}.")
 
 # 💡 DASHBOARD NORMAL
 else:
