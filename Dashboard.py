@@ -279,11 +279,9 @@ def carregar_dados():
                     colunas[i+3]: f"{nome_kpi}_Meta3",
                     colunas[i+4]: f"{nome_kpi}_Valor"
                 }, inplace=True)
-            except IndexError:
-                pass 
+            except IndexError: pass 
 
     colunas_atuais = list(df.columns)
-    
     def achar_coluna(nome_exato, palavras_chave):
         for c in colunas_atuais:
             if str(c).strip().upper() == nome_exato.upper(): return c
@@ -330,10 +328,8 @@ def carregar_dados():
         cargo_e = str(row.get('FUNÇÃO', '')).upper()
         erros_e = float(row.get('ERROS', 0))
         if erros_e > 0:
-            if 'SEPARADOR' in cargo_e:
-                df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 20)} Itens"
-            elif 'OPERADOR' in cargo_e:
-                df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 10)} Mov."
+            if 'SEPARADOR' in cargo_e: df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 20)} Itens"
+            elif 'OPERADOR' in cargo_e: df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 10)} Mov."
     return df
 
 @st.cache_data(ttl=60)
@@ -415,7 +411,6 @@ for turno in ['T2', 'T3']:
             metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), 
                                 next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
             if not metrica_rank: continue
-            
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
             df_eq = df_eq.sort_values(by=metrica_rank, ascending=False)
             
@@ -423,15 +418,12 @@ for turno in ['T2', 'T3']:
             for idx, row_eq in df_eq.iterrows():
                 if float(row_eq.get(metrica_rank, 0)) <= 0: continue 
                 df.at[idx, 'Posicao Ranking'] = pos
-                
                 d_corr_rank = float(row_eq.get('Dias Corridos', 0))
                 d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
                 prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
 
-                if turno == 'T3':
-                    val_base = 250.0 if pos == 1 else (200.0 if pos == 2 else (100.0 if pos == 3 else 0.0))
-                elif turno == 'T2':
-                    val_base = 150.0 if pos == 1 else (100.0 if pos == 2 else (80.0 if pos == 3 else 0.0))
+                if turno == 'T3': val_base = 250.0 if pos == 1 else (200.0 if pos == 2 else (100.0 if pos == 3 else 0.0))
+                elif turno == 'T2': val_base = 150.0 if pos == 1 else (100.0 if pos == 2 else (80.0 if pos == 3 else 0.0))
                 else: val_base = 0.0
                 
                 if val_base > 0: df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
@@ -518,10 +510,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     racional = float(row.get(f"{kpi}_Racional", 1))
                     
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
-                    is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
-                    
+                    is_meta_unica = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
                     if is_meta_unica:
                         alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                         faixa_meta = "100%" if real <= alvo_atual else "0%"
@@ -578,10 +567,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
             worksheet.set_column('K:K', 20, formato_moeda)   
             worksheet.set_column('L:L', 18, formato_central) 
         
-        st.sidebar.download_button(
-            label="📥 Baixar Auditoria", data=buffer.getvalue(), file_name=f"Auditoria_Produtividade_Fechamento.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, type="primary"
-        )
+        st.sidebar.download_button(label="📥 Baixar Auditoria", data=buffer.getvalue(), file_name=f"Auditoria_Produtividade_Fechamento.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, type="primary")
     else:
         st.sidebar.button("🔒 Fechamento (Auditoria)", disabled=True, use_container_width=True, help="A Auditoria é liberada apenas quando o período for exato: do dia 26 ao dia 25.")
 
@@ -705,7 +691,6 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL (VISUAL HTML ROBUSTO + HORAS CORRIGIDAS)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -760,7 +745,6 @@ if ver_jornada:
                 idx_funcao = headers_vals.index("FUNÇÃO") if "FUNÇÃO" in headers_vals else (headers_vals.index("FUNCAO") if "FUNCAO" in headers_vals else -1)
                 idx_cod = headers_vals.index("CÓD.") if "CÓD." in headers_vals else (headers_vals.index("COD") if "COD" in headers_vals else 0)
                 
-                # Mapeador de colunas relativo à data
                 sorted_starts = sorted(datas_indices.values())
                 current_idx = sorted_starts.index(idx_col_inicio)
                 end_col = sorted_starts[current_idx + 1] if current_idx + 1 < len(sorted_starts) else len(headers_vals)
@@ -784,7 +768,7 @@ if ver_jornada:
                 idx_bu = find_col(['ULTIMO', 'ÚLTIMO'])
                 idx_tj = find_col(['JANTA', 'ALMOÇO'])
                 
-                # Preparar fallback em Ponto T3 caso a jornada venha vazia no Acompanhamento JL
+                # Fallback em Ponto T3 se Horas Trabalhadas vier zerado
                 if not df_ponto_t3.empty and 'DATAAPURACAO' in df_ponto_t3.columns:
                     df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].astype(str).apply(formatar_data_br)
                     col_contrato = next((c for c in df_ponto_t3.columns if 'CONTRATO' in str(c).upper() or 'CÓD' in str(c).upper()), None)
@@ -842,7 +826,7 @@ if ver_jornada:
                     bu_format = parse_time(bu_val)
                     tj_format = parse_time(tj_val)
                     
-                    # 💡 RESGATE AUTOMÁTICO DAS HORAS TRABALHADAS NA PONTO T3 (CASO VENHA ZERADO)
+                    # 💡 RESGATE AUTOMÁTICO DE HORAS TRABALHADAS NA PONTO T3
                     if (ht_format in ["00:00:00", "—"]) and not df_ponto_filt.empty:
                         row_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
                         if row_ponto.empty and nome:
@@ -863,8 +847,8 @@ if ver_jornada:
                     dados_tabela_jl.append({
                         "Nome": nome,
                         "Jornada Líquida (%)": jl_float, 
-                        "Horas Trab.": ht_format,
-                        "Horas Sep.": hs_format,
+                        "Horas Trabalhadas": ht_format,
+                        "Horas Separação": hs_format,
                         "Qtd Itens": qtd_int,
                         "KG": kg_float,
                         "Itens/Hora": ih_float,
@@ -876,7 +860,7 @@ if ver_jornada:
                 if dados_tabela_jl:
                     df_display = pd.DataFrame(dados_tabela_jl)
                     
-                    # 💡 MENU DE FILTROS SUPERIORES (NATIVO E LIMPO)
+                    # 💡 MENU DE FILTROS SUPERIORES
                     st.markdown("#### 🔍 Filtrar e Ordenar")
                     col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
                     busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
@@ -896,7 +880,7 @@ if ver_jornada:
                     if df_display.empty:
                         st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                     else:
-                        # 💡 GERADOR DA TABELA HTML COM FONTES GRANDES E DADOS EM NEGRITO
+                        # 💡 GERADOR DA TABELA HTML COM FONTES 18PX E TUDO EM NEGRITO
                         html_tabela = """
                         <style>
                         .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; }
@@ -928,8 +912,8 @@ if ver_jornada:
                             html_tabela += f"""<tr>
                                 <td>{row_disp['Nome']}</td>
                                 <td><span style='color: #2ecc71; font-size: 20px; font-weight: 900;'>{jl_formatado}</span></td>
-                                <td>{row_disp['Horas Trab.']}</td>
-                                <td>{row_disp['Horas Sep.']}</td>
+                                <td>{row_disp['Horas Trabalhadas']}</td>
+                                <td>{row_disp['Horas Separação']}</td>
                                 <td>{qtd_formatado}</td>
                                 <td>{kg_formatado}</td>
                                 <td>{ih_formatado}</td>
@@ -988,14 +972,11 @@ else:
                     if racional == 1 and realizado == 0: continue 
                     
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
-                    is_meta_unica_ava = (kpi_upper == 'AVARIA') 
-                    is_meta_unica = is_meta_unica_dev or is_meta_unica_ava
+                    is_meta_unica = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
                     
                     abaixo_da_meta = False
-                    
                     if is_meta_unica:
-                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
+                        alvo_atual = 0.48 if ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %') else 0.07
                         if realizado > alvo_atual:
                             abaixo_da_meta = True
                             meta1 = alvo_atual 
@@ -1174,7 +1155,7 @@ else:
                         val_tela = f"{realizado:,.0f}".replace(',', '.')
                         alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
 
-                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
+                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
                     aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>" if (erros_qtd > 0 and (('SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper()) or ('OPERADOR' in cargo_p and 'MOV' in str(kpi).upper()))) else ""
 
                     with cols_meta[col_idx % 4]:
