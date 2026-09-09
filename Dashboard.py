@@ -61,16 +61,12 @@ C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef44
 # 🧰 FUNÇÕES DE APOIO E LIMPEZA DE DADOS
 # =============================================================================
 
-# Conversor super inteligente para lidar com horas do Excel (Ex: "9,13" vira "09:13:00")
 def parse_time(val):
     val = str(val).strip()
-    if val in ["", "nan", "None", "—", "-"]: return "00:00:00"
-    if val in ["0", "0,00", "0.00", "00:00:00"]: return "00:00:00"
-    
+    if val in ["", "nan", "None", "—", "-", "0", "0,00", "0.00", "00:00:00"]: return "00:00:00"
     if ":" in val:
         if " " in val: val = val.split(" ")[-1]
         return val
-        
     try:
         v = float(val.replace(',', '.'))
         if 0 < v < 1:  
@@ -89,6 +85,26 @@ def parse_time(val):
             return f"{h:02d}:{m:02d}:00"
     except:
         return val
+
+def extrair_inteiro(val):
+    try:
+        if pd.isna(val): return 0
+    except ValueError:
+        return 0
+    
+    v_str = str(val).strip()
+    if v_str.lower() in ['nan', 'none', '', '-']: return 0
+    
+    v_str = re.sub(r'[^\d.,]', '', v_str)
+    if not v_str: return 0
+    
+    if ',' in v_str:
+        v_str = v_str.split(',')[0]
+        
+    v_str = v_str.replace('.', '')
+    
+    try: return int(v_str)
+    except: return 0
 
 def obter_valor_100(turno, funcao, kpi):
     t = str(turno).strip().upper()
@@ -818,7 +834,6 @@ if st.session_state["perfil"] == "Gerente":
             mime="text/csv", type="primary", use_container_width=True, key="btn_rh_sistema"
         )
 
-
 # =============================================================================
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
@@ -872,12 +887,40 @@ if ver_jornada:
                     index=len(colunas_validas)-1
                 )
                 
+                # Encontra a posição exata das colunas baseadas na data selecionada
                 idx_col_inicio = datas_indices[data_selecionada]
                 
                 headers_vals = [str(x).upper().strip() for x in df_acomp_jl.iloc[idx_header].values]
+                
+                # Mapeia colunas Globais
                 idx_nome = headers_vals.index("NOME") if "NOME" in headers_vals else -1
                 idx_turno = headers_vals.index("TURNO") if "TURNO" in headers_vals else -1
                 idx_funcao = headers_vals.index("FUNÇÃO") if "FUNÇÃO" in headers_vals else (headers_vals.index("FUNCAO") if "FUNCAO" in headers_vals else -1)
+                
+                # Mapeador super blindado que só procura colunas DENTRO do espaço do dia selecionado
+                sorted_starts = sorted(datas_indices.values())
+                current_idx = sorted_starts.index(idx_col_inicio)
+                end_col = sorted_starts[current_idx + 1] if current_idx + 1 < len(sorted_starts) else len(headers_vals)
+
+                search_start = max(0, idx_col_inicio - 2)
+                
+                def find_col(keywords):
+                    for i in range(search_start, end_col):
+                        if i < len(headers_vals):
+                            col_name = str(headers_vals[i]).upper()
+                            if any(k in col_name for k in keywords):
+                                return i
+                    return -1
+
+                idx_jl = find_col(['JL'])
+                idx_ht = find_col(['HORAS TRAB', 'TRABALHADAS'])
+                idx_hs = find_col(['HORAS SEP', 'SEPARA'])
+                idx_qtd = find_col(['QTD', 'ITENS SEP'])
+                idx_kg = find_col(['KG', 'PESO'])
+                idx_ih = find_col(['ITENS/HORA', 'ITENS HORA'])
+                idx_b1 = find_col(['1º', '1O', 'PRIMEIRO'])
+                idx_bu = find_col(['ULTIMO', 'ÚLTIMO'])
+                idx_tj = find_col(['JANTA', 'ALMOÇO'])
                 
                 dados_tabela_jl = []
                 soma_jl_flt = 0.0
@@ -893,16 +936,17 @@ if ver_jornada:
                     if not nome or nome in ["nan", "None", "NOME"] or "SEPARADOR" not in funcao or "T3" not in turno:
                         continue
                         
-                    jl_val = str(linha[idx_col_inicio]).strip() if idx_col_inicio < len(linha) else "0"
-                    ht_val = str(linha[idx_col_inicio+1]).strip() if idx_col_inicio+1 < len(linha) else "00:00:00"
-                    hs_val = str(linha[idx_col_inicio+2]).strip() if idx_col_inicio+2 < len(linha) else "00:00:00"
-                    qtd_val = str(linha[idx_col_inicio+3]).strip() if idx_col_inicio+3 < len(linha) else "0"
-                    kg_val = str(linha[idx_col_inicio+4]).strip() if idx_col_inicio+4 < len(linha) else "0"
-                    ih_val = str(linha[idx_col_inicio+5]).strip() if idx_col_inicio+5 < len(linha) else "0"
-                    b1_val = str(linha[idx_col_inicio+6]).strip() if idx_col_inicio+6 < len(linha) else "00:00:00"
-                    bu_val = str(linha[idx_col_inicio+7]).strip() if idx_col_inicio+7 < len(linha) else "00:00:00"
-                    tj_val = str(linha[idx_col_inicio+8]).strip() if idx_col_inicio+8 < len(linha) else "00:00:00"
+                    jl_val = str(linha[idx_jl]).strip() if idx_jl != -1 else "0"
+                    ht_val = str(linha[idx_ht]).strip() if idx_ht != -1 else "00:00:00"
+                    hs_val = str(linha[idx_hs]).strip() if idx_hs != -1 else "00:00:00"
+                    qtd_val = str(linha[idx_qtd]).strip() if idx_qtd != -1 else "0"
+                    kg_val = str(linha[idx_kg]).strip() if idx_kg != -1 else "0"
+                    ih_val = str(linha[idx_ih]).strip() if idx_ih != -1 else "0"
+                    b1_val = str(linha[idx_b1]).strip() if idx_b1 != -1 else "00:00:00"
+                    bu_val = str(linha[idx_bu]).strip() if idx_bu != -1 else "00:00:00"
+                    tj_val = str(linha[idx_tj]).strip() if idx_tj != -1 else "00:00:00"
                     
+                    # Tratamentos numéricos e de horas
                     try:
                         v_num = float(jl_val.replace('%', '').replace(',', '.'))
                         if v_num <= 2.0 and '%' not in jl_val: v_num *= 100
@@ -933,8 +977,8 @@ if ver_jornada:
                     dados_tabela_jl.append({
                         "Nome": nome,
                         "Jornada Líquida (%)": jl_float, 
-                        "Horas Trab.": ht_format,
-                        "Horas Sep.": hs_format,
+                        "Horas Trabalhadas": ht_format,
+                        "Horas Separação": hs_format,
                         "Qtd Itens": qtd_int,
                         "KG": kg_float,
                         "Itens/Hora": ih_float,
@@ -946,12 +990,14 @@ if ver_jornada:
                 if dados_tabela_jl:
                     df_display = pd.DataFrame(dados_tabela_jl)
                     
-                    # 💡 MENU DE FILTROS SUPERIORES (Restaurado para você!)
+                    # 💡 MENU DE FILTROS SUPERIORES 
                     st.markdown("#### 🔍 Filtrar e Ordenar")
                     col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
                     busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
                     jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
-                    ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Crescente (Menor JL)", "Ordem Decrescente (Maior JL)", "Nome (A-Z)"])
+                    
+                    # 💡 PADRÃO DECRESCENTE (MAIOR JL PRIMEIRO) COMO NA SUA IMAGEM B60AD0
+                    ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Decrescente (Maior JL)", "Ordem Crescente (Menor JL)", "Nome (A-Z)"])
                     
                     if busca_texto: df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
                     if jl_min > 0: df_display = df_display[df_display['Jornada Líquida (%)'] >= jl_min]
@@ -966,11 +1012,11 @@ if ver_jornada:
                     if df_display.empty:
                         st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                     else:
-                        # 💡 GERADOR DA TABELA HTML CUSTOMIZADA (Grande, bonita e com formatações numéricas precisas)
+                        # 💡 GERADOR DA TABELA HTML CUSTOMIZADA (Grande, bonita, formato % limpo)
                         html_tabela = """
                         <style>
-                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 16px; color: #e0e0e0; }
-                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; white-space: nowrap; }
+                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #e0e0e0; font-weight: bold; }
+                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 14px 15px; text-align: left; border-bottom: 2px solid #3b82f6; color: #fff; font-size: 16px; white-space: nowrap; }
                         .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
                         .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
                         </style>
@@ -997,9 +1043,9 @@ if ver_jornada:
                             
                             html_tabela += f"""<tr>
                                 <td>{row_disp['Nome']}</td>
-                                <td><b style='color: #2ecc71;'>{jl_formatado}</b></td>
-                                <td>{row_disp['Horas Trab.']}</td>
-                                <td>{row_disp['Horas Sep.']}</td>
+                                <td><span style='color: #2ecc71; font-size: 20px;'>{jl_formatado}</span></td>
+                                <td>{row_disp['Horas Trabalhadas']}</td>
+                                <td>{row_disp['Horas Separação']}</td>
                                 <td>{qtd_formatado}</td>
                                 <td>{kg_formatado}</td>
                                 <td>{ih_formatado}</td>
