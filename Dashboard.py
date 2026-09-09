@@ -52,23 +52,6 @@ st.markdown("""
         font-weight: 900; 
         margin-bottom: 5px; 
     }
-
-    /* 💡 DEIXANDO A TABELA NATIVA GIGANTE E COM CARA DE DASHBOARD */
-    [data-testid="stDataFrame"] {
-        zoom: 1.35;
-        border: 1px solid #2ecc71;
-        border-radius: 8px;
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
-    }
-    [data-testid="stDataFrame"] th {
-        background-color: rgba(46, 204, 113, 0.15) !important;
-        color: #2ecc71 !important;
-        font-size: 15px !important;
-        font-weight: 900 !important;
-    }
-    [data-testid="stDataFrame"] td {
-        font-size: 14px !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,7 +64,6 @@ C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef44
 # Conversor super inteligente para lidar com horas do Excel (Ex: "9,13" vira "09:13:00")
 def parse_time(val):
     val = str(val).strip()
-    # Se vier vazio ou traço, forçamos o padrão zero horas pra ficar bonito
     if val in ["", "nan", "None", "—", "-"]: return "00:00:00"
     if val in ["0", "0,00", "0.00", "00:00:00"]: return "00:00:00"
     
@@ -91,12 +73,12 @@ def parse_time(val):
         
     try:
         v = float(val.replace(',', '.'))
-        if 0 < v < 1:  # Formato fração de dia interno do Excel (ex: 0.38402)
+        if 0 < v < 1:  
             total_s = int(round(v * 24 * 3600))
             h, rem = divmod(total_s, 3600)
             m, s = divmod(rem, 60)
             return f"{h:02d}:{m:02d}:{s:02d}"
-        else: # Formato numérico solto (ex: "9.13")
+        else: 
             h = int(v)
             v_str = val.replace(',', '.')
             m = 0
@@ -841,13 +823,13 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
+# 💡 ACOMPANHAMENTO JL (TABELA HTML ESTILIZADA + FILTROS EXTERNOS DE NAVEGAÇÃO)
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
     if df_acomp_jl.empty:
         st.warning("⚠️ A aba 'Acompanhamento JL' não foi encontrada na sua planilha do Google.")
     else:
-        # Acha a linha em que os cabeçalhos (NOME, JL, QTD...) estão armazenados
         idx_header = -1
         for i in range(min(10, len(df_acomp_jl))):
             vals = [str(x).upper().strip() for x in df_acomp_jl.iloc[i].values]
@@ -858,7 +840,6 @@ if ver_jornada:
         if idx_header == -1:
             st.warning("⚠️ O formato da aba 'Acompanhamento JL' está incorreto. Não foi possível achar a linha de cabeçalhos (NOME, JL).")
         else:
-            # Puxa a linha logo acima dos cabeçalhos (onde as datas ficam soltas) e cataloga
             datas_indices = {}
             for row_idx in range(idx_header):
                 for col_idx, val in enumerate(df_acomp_jl.iloc[row_idx].values):
@@ -871,7 +852,6 @@ if ver_jornada:
                         if d_str not in datas_indices:
                             datas_indices[d_str] = col_idx 
             
-            # Filtra e adiciona no SelectBox somente as datas no período apurado
             colunas_validas = []
             for d_str in datas_indices.keys():
                 try:
@@ -892,10 +872,8 @@ if ver_jornada:
                     index=len(colunas_validas)-1
                 )
                 
-                # Acha exatamente em que coluna a data escolhida começa
                 idx_col_inicio = datas_indices[data_selecionada]
                 
-                # Acha em que colunas estão o NOME e o TURNO/FUNÇÃO
                 headers_vals = [str(x).upper().strip() for x in df_acomp_jl.iloc[idx_header].values]
                 idx_nome = headers_vals.index("NOME") if "NOME" in headers_vals else -1
                 idx_turno = headers_vals.index("TURNO") if "TURNO" in headers_vals else -1
@@ -905,7 +883,6 @@ if ver_jornada:
                 soma_jl_flt = 0.0
                 qtd_validos = 0
                 
-                # Itera a partir da linha de baixo dos cabeçalhos
                 for row_idx in range(idx_header + 1, len(df_acomp_jl)):
                     linha = df_acomp_jl.iloc[row_idx].values
                     
@@ -916,7 +893,6 @@ if ver_jornada:
                     if not nome or nome in ["nan", "None", "NOME"] or "SEPARADOR" not in funcao or "T3" not in turno:
                         continue
                         
-                    # Extrai os dados deslocando +1 a partir da coluna de "JL"
                     jl_val = str(linha[idx_col_inicio]).strip() if idx_col_inicio < len(linha) else "0"
                     ht_val = str(linha[idx_col_inicio+1]).strip() if idx_col_inicio+1 < len(linha) else "00:00:00"
                     hs_val = str(linha[idx_col_inicio+2]).strip() if idx_col_inicio+2 < len(linha) else "00:00:00"
@@ -927,7 +903,6 @@ if ver_jornada:
                     bu_val = str(linha[idx_col_inicio+7]).strip() if idx_col_inicio+7 < len(linha) else "00:00:00"
                     tj_val = str(linha[idx_col_inicio+8]).strip() if idx_col_inicio+8 < len(linha) else "00:00:00"
                     
-                    # 1. Tratamento da Jornada Liquida: Transformar pra Número Puro para o Streamlit (SEM / 100)
                     try:
                         v_num = float(jl_val.replace('%', '').replace(',', '.'))
                         if v_num <= 2.0 and '%' not in jl_val: v_num *= 100
@@ -937,7 +912,6 @@ if ver_jornada:
                             qtd_validos += 1
                     except: jl_float = 0.0
                     
-                    # 2. Tratamento QTD e KG e Itens/Hora
                     try: qtd_int = int(float(qtd_val.replace('.', '').replace(',', '.')))
                     except: qtd_int = 0
                     
@@ -947,14 +921,12 @@ if ver_jornada:
                     try: ih_float = float(ih_val.replace('.', '').replace(',', '.'))
                     except: ih_float = 0.0
                     
-                    # 3. Formatar e limpar as Horas
                     ht_format = parse_time(ht_val)
                     hs_format = parse_time(hs_val)
                     b1_format = parse_time(b1_val)
                     bu_format = parse_time(bu_val)
                     tj_format = parse_time(tj_val)
                     
-                    # Se zerou tudo de fato, ignora (faltou)
                     if jl_float == 0.0 and ht_format == "00:00:00" and hs_format == "00:00:00" and qtd_int == 0:
                         continue
                         
@@ -974,34 +946,71 @@ if ver_jornada:
                 if dados_tabela_jl:
                     df_display = pd.DataFrame(dados_tabela_jl)
                     
-                    # Sorteia do menor para o maior na JL (como pedido)
-                    df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=True)
+                    # 💡 MENU DE FILTROS SUPERIORES (Restaurado para você!)
+                    st.markdown("#### 🔍 Filtrar e Ordenar")
+                    col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
+                    busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
+                    jl_min = col_f2.number_input("Ocultar abaixo de (%):", min_value=0, max_value=200, value=0)
+                    ordenacao = col_f3.selectbox("Ordenar Tabela por:", ["Ordem Crescente (Menor JL)", "Ordem Decrescente (Maior JL)", "Nome (A-Z)"])
                     
+                    if busca_texto: df_display = df_display[df_display['Nome'].str.contains(busca_texto, case=False, na=False)]
+                    if jl_min > 0: df_display = df_display[df_display['Jornada Líquida (%)'] >= jl_min]
+                        
+                    if ordenacao == "Ordem Crescente (Menor JL)": df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=True)
+                    elif ordenacao == "Ordem Decrescente (Maior JL)": df_display = df_display.sort_values(by="Jornada Líquida (%)", ascending=False)
+                    elif ordenacao == "Nome (A-Z)": df_display = df_display.sort_values(by="Nome", ascending=True)
+
                     media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
                     st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE};'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
                     
-                    # 💡 Tabela Interativa e Bonita (Com formatos numéricos corretos)
-                    st.dataframe(
-                        df_display, 
-                        hide_index=True, 
-                        use_container_width=True,
-                        height=650,
-                        column_config={
-                            "Nome": st.column_config.TextColumn("Nome", width="medium"),
-                            "Jornada Líquida (%)": st.column_config.NumberColumn(
-                                "Jornada Líquida (%)",
-                                format="%d%%" # 💡 Exibe número inteiro (ex: 68%) sem barra de progresso
-                            ),
-                            "Horas Trab.": st.column_config.TextColumn("Horas Trab."),
-                            "Horas Sep.": st.column_config.TextColumn("Horas Sep."),
-                            "Qtd Itens": st.column_config.NumberColumn("Qtd Itens", format="%d"),
-                            "KG": st.column_config.NumberColumn("KG", format="%.2f"),
-                            "Itens/Hora": st.column_config.NumberColumn("Itens/Hora", format="%.2f"),
-                            "1º Bipe": st.column_config.TextColumn("1º Bipe"),
-                            "Último Bipe": st.column_config.TextColumn("Último Bipe"),
-                            "Tempo Janta": st.column_config.TextColumn("Tempo Janta")
-                        }
-                    )
+                    if df_display.empty:
+                        st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
+                    else:
+                        # 💡 GERADOR DA TABELA HTML CUSTOMIZADA (Grande, bonita e com formatações numéricas precisas)
+                        html_tabela = """
+                        <style>
+                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 16px; color: #e0e0e0; }
+                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 12px 15px; text-align: left; border-bottom: 2px solid #3b82f6; font-weight: bold; white-space: nowrap; }
+                        .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                        .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                        </style>
+                        <table class="tabela-jl">
+                            <tr>
+                                <th>Nome</th>
+                                <th>Jornada Líquida (%)</th>
+                                <th>Horas Trabalhadas</th>
+                                <th>Horas Separação</th>
+                                <th>Qtd Itens</th>
+                                <th>KG</th>
+                                <th>Itens/Hora</th>
+                                <th>1º Bipe</th>
+                                <th>Último Bipe</th>
+                                <th>Tempo Janta</th>
+                            </tr>
+                        """
+                        
+                        for index, row_disp in df_display.iterrows():
+                            jl_formatado = f"{row_disp['Jornada Líquida (%)']:.1f}%".replace('.', ',')
+                            qtd_formatado = f"{int(row_disp['Qtd Itens'])}"
+                            kg_formatado = f"{row_disp['KG']:.2f}".replace('.', ',')
+                            ih_formatado = f"{row_disp['Itens/Hora']:.2f}".replace('.', ',')
+                            
+                            html_tabela += f"""<tr>
+                                <td>{row_disp['Nome']}</td>
+                                <td><b style='color: #2ecc71;'>{jl_formatado}</b></td>
+                                <td>{row_disp['Horas Trab.']}</td>
+                                <td>{row_disp['Horas Sep.']}</td>
+                                <td>{qtd_formatado}</td>
+                                <td>{kg_formatado}</td>
+                                <td>{ih_formatado}</td>
+                                <td style='color: #ffca28;'>{row_disp['1º Bipe']}</td>
+                                <td style='color: #ffca28;'>{row_disp['Último Bipe']}</td>
+                                <td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td>
+                            </tr>"""
+                            
+                        html_tabela += "</table><br><br>"
+                        
+                        st.markdown(html_tabela, unsafe_allow_html=True)
                 else:
                     st.info(f"Não houve operação de separação na data {data_selecionada}.")
 
