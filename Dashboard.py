@@ -63,10 +63,21 @@ C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef44
 
 def parse_time(val):
     val = str(val).strip()
-    if val in ["", "nan", "None", "—", "-", "0", "0,00", "0.00", "00:00:00"]: return "00:00:00"
+    if val in ["", "nan", "None", "—", "-", "0", "0,00", "0.00", "00:00:00"]: 
+        return "00:00:00"
+    
     if ":" in val:
-        if " " in val: val = val.split(" ")[-1]
-        return val
+        if " " in val: 
+            val = val.split(" ")[-1]
+        parts = val.split(":")
+        try:
+            h = int(parts[0])
+            m = int(parts[1])
+            s = int(parts[2]) if len(parts) > 2 else 0
+            return f"{h:02d}:{m:02d}:{s:02d}"
+        except:
+            return val
+            
     try:
         v = float(val.replace(',', '.'))
         if 0 < v < 1:  
@@ -337,9 +348,19 @@ def carregar_diarios():
     dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
+        
+        # 💡 BUSCA FLEXÍVEL (Ignora maiúsculas e minúsculas no Google Sheets)
         def processar_aba(nome_aba):
-            aba_bruta = planilha.worksheet(nome_aba).get_all_values()
+            ws = None
+            for sheet in planilha.worksheets():
+                if sheet.title.strip().lower() == nome_aba.strip().lower():
+                    ws = sheet
+                    break
+            if not ws: return pd.DataFrame()
+            
+            aba_bruta = ws.get_all_values()
             if not aba_bruta: return pd.DataFrame()
+            
             if nome_aba == "Acompanhamento JL":
                 return pd.DataFrame(aba_bruta)
             
@@ -691,6 +712,7 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -745,32 +767,34 @@ if ver_jornada:
                 idx_funcao = headers_vals.index("FUNÇÃO") if "FUNÇÃO" in headers_vals else (headers_vals.index("FUNCAO") if "FUNCAO" in headers_vals else -1)
                 idx_cod = headers_vals.index("CÓD.") if "CÓD." in headers_vals else (headers_vals.index("COD") if "COD" in headers_vals else 0)
                 
+                # Delimita o início e fim exclusivo das colunas da data selecionada (NUNCA busca para trás)
                 sorted_starts = sorted(datas_indices.values())
                 current_idx = sorted_starts.index(idx_col_inicio)
                 end_col = sorted_starts[current_idx + 1] if current_idx + 1 < len(sorted_starts) else len(headers_vals)
-                search_start = max(0, idx_col_inicio - 1)
-                
-                def find_col(keywords):
-                    for i in range(search_start, end_col):
+
+                def find_col_in_day(keywords, fallback_offset):
+                    for i in range(idx_col_inicio, end_col):
                         if i < len(headers_vals):
                             col_name = str(headers_vals[i]).upper()
                             if any(k in col_name for k in keywords):
                                 return i
-                    return -1
+                    fallback = idx_col_inicio + fallback_offset
+                    return fallback if fallback < len(headers_vals) else -1
 
-                idx_jl = find_col(['JL'])
-                idx_ht = find_col(['HORAS TRAB', 'TRABALHADAS'])
-                idx_hs = find_col(['HORAS SEP', 'SEPARA'])
-                idx_qtd = find_col(['QTD', 'ITENS SEP'])
-                idx_kg = find_col(['KG', 'PESO'])
-                idx_ih = find_col(['ITENS/HORA', 'ITENS HORA'])
-                idx_b1 = find_col(['1º', '1O', 'PRIMEIRO'])
-                idx_bu = find_col(['ULTIMO', 'ÚLTIMO'])
-                idx_tj = find_col(['JANTA', 'ALMOÇO'])
+                idx_jl = find_col_in_day(['JL'], 0)
+                idx_ht = find_col_in_day(['HORAS TRAB', 'TRABALHADAS'], 1)
+                idx_hs = find_col_in_day(['HORAS SEP', 'SEPARA'], 2)
+                idx_qtd = find_col_in_day(['QTD', 'ITENS SEP'], 3)
+                idx_kg = find_col_in_day(['KG', 'PESO'], 4)
+                idx_ih = find_col_in_day(['ITENS/HORA', 'ITENS HORA'], 5)
+                idx_b1 = find_col_in_day(['1º', '1O', 'PRIMEIRO'], 6)
+                idx_bu = find_col_in_day(['ULTIMO', 'ÚLTIMO'], 7)
+                idx_tj = find_col_in_day(['JANTA', 'ALMOÇO', 'INTERVALO'], 8)
                 
-                # Fallback em Ponto T3 se Horas Trabalhadas vier zerado
-                if not df_ponto_t3.empty and 'DATAAPURACAO' in df_ponto_t3.columns:
-                    df_ponto_t3['DATA_BUSCA'] = df_ponto_t3['DATAAPURACAO'].astype(str).apply(formatar_data_br)
+                # Resgate automático no Ponto T3 caso venha zerado
+                if not df_ponto_t3.empty and any('DATA' in str(c).upper() for c in df_ponto_t3.columns):
+                    col_data_ponto = next((c for c in df_ponto_t3.columns if 'DATA' in str(c).upper()), None)
+                    df_ponto_t3['DATA_BUSCA'] = df_ponto_t3[col_data_ponto].astype(str).apply(formatar_data_br)
                     col_contrato = next((c for c in df_ponto_t3.columns if 'CONTRATO' in str(c).upper() or 'CÓD' in str(c).upper()), None)
                     df_ponto_t3['CONTRATO_LIMPO'] = df_ponto_t3[col_contrato].astype(str).str.replace('.0', '', regex=False).str.strip() if col_contrato else ""
                     df_ponto_filt = df_ponto_t3[df_ponto_t3['DATA_BUSCA'] == data_selecionada]
@@ -835,7 +859,7 @@ if ver_jornada:
                             if col_nome_ponto:
                                 row_ponto = df_ponto_filt[df_ponto_filt[col_nome_ponto].astype(str).str.upper().str.contains(primeiro_nome)]
                         if not row_ponto.empty:
-                            col_jornada = next((c for c in row_ponto.columns if 'JORNADA' in str(c).upper()), None)
+                            col_jornada = next((c for c in row_ponto.columns if 'JORNADA' in str(c).upper() or 'TRAB' in str(c).upper()), None)
                             if col_jornada:
                                 p_jornada = str(row_ponto.iloc[0][col_jornada]).strip()
                                 if p_jornada not in ["", "nan", "None", "0", "00:00:00"]:
@@ -860,7 +884,6 @@ if ver_jornada:
                 if dados_tabela_jl:
                     df_display = pd.DataFrame(dados_tabela_jl)
                     
-                    # 💡 MENU DE FILTROS SUPERIORES
                     st.markdown("#### 🔍 Filtrar e Ordenar")
                     col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
                     busca_texto = col_f1.text_input("Buscar Nome:", "", placeholder="Digite para pesquisar...")
@@ -880,7 +903,7 @@ if ver_jornada:
                     if df_display.empty:
                         st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                     else:
-                        # 💡 GERADOR DA TABELA HTML COM FONTES 18PX E TUDO EM NEGRITO
+                        # 💡 TABELA HTML COM FONTES 18PX E DADOS EM NEGRITO
                         html_tabela = """
                         <style>
                         .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; }
@@ -1379,7 +1402,7 @@ else:
                                 cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
                             
                             if "Tempo" in str(kpi):
-                                v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                                v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{int(real_med)%60:02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
                                 v_tela, t_tela = f"{real_med:.1f}%".replace('.', ','), f"{alvo_atual_med:.1f}%".replace('.', ',')
                             elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
