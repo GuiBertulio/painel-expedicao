@@ -539,7 +539,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
                     if is_meta_unica:
-                        alvo_atual = 0.48 if ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %') else 0.07
+                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                         faixa_meta = "100%" if real <= alvo_atual else "0%"
                         if meta1 <= 0: meta1 = alvo_atual
                         if meta3 <= 0: meta3 = alvo_atual
@@ -771,34 +771,31 @@ if ver_jornada:
                 idx_funcao = headers_vals.index("FUNÇÃO") if "FUNÇÃO" in headers_vals else (headers_vals.index("FUNCAO") if "FUNCAO" in headers_vals else -1)
                 idx_cod = headers_vals.index("CÓD.") if "CÓD." in headers_vals else (headers_vals.index("COD") if "COD" in headers_vals else 0)
                 
-                # Delimita as colunas disponíveis para a data selecionada
+                # 💡 LIMITADOR DE BUSCA (Busca as colunas apenaso no intervalo do dia selecionado)
                 sorted_starts = sorted(datas_indices.values())
                 current_idx = sorted_starts.index(idx_col_inicio)
                 end_col = sorted_starts[current_idx + 1] if current_idx + 1 < len(sorted_starts) else len(headers_vals)
                 search_start = max(0, idx_col_inicio - 1)
 
-                def find_col_in_day(keywords, fallback_offset):
+                def find_col_in_day(keywords):
                     for i in range(idx_col_inicio, end_col):
                         if i < len(headers_vals):
                             col_name = str(headers_vals[i]).upper()
                             if any(k in col_name for k in keywords):
                                 return i
-                    fallback = idx_col_inicio + fallback_offset
-                    return fallback if fallback < len(headers_vals) else -1
+                    return -1
 
-                idx_jl = find_col_in_day(['JL'], 0)
-                idx_ht = find_col_in_day(['HORAS TRAB', 'TRABALHADAS'], 1)
-                idx_hs = find_col_in_day(['HORAS SEP', 'SEPARA'], 2)
-                idx_qtd = find_col_in_day(['QTD', 'ITENS SEP'], 3)
-                idx_kg = find_col_in_day(['KG', 'PESO'], 4)
-                idx_ih = find_col_in_day(['ITENS/HORA', 'ITENS HORA'], 5)
-                idx_b1 = find_col_in_day(['1º', '1O', 'PRIMEIRO'], 6)
-                idx_bu = find_col_in_day(['ULTIMO', 'ÚLTIMO'], 7)
-                
-                # Buscas separadas para Janta e Intervalos
-                idx_tj = find_col_in_day(['JANTA', 'ALMOÇO'], 8)
-                idx_si = find_col_in_day(['SOMA', 'SOMATÓRIO'], 9)
-                idx_mi = find_col_in_day(['MAIOR', 'MÁXIMO'], 10)
+                idx_jl = find_col_in_day(['JL'])
+                idx_ht = find_col_in_day(['HORAS TRAB', 'TRABALHADAS'])
+                idx_hs = find_col_in_day(['HORAS SEP', 'SEPARA'])
+                idx_qtd = find_col_in_day(['QTD', 'ITENS SEP'])
+                idx_kg = find_col_in_day(['KG', 'PESO'])
+                idx_ih = find_col_in_day(['ITENS/HORA', 'ITENS HORA'])
+                idx_b1 = find_col_in_day(['1º', '1O', 'PRIMEIRO'])
+                idx_bu = find_col_in_day(['ULTIMO', 'ÚLTIMO'])
+                idx_tj = find_col_in_day(['JANTA', 'ALMOÇO'])
+                idx_si = find_col_in_day(['SOMA', 'SOMATÓRIO'])
+                idx_mi = find_col_in_day(['MAIOR', 'MÁXIMO'])
                 
                 if not df_ponto_t3.empty and any('DATA' in str(c).upper() for c in df_ponto_t3.columns):
                     col_data_ponto = next((c for c in df_ponto_t3.columns if 'DATA' in str(c).upper()), None)
@@ -833,7 +830,6 @@ if ver_jornada:
                     b1_val = str(linha[idx_b1]).strip() if idx_b1 != -1 else "00:00:00"
                     bu_val = str(linha[idx_bu]).strip() if idx_bu != -1 else "00:00:00"
                     tj_val = str(linha[idx_tj]).strip() if idx_tj != -1 else "00:00:00"
-                    
                     si_val = str(linha[idx_si]).strip() if idx_si != -1 else "00:00:00"
                     mi_val = str(linha[idx_mi]).strip() if idx_mi != -1 else "00:00:00"
                     
@@ -863,7 +859,6 @@ if ver_jornada:
                     si_format = parse_time(si_val)
                     mi_format = parse_time(mi_val)
                     
-                    # Resgate no Ponto T3
                     if (ht_format in ["00:00:00", "—"]) and not df_ponto_filt.empty:
                         row_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
                         if row_ponto.empty and nome:
@@ -1196,7 +1191,7 @@ else:
                         val_tela = f"{realizado:,.0f}".replace(',', '.')
                         alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
 
-                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
+                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
                     aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>" if (erros_qtd > 0 and (('SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper()) or ('OPERADOR' in cargo_p and 'MOV' in str(kpi).upper()))) else ""
 
                     with cols_meta[col_idx % 4]:
