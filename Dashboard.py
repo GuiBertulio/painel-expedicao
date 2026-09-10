@@ -52,6 +52,23 @@ st.markdown("""
         font-weight: 900; 
         margin-bottom: 5px; 
     }
+    
+    /* 💡 CSS PARA DEIXAR A TABELA NATIVA MAIOR E MAIS BONITA */
+    [data-testid="stDataFrame"] {
+        zoom: 1.35;
+        border: 1px solid #2ecc71;
+        border-radius: 8px;
+        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    [data-testid="stDataFrame"] th {
+        background-color: rgba(46, 204, 113, 0.15) !important;
+        color: #2ecc71 !important;
+        font-size: 15px !important;
+        font-weight: 900 !important;
+    }
+    [data-testid="stDataFrame"] td {
+        font-size: 14px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -63,12 +80,9 @@ C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef44
 
 def parse_time(val):
     val = str(val).strip()
-    if val in ["", "nan", "None", "—", "-", "0", "0,00", "0.00", "00:00:00"]: 
-        return "00:00:00"
-    
+    if val in ["", "nan", "None", "—", "-", "0", "0,00", "0.00", "00:00:00"]: return "00:00:00"
     if ":" in val:
-        if " " in val: 
-            val = val.split(" ")[-1]
+        if " " in val: val = val.split(" ")[-1]
         parts = val.split(":")
         try:
             h = int(parts[0])
@@ -77,7 +91,6 @@ def parse_time(val):
             return f"{h:02d}:{m:02d}:{s:02d}"
         except:
             return val
-            
     try:
         v = float(val.replace(',', '.'))
         if 0 < v < 1:  
@@ -100,18 +113,15 @@ def parse_time(val):
 def formatar_data_br(d_str):
     d_str = str(d_str).strip().split(" ")[0]
     match_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', d_str)
-    if match_iso:
-        return f"{match_iso.group(3)}/{match_iso.group(2)}/{match_iso.group(1)}"
+    if match_iso: return f"{match_iso.group(3)}/{match_iso.group(2)}/{match_iso.group(1)}"
     match_br = re.search(r'(\d{2})/(\d{2})/(\d{4})', d_str)
-    if match_br:
-        return f"{match_br.group(1)}/{match_br.group(2)}/{match_br.group(3)}"
+    if match_br: return f"{match_br.group(1)}/{match_br.group(2)}/{match_br.group(3)}"
     return d_str
 
 def extrair_inteiro(val):
     try:
         if pd.isna(val): return 0
-    except ValueError:
-        return 0
+    except ValueError: return 0
     v_str = str(val).strip()
     if v_str.lower() in ['nan', 'none', '', '-']: return 0
     v_str = re.sub(r'[^\d.,]', '', v_str)
@@ -348,8 +358,6 @@ def carregar_diarios():
     dfs = {'sep': pd.DataFrame(), 'op': pd.DataFrame(), 'conf': pd.DataFrame(), 'aux_jl': pd.DataFrame(), 'acomp_jl': pd.DataFrame(), 'ponto_t3': pd.DataFrame()}
     try:
         planilha = conectar_planilha()
-        
-        # 💡 BUSCA FLEXÍVEL (Ignora maiúsculas e minúsculas no Google Sheets)
         def processar_aba(nome_aba):
             ws = None
             for sheet in planilha.worksheets():
@@ -360,9 +368,7 @@ def carregar_diarios():
             
             aba_bruta = ws.get_all_values()
             if not aba_bruta: return pd.DataFrame()
-            
-            if nome_aba == "Acompanhamento JL":
-                return pd.DataFrame(aba_bruta)
+            if nome_aba == "Acompanhamento JL": return pd.DataFrame(aba_bruta)
             
             header_idx = 0
             for i, row_vals in enumerate(aba_bruta):
@@ -372,7 +378,7 @@ def carregar_diarios():
                     break
             
             headers = aba_bruta[header_idx]
-            if header_idx > 0 and nome_aba not in ["Ponto T3"]:
+            if header_idx > 0 and nome_aba.strip().lower() != "ponto t3":
                 linha_datas = []
                 for row_i in range(header_idx):
                     if any(re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', str(c)) for c in aba_bruta[row_i]):
@@ -533,7 +539,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
                     if is_meta_unica:
-                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
+                        alvo_atual = 0.48 if ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %') else 0.07
                         faixa_meta = "100%" if real <= alvo_atual else "0%"
                         if meta1 <= 0: meta1 = alvo_atual
                         if meta3 <= 0: meta3 = alvo_atual
@@ -712,7 +718,7 @@ if st.session_state["perfil"] == "Gerente":
 # 🖥️ 4. RENDERIZAÇÃO DA TELA CENTRAL 
 # =============================================================================
 
-# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL
+# 💡 ACOMPANHAMENTO JL NA TELA CENTRAL COM SOMA E MAIORES INTERVALOS
 if ver_jornada:
     st.markdown("## ⏱️ Acompanhamento de Jornada Líquida - Separadores T3")
     
@@ -729,7 +735,6 @@ if ver_jornada:
         if idx_header == -1:
             st.warning("⚠️ O formato da aba 'Acompanhamento JL' está incorreto. Não foi possível achar a linha de cabeçalhos (NOME, JL).")
         else:
-            # 1. Catálogo exato das datas presentes no topo
             datas_indices = {}
             for row_idx in range(idx_header):
                 for col_idx, val in enumerate(df_acomp_jl.iloc[row_idx].values):
@@ -742,7 +747,6 @@ if ver_jornada:
                         if d_str not in datas_indices:
                             datas_indices[d_str] = col_idx 
             
-            # 2. Filtra as datas disponíveis no período apurado
             colunas_validas = []
             for d_str in datas_indices.keys():
                 try:
@@ -767,10 +771,11 @@ if ver_jornada:
                 idx_funcao = headers_vals.index("FUNÇÃO") if "FUNÇÃO" in headers_vals else (headers_vals.index("FUNCAO") if "FUNCAO" in headers_vals else -1)
                 idx_cod = headers_vals.index("CÓD.") if "CÓD." in headers_vals else (headers_vals.index("COD") if "COD" in headers_vals else 0)
                 
-                # Delimita o início e fim exclusivo das colunas da data selecionada (NUNCA busca para trás)
+                # Delimita as colunas disponíveis para a data selecionada
                 sorted_starts = sorted(datas_indices.values())
                 current_idx = sorted_starts.index(idx_col_inicio)
                 end_col = sorted_starts[current_idx + 1] if current_idx + 1 < len(sorted_starts) else len(headers_vals)
+                search_start = max(0, idx_col_inicio - 1)
 
                 def find_col_in_day(keywords, fallback_offset):
                     for i in range(idx_col_inicio, end_col):
@@ -789,9 +794,12 @@ if ver_jornada:
                 idx_ih = find_col_in_day(['ITENS/HORA', 'ITENS HORA'], 5)
                 idx_b1 = find_col_in_day(['1º', '1O', 'PRIMEIRO'], 6)
                 idx_bu = find_col_in_day(['ULTIMO', 'ÚLTIMO'], 7)
-                idx_tj = find_col_in_day(['JANTA', 'ALMOÇO', 'INTERVALO'], 8)
                 
-                # Resgate automático no Ponto T3 caso venha zerado
+                # Buscas separadas para Janta e Intervalos
+                idx_tj = find_col_in_day(['JANTA', 'ALMOÇO'], 8)
+                idx_si = find_col_in_day(['SOMA', 'SOMATÓRIO'], 9)
+                idx_mi = find_col_in_day(['MAIOR', 'MÁXIMO'], 10)
+                
                 if not df_ponto_t3.empty and any('DATA' in str(c).upper() for c in df_ponto_t3.columns):
                     col_data_ponto = next((c for c in df_ponto_t3.columns if 'DATA' in str(c).upper()), None)
                     df_ponto_t3['DATA_BUSCA'] = df_ponto_t3[col_data_ponto].astype(str).apply(formatar_data_br)
@@ -826,6 +834,9 @@ if ver_jornada:
                     bu_val = str(linha[idx_bu]).strip() if idx_bu != -1 else "00:00:00"
                     tj_val = str(linha[idx_tj]).strip() if idx_tj != -1 else "00:00:00"
                     
+                    si_val = str(linha[idx_si]).strip() if idx_si != -1 else "00:00:00"
+                    mi_val = str(linha[idx_mi]).strip() if idx_mi != -1 else "00:00:00"
+                    
                     try:
                         v_num = float(jl_val.replace('%', '').replace(',', '.'))
                         if v_num <= 2.0 and '%' not in jl_val: v_num *= 100
@@ -849,8 +860,10 @@ if ver_jornada:
                     b1_format = parse_time(b1_val)
                     bu_format = parse_time(bu_val)
                     tj_format = parse_time(tj_val)
+                    si_format = parse_time(si_val)
+                    mi_format = parse_time(mi_val)
                     
-                    # 💡 RESGATE AUTOMÁTICO DE HORAS TRABALHADAS NA PONTO T3
+                    # Resgate no Ponto T3
                     if (ht_format in ["00:00:00", "—"]) and not df_ponto_filt.empty:
                         row_ponto = df_ponto_filt[df_ponto_filt['CONTRATO_LIMPO'] == cod]
                         if row_ponto.empty and nome:
@@ -878,7 +891,9 @@ if ver_jornada:
                         "Itens/Hora": ih_float,
                         "1º Bipe": b1_format,
                         "Último Bipe": bu_format,
-                        "Tempo Janta": tj_format
+                        "Tempo Janta": tj_format,
+                        "Soma Intervalos": si_format,
+                        "Maior Intervalo": mi_format
                     })
                     
                 if dados_tabela_jl:
@@ -903,7 +918,6 @@ if ver_jornada:
                     if df_display.empty:
                         st.warning("⚠️ Nenhum colaborador encontrado com esses filtros.")
                     else:
-                        # 💡 TABELA HTML COM FONTES 18PX E DADOS EM NEGRITO
                         html_tabela = """
                         <style>
                         .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; }
@@ -923,6 +937,8 @@ if ver_jornada:
                                 <th>1º Bipe</th>
                                 <th>Último Bipe</th>
                                 <th>Tempo Janta</th>
+                                <th>Soma Intervalos</th>
+                                <th>Maior Intervalo</th>
                             </tr>
                         """
                         
@@ -943,6 +959,8 @@ if ver_jornada:
                                 <td style='color: #ffca28;'>{row_disp['1º Bipe']}</td>
                                 <td style='color: #ffca28;'>{row_disp['Último Bipe']}</td>
                                 <td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td>
+                                <td style='color: #ef4444;'>{row_disp['Soma Intervalos']}</td>
+                                <td style='color: #ef4444;'>{row_disp['Maior Intervalo']}</td>
                             </tr>"""
                             
                         html_tabela += "</table><br><br>"
@@ -1402,7 +1420,7 @@ else:
                                 cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
                             
                             if "Tempo" in str(kpi):
-                                v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{int(real_med)%60:02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                                v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
                                 v_tela, t_tela = f"{real_med:.1f}%".replace('.', ','), f"{alvo_atual_med:.1f}%".replace('.', ',')
                             elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
