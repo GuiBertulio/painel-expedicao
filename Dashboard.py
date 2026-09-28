@@ -537,7 +537,8 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     racional = float(row.get(f"{kpi}_Racional", 1))
                     
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
+                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA')
                     if is_meta_unica:
                         alvo_atual = 0.48 if is_meta_unica_dev else 0.07
                         faixa_meta = "100%" if real <= alvo_atual else "0%"
