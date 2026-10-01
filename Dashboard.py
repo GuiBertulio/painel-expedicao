@@ -1445,12 +1445,19 @@ else:
                         
                         nome_alvo = "Meta Única"
                         
-                        if is_chk:
-                            cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado >= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
-                            real_perc = 100.0 if realizado >= alvo_atual else ((realizado / alvo_atual * 100) if alvo_atual > 0 else 0)
-                        else:
-                            cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado <= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
-                            real_perc = 100.0 if realizado <= alvo_atual else ((alvo_atual / realizado * 100) if realizado > 0 else 0)
+                        if is_meta_unica:
+                                if is_meta_unica_dev: alvo_atual_med = 0.48
+                                elif is_chk: alvo_atual_med = 0.95
+                                else: alvo_atual_med = 0.07
+                                
+                                nome_alvo = "Meta Única"
+                                
+                                if is_chk:
+                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med >= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
+                                    real_perc = 100.0 if real_med >= alvo_atual_med else ((real_med / alvo_atual_med * 100) if alvo_atual_med > 0 else 0)
+                                else:
+                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
+                                    real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
                             else:
                                 if racional_temp == 1: 
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med < meta1_med else ((meta2_med, "Meta 2") if real_med < meta2_med else ((meta3_med, "Meta 3") if real_med < meta3_med else (meta3_med, "Meta Máx")))
