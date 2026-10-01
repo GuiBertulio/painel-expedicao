@@ -538,10 +538,19 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in funcao_upper and kpi_upper == 'DEV. %')
-                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA')
+                    is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
+                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
+                    
                     if is_meta_unica:
-                        alvo_atual = 0.48 if is_meta_unica_dev else 0.07
-                        faixa_meta = "100%" if real <= alvo_atual else "0%"
+                        if is_meta_unica_dev: alvo_atual = 0.48
+                        elif is_chk: alvo_atual = 0.95
+                        else: alvo_atual = 0.07
+                        
+                        if is_chk:
+                            faixa_meta = "100%" if real >= alvo_atual else "0%"
+                        else:
+                            faixa_meta = "100%" if real <= alvo_atual else "0%"
+                            
                         if meta1 <= 0: meta1 = alvo_atual
                         if meta3 <= 0: meta3 = alvo_atual
                     else:
@@ -555,7 +564,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     def formata(v):
                         if "Tempo" in str(kpi): return f"{int(v)//3600:02d}:{(int(v)%3600)//60:02d}:{(int(v)%60):02d}"
                         elif "LÍQ" in str(kpi).upper(): return f"{v:.1f}%".replace('.', ',')
-                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi): return f"{v:.2f}%".replace('.', ',')
+                        elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "CHECKLIST" in str(kpi).upper(): return f"{v * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and v < 2) else f"{v:.2f}%".replace('.', ',')
                         else: return f"{v:,.0f}".replace(',', '.')
                     
                     df_auditoria.append({
@@ -649,7 +658,9 @@ if st.session_state["perfil"] == "Gerente":
                 if pd.to_numeric(row.get(f"{k}_Meta2", 0), errors='coerce') > 0:
                     v_base = obter_valor_100(row['TURNO'], row['FUNÇÃO'], k)
                     kpi_upper = str(k).strip().upper()
-                    is_meta_unica = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_str and kpi_upper == 'DEV. %')
+                    is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
+                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
                     potencial += v_base if is_meta_unica else v_base * 1.2
             
             if 'SEPARADOR' in cargo_str:
@@ -1011,19 +1022,35 @@ else:
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
                     
+                    kpi_upper = str(kpi).strip().upper()
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
+                    is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
+                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
+                    
                     abaixo_da_meta = False
                     if is_meta_unica:
-                        alvo_atual = 0.48 if ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %') else 0.07
-                        if realizado > alvo_atual:
-                            abaixo_da_meta = True
-                            meta1 = alvo_atual 
+                        if is_meta_unica_dev: alvo_atual = 0.48
+                        elif is_chk: alvo_atual = 0.95
+                        else: alvo_atual = 0.07
+                        
+                        if is_chk:
+                            if realizado < alvo_atual:
+                                abaixo_da_meta = True
+                                meta1 = alvo_atual
+                        else:
+                            if realizado > alvo_atual:
+                                abaixo_da_meta = True
+                                meta1 = alvo_atual 
                     else:
                         if racional == 1 and realizado < meta1: abaixo_da_meta = True
                         elif racional == 0 and realizado > meta1: abaixo_da_meta = True
 
                     if abaixo_da_meta:
                         if "LÍQ" in str(kpi).upper(): detalhes_gargalo.append(f"❌ {kpi}: {realizado:.1f}% vs Alvo Mínimo (Meta 1) {meta1:.1f}%")
-                        elif "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi: detalhes_gargalo.append(f"❌ {kpi}: {realizado:.2f}% vs Alvo Mínimo (Meta 1) {meta1:.2f}%")
+                        elif "%" in kpi or "Avaria" in kpi or "Corte" in kpi or "Dev" in kpi or "CHECKLIST" in kpi.upper(): 
+                            v_real_t = realizado * 100 if ("CHECKLIST" in kpi.upper() and realizado < 2) else realizado
+                            v_meta_t = meta1 * 100 if ("CHECKLIST" in kpi.upper() and meta1 < 2) else meta1
+                            detalhes_gargalo.append(f"❌ {kpi}: {v_real_t:.2f}% vs Alvo Mínimo (Meta 1) {v_meta_t:.2f}%")
                         else: detalhes_gargalo.append(f"❌ {kpi}: {realizado:,.0f} vs Alvo Mínimo (Meta 1) {meta1:,.0f}".replace(',', '.'))
 
                 if detalhes_gargalo:
@@ -1142,11 +1169,24 @@ else:
                     kpi_upper = str(kpi).strip().upper()
                     is_meta_unica = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
 
-                    if is_meta_unica:
-                        alvo_atual = 0.48 if ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %') else 0.07
-                        nome_alvo = "Meta Única"
-                        cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado <= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
-                        real_perc = 100.0 if realizado <= alvo_atual else ((alvo_atual / realizado * 100) if realizado > 0 else 0)
+                    kpi_upper = str(kpi).strip().upper()
+                            is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
+                            is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
+                            is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
+
+                            if is_meta_unica:
+                                if is_meta_unica_dev: alvo_atual_med = 0.48
+                                elif is_chk: alvo_atual_med = 0.95
+                                else: alvo_atual_med = 0.07
+                                
+                                nome_alvo = "Meta Única"
+                                
+                                if is_chk:
+                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med >= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
+                                    real_perc = 100.0 if real_med >= alvo_atual_med else ((real_med / alvo_atual_med * 100) if alvo_atual_med > 0 else 0)
+                                else:
+                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
+                                    real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
                     else:
                         if racional == 1: 
                             perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
@@ -1185,9 +1225,12 @@ else:
                     elif "LÍQ" in str(kpi).upper():
                         val_tela = f"{realizado:.1f}%".replace('.', ',')
                         alvo_tela = f"{alvo_atual:.1f}%".replace('.', ',') if meta2_val > 0 else "-"
-                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                        val_tela = f"{realizado:.2f}%".replace('.', ',')
-                        alvo_tela = f"{alvo_atual:.2f}%".replace('.', ',') if meta2_val > 0 else "-"
+                    elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "CHECKLIST" in str(kpi).upper():
+                        val_tela = f"{realizado * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and realizado < 2) else f"{realizado:.2f}%".replace('.', ',')
+                        if "CHECKLIST" in str(kpi).upper() and alvo_atual < 2:
+                            alvo_tela = f"{alvo_atual * 100:.2f}%".replace('.', ',') if meta2_val > 0 else "-"
+                        else:
+                            alvo_tela = f"{alvo_atual:.2f}%".replace('.', ',') if meta2_val > 0 else "-"
                     else:
                         val_tela = f"{realizado:,.0f}".replace(',', '.')
                         alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
@@ -1397,13 +1440,23 @@ else:
 
                             cargo_atual_upper = str(cargo_atual).strip().upper()
                             kpi_upper = str(kpi).strip().upper()
-                            is_meta_unica = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
+                    is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
+                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
 
-                            if is_meta_unica:
-                                alvo_atual_med = 0.48 if ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %') else 0.07
-                                nome_alvo = "Meta Única"
-                                cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
-                                real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
+                    if is_meta_unica:
+                        if is_meta_unica_dev: alvo_atual = 0.48
+                        elif is_chk: alvo_atual = 0.95
+                        else: alvo_atual = 0.07
+                        
+                        nome_alvo = "Meta Única"
+                        
+                        if is_chk:
+                            cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado >= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
+                            real_perc = 100.0 if realizado >= alvo_atual else ((realizado / alvo_atual * 100) if alvo_atual > 0 else 0)
+                        else:
+                            cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado <= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
+                            real_perc = 100.0 if realizado <= alvo_atual else ((alvo_atual / realizado * 100) if realizado > 0 else 0)
                             else:
                                 if racional_temp == 1: 
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med < meta1_med else ((meta2_med, "Meta 2") if real_med < meta2_med else ((meta3_med, "Meta 3") if real_med < meta3_med else (meta3_med, "Meta Máx")))
@@ -1419,8 +1472,12 @@ else:
                                 v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
                                 v_tela, t_tela = f"{real_med:.1f}%".replace('.', ','), f"{alvo_atual_med:.1f}%".replace('.', ',')
-                            elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi):
-                                v_tela, t_tela = f"{real_med:.2f}%".replace('.', ','), f"{alvo_atual_med:.2f}%".replace('.', ',')
+                            elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "CHECKLIST" in str(kpi).upper():
+                                v_tela = f"{real_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else f"{real_med:.2f}%".replace('.', ',')
+                                if "CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2:
+                                    t_tela = f"{alvo_atual_med * 100:.2f}%".replace('.', ',')
+                                else:
+                                    t_tela = f"{alvo_atual_med:.2f}%".replace('.', ',')
                             else:
                                 v_tela, t_tela = f"{real_med:,.0f}".replace(',', '.'), f"{alvo_atual_med:,.0f}".replace(',', '.')
 
