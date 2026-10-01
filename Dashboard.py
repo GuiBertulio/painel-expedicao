@@ -1020,9 +1020,6 @@ else:
                     if racional == 1 and realizado == 0: continue 
                     
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
-                    
-                    kpi_upper = str(kpi).strip().upper()
                     is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_c and kpi_upper == 'DEV. %')
                     is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
                     is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
@@ -1167,26 +1164,23 @@ else:
                     valor_reais = float(row.get(f"{kpi}_Valor", 0))
 
                     kpi_upper = str(kpi).strip().upper()
-                    is_meta_unica = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %') or (kpi_upper == 'AVARIA')
+                    is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_p and kpi_upper == 'DEV. %')
+                    is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
+                    is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
 
-                    kpi_upper = str(kpi).strip().upper()
-                            is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
-                            is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
-                            is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
+                    if is_meta_unica:
+                        if is_meta_unica_dev: alvo_atual = 0.48
+                        elif is_chk: alvo_atual = 0.95
+                        else: alvo_atual = 0.07
 
-                            if is_meta_unica:
-                                if is_meta_unica_dev: alvo_atual_med = 0.48
-                                elif is_chk: alvo_atual_med = 0.95
-                                else: alvo_atual_med = 0.07
-                                
-                                nome_alvo = "Meta Única"
-                                
-                                if is_chk:
-                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med >= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
-                                    real_perc = 100.0 if real_med >= alvo_atual_med else ((real_med / alvo_atual_med * 100) if alvo_atual_med > 0 else 0)
-                                else:
-                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
-                                    real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
+                        nome_alvo = "Meta Única"
+
+                        if is_chk:
+                            cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado >= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
+                            real_perc = 100.0 if realizado >= alvo_atual else ((realizado / alvo_atual * 100) if alvo_atual > 0 else 0)
+                        else:
+                            cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado <= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
+                            real_perc = 100.0 if realizado <= alvo_atual else ((alvo_atual / realizado * 100) if realizado > 0 else 0)
                     else:
                         if racional == 1: 
                             perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
