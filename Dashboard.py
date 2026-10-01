@@ -1463,14 +1463,17 @@ else:
                                 cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
                             
                             if "Tempo" in str(kpi):
-                                v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                                v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                                t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
-                                v_tela, t_tela = f"{real_med:.1f}%".replace('.', ','), f"{alvo_atual_med:.1f}%".replace('.', ',')
+                                v_tela = f"{real_med:.1f}%".replace('.', ',')
+                                t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
                             elif "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper():
                                 v_tela = f"{real_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else f"{real_med:.2f}%".replace('.', ',')
                                 t_tela = f"{alvo_atual_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else f"{alvo_atual_med:.2f}%".replace('.', ',')
                             else:
-                                v_tela, t_tela = f"{real_med:,.0f}".replace(',', '.'), f"{alvo_atual_med:,.0f}".replace(',', '.')
+                                v_tela = f"{real_med:,.0f}".replace(',', '.')
+                                t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
                             eh_global = any(g in str(kpi).upper() for g in ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET'])
                             titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
