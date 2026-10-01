@@ -15,9 +15,8 @@ import re
 # =============================================================================
 st.set_page_config(page_title="Dashboard Expedição | TAF", page_icon="📊", layout="wide")
 
-# ⚠️ CONTEÚDO PERDIDO NA COLAGEM: o bloco de CSS original (entre as aspas triplas abaixo)
-# não veio no texto que você me enviou — chegou como string vazia. Cole aqui o seu CSS original.
 st.markdown("""
+    
 """, unsafe_allow_html=True)
 
 C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
