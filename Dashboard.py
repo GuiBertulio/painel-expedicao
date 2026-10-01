@@ -1466,12 +1466,9 @@ else:
                                 v_tela, t_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}", f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
                                 v_tela, t_tela = f"{real_med:.1f}%".replace('.', ','), f"{alvo_atual_med:.1f}%".replace('.', ',')
-                            elif "%" in str(kpi) or "Avaria" in str(kpi) or "Corte" in str(kpi) or "Dev" in str(kpi) or "CHECKLIST" in str(kpi).upper():
+                            elif "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper():
                                 v_tela = f"{real_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else f"{real_med:.2f}%".replace('.', ',')
-                                if "CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2:
-                                    t_tela = f"{alvo_atual_med * 100:.2f}%".replace('.', ',')
-                                else:
-                                    t_tela = f"{alvo_atual_med:.2f}%".replace('.', ',')
+                                t_tela = f"{alvo_atual_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else f"{alvo_atual_med:.2f}%".replace('.', ',')
                             else:
                                 v_tela, t_tela = f"{real_med:,.0f}".replace(',', '.'), f"{alvo_atual_med:,.0f}".replace(',', '.')
 
