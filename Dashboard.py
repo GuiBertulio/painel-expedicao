@@ -805,21 +805,21 @@ if st.session_state["perfil"] == "Gerente":
         df_rh['Potencial Máx. (R$)'] = potencial_max_list
         df_rh['Motivo'] = motivos_list
         df_rh = df_rh.rename(columns={'CÓD.': 'Matrícula', 'NOME': 'Nome', 'Valor Final': 'Premiação (R$)'})
-        df_rh['Premiação (R()'] = df_rh['Premiação (R$)'].round(2)
-        df_rh['Potencial Máx. (R()'] = df_rh['Potencial Máx. (R$)'].round(2)
-        df_rh = df_rh[['Matrícula', 'Nome', 'FUNÇÃO', 'TURNO', 'Potencial Máx. (R()', 'Premiação (R$)', 'Motivo']].drop_duplicates(subset=['Matrícula', 'Nome']).sort_values(by='Nome')
+        df_rh['Premiação (R$)'] = df_rh['Premiação (R$)'].round(2)
+        df_rh['Potencial Máx. (R$)'] = df_rh['Potencial Máx. (R$)'].round(2)
+        df_rh = df_rh[['Matrícula', 'Nome', 'FUNÇÃO', 'TURNO', 'Potencial Máx. (R$)', 'Premiação (R$)', 'Motivo']].drop_duplicates(subset=['Matrícula', 'Nome']).sort_values(by='Nome')
 
         config_rh = {
             "Matrícula": st.column_config.TextColumn("Matrícula"),
-            "Potencial Máx. (R()": st.column_config.NumberColumn("Potencial Máx. (R$)", format="R$ %.2f"),
-            "Premiação (R()": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f"),
+            "Potencial Máx. (R$)": st.column_config.NumberColumn("Potencial Máx. (R$)", format="R$ %.2f"),
+            "Premiação (R$)": st.column_config.NumberColumn("Premiação (R$)", format="R$ %.2f"),
             "Motivo": st.column_config.TextColumn("Motivo (Se Zerado)")
         }
         st.sidebar.dataframe(df_rh, hide_index=True, use_container_width=True, column_config=config_rh)
 
         df_download = df_rh.copy()
-        df_download['Premiação (R()'] = df_download['Premiação (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-        df_download['Potencial Máx. (R()'] = df_download['Potencial Máx. (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+        df_download['Premiação (R$)'] = df_download['Premiação (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+        df_download['Potencial Máx. (R$)'] = df_download['Potencial Máx. (R$)'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
         csv_rh = df_download.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
 
         try:
