@@ -1469,15 +1469,19 @@ else:
                                 real_perc = perc * 100
                                 cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
                             
-                                if "Tempo" in str(kpi):
+                           is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
+                            
+                            if "Tempo" in str(kpi):
                                 v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
                                 t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
                             elif "LÍQ" in str(kpi).upper():
                                 v_tela = f"{real_med:.1f}%".replace('.', ',')
                                 t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
-                            elif "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper():
-                                v_tela = f"{real_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else f"{real_med:.2f}%".replace('.', ',')
-                                t_tela = f"{alvo_atual_med * 100:.2f}%".replace('.', ',') if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else f"{alvo_atual_med:.2f}%".replace('.', ',')
+                            elif is_percent_format:
+                                v_real_formated = real_med * 100 if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else real_med
+                                v_alvo_formated = alvo_atual_med * 100 if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else alvo_atual_med
+                                v_tela = f"{v_real_formated:.2f}%".replace('.', ',')
+                                t_tela = f"{v_alvo_formated:.2f}%".replace('.', ',')
                             else:
                                 v_tela = f"{real_med:,.0f}".replace(',', '.')
                                 t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
