@@ -1458,7 +1458,7 @@ else:
                                 else:
                                     cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
                                     real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
-                            else:
+                        else:
                                 if racional_temp == 1: 
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med < meta1_med else ((meta2_med, "Meta 2") if real_med < meta2_med else ((meta3_med, "Meta 3") if real_med < meta3_med else (meta3_med, "Meta Máx")))
                                     perc = (real_med / meta2_med) if meta2_med > 0 else 0
