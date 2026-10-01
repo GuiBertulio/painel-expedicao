@@ -1307,7 +1307,7 @@ else:
                         val_tela = f"{realizado:,.0f}".replace(',', '.')
                         alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
 
-                    alvo_formatado = f" | Alvo ({nome_alvo}): {alvo_tela}"  # ⚠️ nota: 't_tela' não é definida nesta seção (a variável definida acima é 'alvo_tela'); isso já estava assim no texto que você colou — vale revisar se não é um typo do arquivo original
+                    alvo_formatado = f" | Alvo ({nome_alvo}): {alvo_tela}"  # ⚠️ nota: 't_tela' não é definida nesta seção (a variável definida acima é 'alvo_tela'); isso já estava assim no texto que você colou — vale revisar se é um typo do arquivo original
                     aviso_erro = f"" if (erros_qtd > 0 and (('SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper()) or ('OPERADOR' in cargo_p and 'MOV' in str(kpi).upper()))) else ""
 
                     with cols_meta[col_idx % 4]:
