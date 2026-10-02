@@ -828,7 +828,7 @@ if st.session_state["perfil"] == "Gerente":
         except: data_fim_mes = dt_inicio.strftime('%d/%m/%Y')
 
         df_rh_sistema = pd.DataFrame({
-            'CONTRATO': df_rh['Matrícula'], 'VDB': 2601, 'DESCRIÇÃO VDB': 'Adicional Produtividade',
+            'CONTRATO': df_rh['Matrícula'], 'VDB': 15702, 'DESCRIÇÃO VDB': 'Prêmio Art. 457 § 4º',
             'REFERENCIA FOLHA_1': 0, 'VALOR': df_rh['Premiação (R$)'].apply(lambda x: f"{x:.2f}".replace('.', ',')),
             'REFERENCIA FOLHA_2': 11, 'ULTIMO DIA DO MÊS_1': data_fim_mes, 'ULTIMO DIA DO MÊS_2': data_fim_mes
         })
