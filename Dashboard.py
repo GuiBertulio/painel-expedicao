@@ -11,14 +11,46 @@ import calendar
 import re
 
 # =============================================================================
+
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (O CSS do site)
+
 # =============================================================================
-st.set_page_config(page_title="Dashboard Expedição | TAF", page_icon="📊", layout="wide")
 
-st.markdown("""
-
-""", unsafe_allow_html=True)
-
+st.set_page_config(page_title="Dashboard Expedição", page_icon="📊", layout="wide")
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 2rem !important; }
+    .card-meta { 
+        background-color: var(--background-color); 
+        padding: 15px;                             
+        border-radius: 10px;                       
+        border-left: 8px solid #ccc;               
+        margin-bottom: 15px;                       
+    }
+    .card-detrator { 
+        background-color: rgba(239, 68, 68, 0.1);  
+        border: 1px solid #ef4444;                 
+        padding: 20px; 
+        border-radius: 12px; 
+        margin-bottom: 15px; 
+    }
+    .texto-card-principal { 
+        font-size: 42px;                           
+        color: var(--text-color); 
+        font-weight: 900;                          
+        line-height: 1.1; 
+    }
+    .texto-card-titulo { 
+        font-size: 22px;                           
+        color: var(--text-color); 
+        font-weight: 900; 
+        margin-bottom: 5px; 
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
 C_AZUL, C_VERDE, C_AMARELO, C_VERMELHO = "#3b82f6", "#2ecc71", "#ffca28", "#ef4444"
 
 # =============================================================================
