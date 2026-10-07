@@ -1090,28 +1090,51 @@ if ver_jornada:
                         st.warning("⚠️️ Nenhum colaborador encontrado com esses filtros.")
                     else:
                         html_tabela = """
-
-"""
-
+                        <style>
+                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; }
+                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 14px 15px; text-align: left; border-bottom: 2px solid #3b82f6; color: #ffffff; font-size: 16px; font-weight: 800; white-space: nowrap; }
+                        .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+                        .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
+                        </style>
+                        <table class="tabela-jl">
+                            <tr>
+                                <th>Nome</th>
+                                <th>Jornada Líquida (%)</th>
+                                <th>Horas Trabalhadas</th>
+                                <th>Horas Separação</th>
+                                <th>Qtd Itens</th>
+                                <th>KG</th>
+                                <th>Itens/Hora</th>
+                                <th>1º Bipe</th>
+                                <th>Último Bipe</th>
+                                <th>Tempo Janta</th>
+                                <th>Soma Intervalos</th>
+                                <th>Maior Intervalo</th>
+                            </tr>
+                        """
+                        
                         for index, row_disp in df_display.iterrows():
                             jl_formatado = f"{row_disp['Jornada Líquida (%)']:.1f}%".replace('.', ',')
                             qtd_formatado = f"{int(row_disp['Qtd Itens'])}"
                             kg_formatado = f"{row_disp['KG']:.2f}".replace('.', ',')
                             ih_formatado = f"{row_disp['Itens/Hora']:.2f}".replace('.', ',')
-
-                            html_tabela += f"""
-
-"""
-
-                        html_tabela += """
-
-| **Nome**           | **Jornada Líquida (%)** | **Horas Trabalhadas**           | **Horas Separação**           | **Qtd Itens**   | **KG**         | **Itens/Hora** | **1º Bipe**           | **Último Bipe**           | **Tempo Janta**           | **Soma Intervalos**           | **Maior Intervalo**           |
-| ------------------ | ----------------------- | ------------------------------- | ----------------------------- | --------------- | -------------- | -------------- | --------------------- | ------------------------- | ------------------------- | ----------------------------- | ----------------------------- |
-| {row_disp['Nome']} | {jl_formatado}          | {row_disp['Horas Trabalhadas']} | {row_disp['Horas Separação']} | {qtd_formatado} | {kg_formatado} | {ih_formatado} | {row_disp['1º Bipe']} | {row_disp['Último Bipe']} | {row_disp['Tempo Janta']} | {row_disp['Soma Intervalos']} | {row_disp['Maior Intervalo']} |
-
-
-
-"""
+                            
+                            html_tabela += f"""<tr>
+                                <td>{row_disp['Nome']}</td>
+                                <td><span style='color: #2ecc71; font-size: 20px; font-weight: 900;'>{jl_formatado}</span></td>
+                                <td>{row_disp['Horas Trabalhadas']}</td>
+                                <td>{row_disp['Horas Separação']}</td>
+                                <td>{qtd_formatado}</td>
+                                <td>{kg_formatado}</td>
+                                <td>{ih_formatado}</td>
+                                <td style='color: #ffca28;'>{row_disp['1º Bipe']}</td>
+                                <td style='color: #ffca28;'>{row_disp['Último Bipe']}</td>
+                                <td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td>
+                                <td style='color: #ef4444;'>{row_disp['Soma Intervalos']}</td>
+                                <td style='color: #ef4444;'>{row_disp['Maior Intervalo']}</td>
+                            </tr>"""
+                            
+                        html_tabela += "</table><br><br>"
                         st.markdown(html_tabela, unsafe_allow_html=True)
                 else:
                     st.info(f"Não houve operação de separação na data {data_selecionada}.")
