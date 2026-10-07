@@ -1291,8 +1291,8 @@ Pontos de Desvio Identificados:
                         def pega_v_ind(keywords):
                             for c in linha_aux.index:
                                 if str(c).strip().upper() in keywords:
-                                        try: return int(float(str(linha_aux[c]).replace(',', '.')))
-                                        except: pass
+                                    try: return int(float(str(linha_aux[c]).replace(',', '.')))
+                                    except: pass
                             return 0
 
                         qtd_at = pega_v_ind(['AT', 'A.T'])
@@ -1310,73 +1310,49 @@ Pontos de Desvio Identificados:
                             qtd_nt, qtd_fc, qtd_fe, qtd_at, qtd_fi, qtd_ad = valores_aux.count('NT'), valores_aux.count('FC'), valores_aux.count('FE'), valores_aux.count('AT'), valores_aux.count('FI'), valores_aux.count('AD')
                             qtd_sa, qtd_fb, qtd_aa = valores_aux.count('SA'), valores_aux.count('FB'), valores_aux.count('AA')
 
-                        if qtd_nt > 0: ocorrencias_texto.append(f"🛑 **{qtd_nt}** dia(s) Não Trabalhado(s) (NT)")
-                        if qtd_fc > 0: ocorrencias_texto.append(f"🔄 **{qtd_fc}** Folga(s) Compensada(s) (FC)")
-                        if qtd_fe > 0: ocorrencias_texto.append(f"🌴 **{qtd_fe}** dia(s) de Férias (FE)")
-                        if qtd_at > 0: ocorrencias_texto.append(f"🏥 **{qtd_at}** dia(s) de Atestado (AT)")
-                        if qtd_fi > 0: ocorrencias_texto.append(f"❌ **{qtd_fi}** Falta(s) Injustificada(s) (FI)")
-                        if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ **{qtd_ad}** dia(s) de Suspensão/Advertência (AD)")
-                        if qtd_sa > 0: ocorrencias_texto.append(f"⏱️ **{qtd_sa}** Saída(s) Antecipada(s) (SA)")
-                        if qtd_fb > 0: ocorrencias_texto.append(f"🏦 **{qtd_fb}** Folga(s) Banco (FB)")
-                        if qtd_aa > 0: ocorrencias_texto.append(f"🛠️ **{qtd_aa}** dia(s) em Atividade Auxiliar (AA)")
+                        if qtd_nt > 0: ocorrencias_texto.append(f"🛑 <b>{qtd_nt}</b> dia(s) Não Trabalhado(s) (NT)")
+                        if qtd_fc > 0: ocorrencias_texto.append(f"🔄 <b>{qtd_fc}</b> Folga(s) Compensada(s) (FC)")
+                        if qtd_fe > 0: ocorrencias_texto.append(f"🌴 <b>{qtd_fe}</b> dia(s) de Férias (FE)")
+                        if qtd_at > 0: ocorrencias_texto.append(f"🏥 <b>{qtd_at}</b> dia(s) de Atestado (AT)")
+                        if qtd_fi > 0: ocorrencias_texto.append(f"❌ <b>{qtd_fi}</b> Falta(s) Injustificada(s) (FI)")
+                        if qtd_ad > 0: ocorrencias_texto.append(f"⚠️ <b>{qtd_ad}</b> dia(s) de Suspensão/Advertência (AD)")
+                        if qtd_sa > 0: ocorrencias_texto.append(f"⏱️ <b>{qtd_sa}</b> Saída(s) Antecipada(s) (SA)")
+                        if qtd_fb > 0: ocorrencias_texto.append(f"🏦 <b>{qtd_fb}</b> Folga(s) Banco (FB)")
+                        if qtd_aa > 0: ocorrencias_texto.append(f"🛠️ <b>{qtd_aa}</b> dia(s) em Atividade Auxiliar (AA)")
 
                 if d_trab_p < d_corridos_p and d_corridos_p > 0:
                     proporcao_tela = (d_trab_p / d_corridos_p) * 100
-                    st.markdown(f"""
-
-
-ℹ️ **Atenção (Proporcionalidade):** Colaborador atuou **{d_trab_p}** de **{d_corridos_p}** dias corridos. Os prêmios foram calculados com proporção de **{proporcao_tela:.1f}%** do valor integral.
-
-""", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: rgba(255, 202, 40, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_AMARELO}; font-size: 16px; color: {C_AMARELO};'>ℹ️ <b>Atenção (Proporcionalidade):</b> Colaborador atuou <b>{d_trab_p}</b> de <b>{d_corridos_p}</b> dias corridos. Os prêmios foram calculados com proporção de <b>{proporcao_tela:.1f}%</b> do valor integral.</div>", unsafe_allow_html=True)
 
                 if ocorrencias_texto:
-                    st.markdown(f"""
-
-
-**📋 Impacto no Pagamento (Redução de Dias Trabalhados):**
-
-{chr(10).join(ocorrencias_texto)}
-
-""", unsafe_allow_html=True)
-
+                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {C_VERMELHO}; font-size: 15px; color: #e0e0e0;'><b>📋 Impacto no Pagamento (Redução de Dias Trabalhados):</b><br><div style='margin-top: 5px; line-height: 1.6;'>{'<br>'.join(ocorrencias_texto)}</div></div>", unsafe_allow_html=True)
+                
                 erros_qtd = int(row.get('ERROS', 0))
                 penalidade_txt = str(row.get('Penalidade_Texto', ''))
                 if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
-                    st.markdown(f"""
-
-
-⚠️ **Penalidade de Qualidade:** Foram identificados **{erros_qtd} erro(s)**, resultando num desconto de **{penalidade_txt}** já aplicado nos seus totais pelo Excel.
-
-""", unsafe_allow_html=True)
-
+                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
+                
                 is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
                 if is_ranking_cargo:
                     funcao_original = row.get('FUNÇÃO', '')
                     cat_rank = str(row.get('Ranking_Categoria', '')).strip()
-                    texto_funcao_rank = f"{funcao_original} \n📊 {cat_rank}" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
+                    texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
                     total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
                     medalha, cor_rank = ("🥇", "#ffd700") if pos == 1 else (("🥈", "#c0c0c0") if pos == 2 else (("🥉", "#cd7f32") if pos == 3 else ("🏅", "#555555")))
                     val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    texto_premio_rank = f" | **💰 Prêmio Ranking: R$ {val_rank_str}**" if val_rank > 0 else " | **Premiação: R$ 0,00**"
-                    txt_posicao = f"**{medalha} Posição:** {pos}º lugar de {total_eq}" if pos > 0 else f"**{medalha} Análise da Equipe** ({total_eq} pessoas)"
-                    st.markdown(f"""
+                    texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>" if val_rank > 0 else " | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
+                    txt_posicao = f"<b>{medalha} Posição:</b> {pos}º lugar de {total_eq}" if pos > 0 else f"<b>{medalha} Análise da Equipe</b> ({total_eq} pessoas)"
+                    st.markdown(f"<div style='background-color: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid {cor_rank}; font-size: 18px;'>{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}</div>", unsafe_allow_html=True)
 
-{txt_posicao} na função de {texto_funcao_rank}{texto_premio_rank}
-
-""", unsafe_allow_html=True)
-
-                cols_meta = st.columns(4)
+                cols_meta = st.columns(4) 
                 col_idx = 0
                 grafico_dados = []
 
                 for kpi in kpis_mapeados:
                     meta2 = row.get(f"{kpi}_Meta2", 0)
-                    try:
-                        meta2_val = float(meta2)
-                    except:
-                        meta2_val = 0
-                    if meta2_val <= 0:
-                        continue
+                    try: meta2_val = float(meta2)
+                    except: meta2_val = 0
+                    if meta2_val <= 0: continue
 
                     realizado = float(row.get(kpi, 0))
                     meta1, meta3 = float(row.get(f"{kpi}_Meta1", 0)), float(row.get(f"{kpi}_Meta3", 0))
@@ -1389,15 +1365,12 @@ Pontos de Desvio Identificados:
                     is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
 
                     if is_meta_unica:
-                        if is_meta_unica_dev:
-                            alvo_atual = 0.48
-                        elif is_chk:
-                            alvo_atual = 0.95
-                        else:
-                            alvo_atual = 0.07
-
+                        if is_meta_unica_dev: alvo_atual = 0.48
+                        elif is_chk: alvo_atual = 0.95
+                        else: alvo_atual = 0.07
+                        
                         nome_alvo = "Meta Única"
-
+                        
                         if is_chk:
                             cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado >= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
                             real_perc = 100.0 if realizado >= alvo_atual else ((realizado / alvo_atual * 100) if alvo_atual > 0 else 0)
@@ -1405,71 +1378,39 @@ Pontos de Desvio Identificados:
                             cor, icone, status = (C_VERDE, "🟢", "Atingiu") if realizado <= alvo_atual else (C_VERMELHO, "🔴", "Abaixo")
                             real_perc = 100.0 if realizado <= alvo_atual else ((alvo_atual / realizado * 100) if realizado > 0 else 0)
                     else:
-                        if racional == 1:
+                        if racional == 1: 
                             perc_atingimento = (realizado / meta2_val) if meta2_val > 0 else 0
                             alvo_atual, nome_alvo = (meta1, "Meta 1") if realizado < meta1 else ((meta2_val, "Meta 2") if realizado < meta2_val else ((meta3, "Meta 3") if realizado < meta3 else (meta3, "Meta Máx")))
                             cor, icone, status = (C_AZUL, "🔵", "Superou") if realizado >= meta3 else ((C_VERDE, "🟢", "Atingiu") if realizado >= meta2_val else ((C_AMARELO, "🟡", "Parcial") if realizado >= meta1 else (C_VERMELHO, "🔴", "Abaixo")))
-                        else:
+                        else: 
                             perc_atingimento = (meta2_val / realizado) if realizado > 0 else 1.2
                             alvo_atual, nome_alvo = (meta1, "Meta 1") if realizado > meta1 else ((meta2_val, "Meta 2") if realizado > meta2_val else ((meta3, "Meta 3") if realizado > meta3 else (meta3, "Meta Máx")))
                             cor, icone, status = (C_AZUL, "🔵", "Superou") if realizado <= meta3 else ((C_VERDE, "🟢", "Atingiu") if realizado <= meta2_val else ((C_AMARELO, "🟡", "Parcial") if realizado <= meta1 else (C_VERMELHO, "🔴", "Abaixo")))
                         real_perc = perc_atingimento * 100
-
-                    grafico_dados.append({'Indicador': f"**{kpi}**", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
+                    
+                    grafico_dados.append({'Indicador': f"<b>{kpi}</b>", 'Atingimento (%)': min(real_perc, 120), 'Real': real_perc, 'Cor_Barra': cor})
                     html_tabela_premios = ""
                     v_100_base = obter_valor_100(turno_p, cargo_p, kpi)
-
+                    
                     if v_100_base > 0:
                         if is_meta_unica:
                             v_unica_str = f"{v_100_base:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_tabela_premios = f"""
-
-💰 Tabela da Métrica (Mês Integral)
-
-Meta Única
-
-R$ {v_unica_str}
-
-"""
+                            html_tabela_premios = f"<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div></div></div>"
                         else:
                             v_m1, v_m2, v_m3 = v_100_base * 0.5, v_100_base * 1.0, v_100_base * 1.2
                             v_m1_str, v_m2_str, v_m3_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                            html_tabela_premios = f"""
-
-💰 Tabela da Métrica (Mês Integral)
-
-Meta 1
-
-R$ {v_m1_str}
-
-Meta 2
-
-R$ {v_m2_str}
-
-Meta Máx
-
-R$ {v_m3_str}
-
-"""
-
+                            html_tabela_premios = f"<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div><div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div><div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div></div></div>"
+                    
                     html_dinheiro = ""
                     val_adquirido_str = f"{valor_reais:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     txt_prop = " (Proporcional)" if (d_corridos_p > 0 and d_trab_p < d_corridos_p) else ""
                     if valor_reais > 0:
-                        html_dinheiro = f"""
-
-💵 Conquistado{txt_prop}: **R$ {val_adquirido_str}**
-
-"""
+                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ {val_adquirido_str}</b></span></div>"
                     elif v_100_base > 0:
-                        html_dinheiro = f"""
-
-💵 Conquistado{txt_prop}: **R$ 0,00**
-
-"""
+                        html_dinheiro = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💵 Conquistado{txt_prop}: <b>R$ 0,00</b></span></div>"
 
                     is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
-
+                    
                     if "Tempo" in str(kpi):
                         val_tela = f"{int(realizado)//3600:02d}:{(int(realizado)%3600)//60:02d}:{int(realizado)%60:02d}"
                         alvo_tela = f"{int(alvo_atual)//3600:02d}:{(int(alvo_atual)%3600)//60:02d}:{(int(alvo_atual)%60):02d}" if meta2_val > 0 else "-"
@@ -1485,36 +1426,19 @@ R$ {v_m3_str}
                         val_tela = f"{realizado:,.0f}".replace(',', '.')
                         alvo_tela = f"{alvo_atual:,.0f}".replace(',', '.') if meta2_val > 0 else "-"
 
-                    alvo_formatado = f" | Alvo ({nome_alvo}): {alvo_tela}"
-                    aviso_erro = f"""
-
-⚠️ **{erros_qtd} Erro(s):** {penalidade_txt}
-
-""" if (erros_qtd > 0 and (('SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper()) or ('OPERADOR' in cargo_p and 'MOV' in str(kpi).upper()))) else ""
+                    alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {alvo_tela}</span>"
+                    aviso_erro = f"<div style='margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 14px;'>⚠️ <b>{erros_qtd} Erro(s):</b> {penalidade_txt}</div>" if (erros_qtd > 0 and (('SEPARADOR' in cargo_p and 'ITENS' in str(kpi).upper() and 'RAMPA' not in str(kpi).upper()) or ('OPERADOR' in cargo_p and 'MOV' in str(kpi).upper()))) else ""
 
                     with cols_meta[col_idx % 4]:
-                        st.markdown(f"""
-
-{kpi}
-
-{val_tela}{alvo_formatado}
-
-{icone} {status}
-
-{html_tabela_premios}{html_dinheiro}{aviso_erro}
-
-""", unsafe_allow_html=True)
-
+                        st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{kpi}</div><div class='texto-card-principal'>{val_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios}{html_dinheiro}{aviso_erro}</div>", unsafe_allow_html=True)
                     col_idx += 1
 
                 valor_final_total = row.get('Valor Final', 0)
                 if valor_final_total > 0:
                     val_tot_str = f"{valor_final_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    st.markdown("""
-
-""", unsafe_allow_html=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
                     st.success(f"💰 **Premiação Variável Acumulada TOTAL Validada:** R$ {val_tot_str}")
-                    st.divider()
+                st.divider()
 
                 nome_c = row.get('NOME', pessoa_selecionada)
                 cod_c = row.get('CÓD.', '')
