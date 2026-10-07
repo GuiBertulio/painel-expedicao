@@ -423,18 +423,18 @@ def carregar_diarios():
             df_aba.columns = [str(c).strip() for c in df_aba.columns]
             return df_aba
 
-            try: dfs['sep'] = processar_aba("Relatorio Diario")
-            except: pass
-            try: dfs['op'] = processar_aba("Relatorio Operador")
-            except: pass
-            try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
-            except: pass
-            try: dfs['aux_jl'] = processar_aba("Aux Absent")
-            except: pass
-            try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
-            except: pass
-            try: dfs['ponto_t3'] = processar_aba("Ponto T3")
-            except: pass
+        try: dfs['sep'] = processar_aba("Relatorio Diario")
+        except: pass
+        try: dfs['op'] = processar_aba("Relatorio Operador")
+        except: pass
+        try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
+        except: pass
+        try: dfs['aux_jl'] = processar_aba("Aux Absent")
+        except: pass
+        try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
+        except: pass
+        try: dfs['ponto_t3'] = processar_aba("Ponto T3")
+        except: pass
 
     except Exception as e:
         print(f"Erro ao carregar abas diárias: {e}")
