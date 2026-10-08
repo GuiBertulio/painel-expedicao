@@ -563,8 +563,28 @@ for turno in ['T2', 'T3']:
                     df.at[idx, 'Valor Ranking'] += (200.0 * prop_rank)
                 pos += 1
 
-colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
-df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
+# 🚨 SOMA SEGURA DO VALOR FINAL (Ignora lixo do Excel, soma apenas KPIs ativos na tela)
+kpis_gerais_soma = [c.replace('_Racional', '') for c in df.columns if '_Racional' in c]
+df['Valor Final'] = 0.0
+
+for idx, row in df.iterrows():
+    soma_valida = 0.0
+    for kpi in kpis_gerais_soma:
+        try:
+            m2 = float(row.get(f"{kpi}_Meta2", 0))
+        except:
+            m2 = 0.0
+            
+        if m2 > 0:  # Se a meta aparece na tela, o dinheiro dela entra na soma
+            try:
+                v_kpi = float(row.get(f"{kpi}_Valor", 0))
+                if v_kpi > 0:
+                    soma_valida += v_kpi
+            except:
+                pass
+                
+    v_rank = float(row.get('Valor Ranking', 0))
+    df.at[idx, 'Valor Final'] = soma_valida + v_rank
 
 # 🚨 ZERAR PREMIAÇÃO GLOBALMENTE (FALTAS INJUSTIFICADAS E ADVERTÊNCIAS)
 if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
