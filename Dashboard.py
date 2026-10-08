@@ -363,7 +363,7 @@ def carregar_dados():
         erros_e = float(row.get('ERROS', 0))
         if erros_e > 0:
             if 'SEPARADOR' in cargo_e: df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 20)} Itens"
-            elif 'OPERADOR' in cargo_e: df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 10)} Mov."
+            elif 'OPERADOR' in cargo_e: df.at[idx, 'Penalidade_Texto'] = f"-{int(erros_e * 5)} Mov."
     return df
 
 
