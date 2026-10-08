@@ -566,6 +566,39 @@ for turno in ['T2', 'T3']:
 colunas_valor = [c for c in df.columns if c.endswith('_Valor')]
 df['Valor Final'] = df[colunas_valor].sum(axis=1) + df['Valor Ranking']
 
+# 🚨 ZERAR PREMIAÇÃO GLOBALMENTE (FALTAS INJUSTIFICADAS E ADVERTÊNCIAS)
+if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
+    df_aux_jl_clone = df_aux_jl.copy()
+    df_aux_jl_clone['NOME_UPPER'] = df_aux_jl_clone['NOME'].astype(str).str.strip().str.upper()
+    for idx, row in df.iterrows():
+        nome_df = str(row.get('NOME', '')).strip().upper()
+        match = df_aux_jl_clone[df_aux_jl_clone['NOME_UPPER'] == nome_df]
+        if not match.empty:
+            linha_aux = match.iloc[0]
+            
+            def pega_v_global(keywords):
+                for c in linha_aux.index:
+                    if str(c).strip().upper() in keywords:
+                        try: return int(float(str(linha_aux[c]).replace(',', '.')))
+                        except: pass
+                return 0
+                
+            q_fi = pega_v_global(['FI', 'F.I'])
+            q_ad = pega_v_global(['AD', 'A.D'])
+            
+            if q_fi == 0 and q_ad == 0:
+                valores_aux = [str(v).strip().upper().replace('.', '') for v in linha_aux.values]
+                q_fi = valores_aux.count('FI')
+                q_ad = valores_aux.count('AD')
+                
+            if q_fi > 0 or q_ad > 0:
+                df.at[idx, 'Valor Final'] = 0.0
+                df.at[idx, 'Valor Ranking'] = 0.0
+
+# =============================================================================
+# 📅 3. LÓGICA DE DATAS E BARRA LATERAL
+# =============================================================================
+
 
 # =============================================================================
 
