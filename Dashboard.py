@@ -429,7 +429,7 @@ def carregar_diarios():
         except: pass
         try: dfs['conf'] = processar_aba("Relatorio Diario Conferente")
         except: pass
-        try: dfs['aux_jl'] = processar_aba("Aux Absent")
+        try: dfs['aux_jl'] = processar_aba("Aux JL")
         except: pass
         try: dfs['acomp_jl'] = processar_aba("Acompanhamento JL")
         except: pass
