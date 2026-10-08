@@ -1728,55 +1728,36 @@ Pontos de Desvio Identificados:
         # 👥 VISÃO GERAL EQUIPE
         # =============================================================================
         else:
-            filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
-
-            if not filtros_ativos:
-                st.markdown(f"""
-
-
-""", unsafe_allow_html=True)
-
-                st.markdown("""
-
-## 👋 Bem-vindo ao Painel de Comando da Expedição
-
-""", unsafe_allow_html=True)
-
-                st.markdown("""
-
-O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.
-
-""", unsafe_allow_html=True)
-
-                st.markdown("""
-
-""", unsafe_allow_html=True)
-
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    st.markdown(f"""
-
-#### 👥 Visão de Equipe
-
-Filtre por **Turno** ou **Função** para carregar os indicadores coletivos.
-
-""", unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f"""
-
-#### 🎯 Análise Individual
-
-Selecione um **Colaborador** para auditar seu desempenho real, prêmios e posição no Ranking.
-
-""", unsafe_allow_html=True)
-                with c3:
-                    st.markdown(f"""
-
-#### 🚨 Gestão de Detratores
-
-Ative o filtro de **Desempenho Abaixo da Meta** para identify gargalos.
-
-""", unsafe_allow_html=True)
+        filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (
+            cargo_selecionado != "Todos"
+        )
+        if not filtros_ativos:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.markdown(
+                "<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>",
+                unsafe_allow_html=True,
+            )
+            st.markdown("<br>", unsafe_allow_html=True)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(
+                    f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>",
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                st.markdown(
+                    f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>",
+                    unsafe_allow_html=True,
+                )
+            with c3:
+                st.markdown(
+                    f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identificar gargalos.</p></div>",
+                    unsafe_allow_html=True,
+                )
             else:
                 cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
