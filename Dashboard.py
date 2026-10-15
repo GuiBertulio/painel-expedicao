@@ -214,7 +214,7 @@ USUARIOS = {
     "diego": {"senha": "Diego@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
     "carlos": {"senha": "Carlos@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
     "luis": {"senha": "Luis@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
-    "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T3"}
+    "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T4"}
 }
 
 if "logado" not in st.session_state:
