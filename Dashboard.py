@@ -1872,7 +1872,7 @@ Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med > meta1_med else ((meta2_med, "Meta 2") if real_med > meta2_med else ((meta3_med, "Meta 3") if real_med > meta3_med else (meta3_med, "Meta Máx")))
                                     cor, icone, status = (C_AZUL, "🔵", "Superando") if real_med <= meta3_med else ((C_VERDE, "🟢", "Na Meta") if real_med <= meta2_med else ((C_AMARELO, "🟡", "Parcial") if real_med <= meta1_med else (C_VERMELHO, "🔴", "Abaixo")))
 
-                            is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
+                                is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
 
                             if "Tempo" in str(kpi):
                                 v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
