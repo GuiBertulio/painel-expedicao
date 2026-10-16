@@ -192,6 +192,30 @@ def obter_valor_100(turno, funcao, kpi):
         ("T3", "RESPONSAVEL SALA BATERIAS", "ITENS/HORA"): 150,
         ("T3", "RESPONSAVEL SALA BATERIAS", "AVARIA"): 100,
         ("T3", "RESPONSAVEL SALA BATERIAS", "CHECKLIST MANUTENÇÃO"): 250,
+        
+        ("T4", "SEPARADOR F", "JORNADA LÍQ."): 150,
+        ("T4", "SEPARADOR F", "ITENS SEP"): 150,
+        ("T4", "SEPARADOR F", "ITENS/HORA"): 150,
+        ("T4", "SEPARADOR G", "JORNADA LÍQ."): 150,
+        ("T4", "SEPARADOR G", "ITENS SEP"): 150,
+        ("T4", "SEPARADOR G", "ITENS/HORA"): 150,
+
+        ("T4", "CARREGAMENTO BOX", "ITENS RAMPA"): 150,
+        ("T4", "CARREGAMENTO BOX", "DEV. %"): 150,
+        ("T4", "CARREGAMENTO BOX", "AVARIA"): 100,
+
+        ("T4", "CONFERENTE", "ITENS CONF."): 350,
+        ("T4", "CONFERENTE", "DEV. %"): 150,
+        ("T4", "CONFERENTE GRANDEZA", "ITENS CONF."): 350,
+        ("T4", "CONFERENTE GRANDEZA", "DEV. %"): 150,
+
+        ("T4", "LÍDER", "JORNADA LÍQ. EQ."): 240,
+        ("T4", "LÍDER", "AVARIA"): 150,
+        ("T4", "LÍDER", "DEV. %"): 240,
+        ("T4", "LÍDER", "ITENS/HORA EQ."): 240,
+
+        ("T4", "OPERADOR", "MOV. HORIZONTAL"): 450,
+        ("T4", "OPERADOR", "AVARIA"): 100,
     }
     return mapa.get((t, f, k), 0)
 
@@ -483,10 +507,11 @@ df['Posicao Ranking'] = 0
 
 df['Ranking_Categoria'] = ""
 
-for turno in ['T2', 'T3']:
+for grupo_turno in [['T2'], ['T3', 'T4']]:
+    is_t3_t4 = ('T3' in grupo_turno)
     for cargo in df['FUNÇÃO'].unique():
         cargo_str = str(cargo).upper()
-        df_eq = df[(df['TURNO'] == turno) & (df['FUNÇÃO'] == cargo)].copy()
+        df_eq = df[(df['TURNO'].isin(grupo_turno)) & (df['FUNÇÃO'] == cargo)].copy()
         if df_eq.empty:
             continue
 
@@ -511,9 +536,9 @@ for turno in ['T2', 'T3']:
                 d_trab_rank = float(row_eq.get('Dias Trabalhados', 0))
                 prop_rank = min(d_trab_rank / d_corr_rank, 1.0) if d_corr_rank > 0 else 1.0
 
-                if turno == 'T3':
+                if is_t3_t4:
                     val_base = 250.0 if pos == 1 else (200.0 if pos == 2 else (100.0 if pos == 3 else 0.0))
-                elif turno == 'T2':
+                elif 'T2' in grupo_turno:
                     val_base = 150.0 if pos == 1 else (100.0 if pos == 2 else (80.0 if pos == 3 else 0.0))
                 else:
                     val_base = 0.0
@@ -522,7 +547,7 @@ for turno in ['T2', 'T3']:
                     df.at[idx, 'Valor Ranking'] += (val_base * prop_rank)
                 pos += 1
 
-        elif 'CONFERENTE' in cargo_str and turno == 'T3':
+        elif 'CONFERENTE' in cargo_str and is_t3_t4:
             metrica_rank = next((k for k in kpis if 'ITENS CONF' in k.upper()), None)
             if not metrica_rank:
                 continue
@@ -545,7 +570,7 @@ for turno in ['T2', 'T3']:
                 df.at[idx, 'Ranking_Categoria'] = f"{cat_name} ({val_kpi:,.0f})".replace(',', '.')
                 pos += 1
 
-        elif 'OPERADOR' in cargo_str and turno == 'T3':
+        elif 'OPERADOR' in cargo_str and is_t3_t4:
             metrica_rank = next((k for k in kpis if 'MOV' in k.upper()), kpis[0])
             racional = df_eq[f"{metrica_rank}_Racional"].mode()[0] if not df_eq[f"{metrica_rank}_Racional"].empty else 1
             df_eq[metrica_rank] = pd.to_numeric(df_eq[metrica_rank], errors='coerce').fillna(0)
@@ -718,7 +743,7 @@ if st.session_state.get("usuario") in ["guilherme", "nilo"]:
                     })
 
             pos = int(row.get('Posicao Ranking', 0))
-            if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno == 'T3') or ('OPERADOR' in funcao_upper and turno == 'T3')):
+            if pos > 0 and ('SEPARADOR' in funcao_upper or ('CONFERENTE' in funcao_upper and turno in ['T3', 'T4']) or ('OPERADOR' in funcao_upper and turno in ['T3', 'T4'])):
                 val_rank = float(row.get('Valor Ranking', 0))
                 cat_rank = row.get('Ranking_Categoria', '')
                 txt_indicador = f"Ranking ({cat_rank})" if ('CONFERENTE' in funcao_upper and cat_rank) else "Ranking"
@@ -831,10 +856,10 @@ if st.session_state["perfil"] == "Gerente":
                     potencial += v_base if is_meta_unica else v_base * 1.2
 
             if 'SEPARADOR' in cargo_str:
-                potencial += 250 if turno_str == 'T3' else (150 if turno_str == 'T2' else 0)
-            elif 'CONFERENTE' in cargo_str and turno_str == 'T3':
+                potencial += 250 if turno_str in ['T3', 'T4'] else (150 if turno_str == 'T2' else 0)
+            elif 'CONFERENTE' in cargo_str and turno_str in ['T3', 'T4']:
                 potencial += 200
-            elif 'OPERADOR' in cargo_str and turno_str == 'T3':
+            elif 'OPERADOR' in cargo_str and turno_str in ['T3', 'T4']:
                 potencial += 200
             potencial_max_list.append(potencial)
 
@@ -1041,7 +1066,7 @@ if ver_jornada:
                     turno = str(linha[idx_turno]).strip().upper() if idx_turno != -1 and idx_turno < len(linha) else ""
                     cod = str(linha[idx_cod]).replace('.0', '').strip() if idx_cod < len(linha) else ""
 
-                    if not nome or nome in ["nan", "None", "NOME"] or "SEPARADOR" not in funcao or "T3" not in turno:
+                    if not nome or nome in ["nan", "None", "NOME"] or "SEPARADOR" not in funcao or turno not in ["T3", "T4"]:
                         continue
 
                     jl_val = str(linha[idx_jl]).strip() if idx_jl != -1 else "0"
@@ -1408,12 +1433,15 @@ Pontos de Desvio Identificados:
                 if erros_qtd > 0 and ('SEPARADOR' in cargo_p or 'OPERADOR' in cargo_p):
                     st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 6px solid #ef4444; font-size: 16px; color: #ef4444;'>⚠️ <b>Penalidade de Qualidade:</b> Foram identificados <b>{erros_qtd} erro(s)</b>, resultando num desconto de <b>{penalidade_txt}</b> já aplicado nos seus totais pelo Excel.</div>", unsafe_allow_html=True)
                 
-                is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
+                is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p in ['T3', 'T4']) or ('OPERADOR' in cargo_p and turno_p in ['T3', 'T4']))
                 if is_ranking_cargo:
                     funcao_original = row.get('FUNÇÃO', '')
                     cat_rank = str(row.get('Ranking_Categoria', '')).strip()
                     texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
-                    total_eq = len(df_filtrado[(df_filtrado['TURNO'] == row.get('TURNO')) & (df_filtrado['FUNÇÃO'] == funcao_original)])
+                    if turno_p in ['T3', 'T4']:
+                        total_eq = len(df[(df['TURNO'].isin(['T3', 'T4'])) & (df['FUNÇÃO'] == funcao_original)])
+                    else:
+                        total_eq = len(df[(df['TURNO'] == row.get('TURNO')) & (df['FUNÇÃO'] == funcao_original)])
                     medalha, cor_rank = ("🥇", "#ffd700") if pos == 1 else (("🥈", "#c0c0c0") if pos == 2 else (("🥉", "#cd7f32") if pos == 3 else ("🏅", "#555555")))
                     val_rank_str = f"{val_rank:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                     texto_premio_rank = f" | <span style='color: #2ecc71;'><b>💰 Prêmio Ranking: R$ {val_rank_str}</b></span>" if val_rank > 0 else " | <span style='color: #888;'><b>Premiação: R$ 0,00</b></span>"
