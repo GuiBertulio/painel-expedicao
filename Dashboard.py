@@ -1848,7 +1848,7 @@ Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
                             is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
                             is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
 
-                           if is_meta_unica:
+                    if is_meta_unica:
                                 if is_meta_unica_dev:
                                     alvo_atual_med = 0.48
                                 elif is_chk:
