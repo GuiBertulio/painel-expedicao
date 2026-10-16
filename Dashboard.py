@@ -1848,7 +1848,7 @@ Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
                             is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
                             is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
 
-                            if is_meta_unica:
+                           if is_meta_unica:
                                 if is_meta_unica_dev:
                                     alvo_atual_med = 0.48
                                 elif is_chk:
@@ -1867,13 +1867,10 @@ Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
                             else:
                                 if racional_temp == 1:
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med < meta1_med else ((meta2_med, "Meta 2") if real_med < meta2_med else ((meta3_med, "Meta 3") if real_med < meta3_med else (meta3_med, "Meta Máx")))
-                                    perc = (real_med / meta2_med) if meta2_med > 0 else 0
+                                    cor, icone, status = (C_AZUL, "🔵", "Superando") if real_med >= meta3_med else ((C_VERDE, "🟢", "Na Meta") if real_med >= meta2_med else ((C_AMARELO, "🟡", "Parcial") if real_med >= meta1_med else (C_VERMELHO, "🔴", "Abaixo")))
                                 else:
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med > meta1_med else ((meta2_med, "Meta 2") if real_med > meta2_med else ((meta3_med, "Meta 3") if real_med > meta3_med else (meta3_med, "Meta Máx")))
-                                    perc = (meta2_med / real_med) if real_med > 0 else 1.2
-
-                                real_perc = perc * 100
-                                cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
+                                    cor, icone, status = (C_AZUL, "🔵", "Superando") if real_med <= meta3_med else ((C_VERDE, "🟢", "Na Meta") if real_med <= meta2_med else ((C_AMARELO, "🟡", "Parcial") if real_med <= meta1_med else (C_VERMELHO, "🔴", "Abaixo")))
 
                             is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
 
@@ -1893,35 +1890,33 @@ Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
                                 t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
                             eh_global = any(g in str(kpi).upper() for g in ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET'])
-                            titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} (Soma: {f'{soma_total:,.0f}'.replace(',', '.')})"
-                            alvo_formatado = f" | Alvo ({nome_alvo}): {t_tela}"
+                            titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
+                            alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
+                            
+                            turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
+                            v_100_base_eq = obter_valor_100(turno_atual, cargo_atual_upper, kpi)
+                            html_tabela_premios_eq = ""
+                            if v_100_base_eq > 0:
+                                if is_meta_unica:
+                                    v_unica_str = f"{v_100_base_eq:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                    html_tabela_premios_eq = f"<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div></div></div>"
+                                else:
+                                    v_m1, v_m2, v_m3 = v_100_base_eq * 0.5, v_100_base_eq * 1.0, v_100_base_eq * 1.2
+                                    v_m1_str, v_m2_str, v_m3_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                    html_tabela_premios_eq = f"<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div><div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div><div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div></div></div>"
+
                             val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
                             html_dinheiro_med = ""
-
-                            turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
-                            is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
-                            if not is_itens_t2_sepg and val_tot_equipe > 0:
-                                val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                                html_dinheiro_med = f"""
-
-
-💰 Total Adquirido (Equipe): **R$ {val_tot_eq_str}**
-
-"""
+                            is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in cargo_atual_upper and 'ITENS SEP' in str(kpi).upper())
+                            if not is_itens_t2_sepg:
+                                if val_tot_equipe > 0:
+                                    val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                    html_dinheiro_med = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💰 Total Adquirido (Equipe): <b>R$ {val_tot_eq_str}</b></span></div>"
+                                elif v_100_base_eq > 0:
+                                    html_dinheiro_med = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💰 Total Adquirido (Equipe): <b>R$ 0,00</b></span></div>"
 
                             with cols_eq[col_idx % 4]:
-                                st.markdown(f"""
-
-
-{titulo_card}
-
-{v_tela}{alvo_formatado}
-
-{icone} {status}
-
-{html_dinheiro_med}
-
-""", unsafe_allow_html=True)
+                                st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios_eq}{html_dinheiro_med}</div>", unsafe_allow_html=True)
 
                             col_idx += 1
 
