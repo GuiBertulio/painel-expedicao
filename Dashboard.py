@@ -1874,20 +1874,20 @@ Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
 
                                 is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
 
-                            if "Tempo" in str(kpi):
-                                v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-                                t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-                            elif "LÍQ" in str(kpi).upper():
-                                v_tela = f"{real_med:.1f}%".replace('.', ',')
-                                t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
-                            elif is_percent_format:
-                                v_real_formated = real_med * 100 if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else real_med
-                                v_alvo_formated = alvo_atual_med * 100 if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else alvo_atual_med
-                                v_tela = f"{v_real_formated:.2f}%".replace('.', ',')
-                                t_tela = f"{v_alvo_formated:.2f}%".replace('.', ',')
-                            else:
-                                v_tela = f"{real_med:,.0f}".replace(',', '.')
-                                t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
+                                if "Tempo" in str(kpi):
+                                    v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
+                                    t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
+                                elif "LÍQ" in str(kpi).upper():
+                                    v_tela = f"{real_med:.1f}%".replace('.', ',')
+                                    t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
+                                elif is_percent_format:
+                                    v_real_formated = real_med * 100 if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else real_med
+                                    v_alvo_formated = alvo_atual_med * 100 if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else alvo_atual_med
+                                    v_tela = f"{v_real_formated:.2f}%".replace('.', ',')
+                                    t_tela = f"{v_alvo_formated:.2f}%".replace('.', ',')
+                                else:
+                                    v_tela = f"{real_med:,.0f}".replace(',', '.')
+                                    t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
                             eh_global = any(g in str(kpi).upper() for g in ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET'])
                             titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
