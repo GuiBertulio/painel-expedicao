@@ -213,7 +213,7 @@ USUARIOS = {
     "jorge": {"senha": "Jorge@26TAF", "perfil": "Líder", "turno_acesso": "T2"},
     "diego": {"senha": "Diego@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
     "carlos": {"senha": "Carlos@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
-    "luis": {"senha": "Luis@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
+    "tatiege": {"senha": "Tati@26TAF", "perfil": "Líder", "turno_acesso": "T3"},
     "luiz": {"senha": "Luiz@26TAF", "perfil": "Líder", "turno_acesso": "T4"}
 }
 
