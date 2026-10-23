@@ -2312,121 +2312,23 @@ if ver_jornada:
 
 
                     media_equipe = (soma_jl_flt / qtd_validos) if qtd_validos > 0 else 0
-
-                    st.markdown(f"""
-
-
-
-#### Média de Jornada Líquida da Equipe (T3)
-
-
-
-## {media_equipe:.1f}%
-
-
-
-""", unsafe_allow_html=True)
-
-
+                    st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 15px 20px; border-radius: 8px; border-left: 5px solid {C_VERDE}; margin-bottom: 20px;'><h4 style='margin:0; color: #888; font-size: 16px;'>Média de Jornada Líquida da Equipe (T3)</h4><h2 style='margin:0; color: {C_VERDE}; font-size: 36px; font-weight: 900;'>{media_equipe:.1f}%</h2></div>", unsafe_allow_html=True)
 
                     if df_display.empty:
-
-                        st.warning("⚠️️ Nenhum colaborador encontrado com esses filtros.")
-
+                        st.warning("⚠ Nenhum colaborador encontrado com esses filtros.")
                     else:
-
-                        html_tabela = """
-
-                        <style>
-
-                        .tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; }
-
-                        .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 14px 15px; text-align: left; border-bottom: 2px solid #3b82f6; color: #ffffff; font-size: 16px; font-weight: 800; white-space: nowrap; }
-
-                        .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-
-                        .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }
-
-                        </style>
-
-                        <table class="tabela-jl">
-
-                            <tr>
-
-                                <th>Nome</th>
-
-                                <th>Jornada Líquida (%)</th>
-
-                                <th>Horas Trabalhadas</th>
-
-                                <th>Horas Separação</th>
-
-                                <th>Qtd Itens</th>
-
-                                <th>KG</th>
-
-                                <th>Itens/Hora</th>
-
-                                <th>1º Bipe</th>
-
-                                <th>Último Bipe</th>
-
-                                <th>Tempo Janta</th>
-
-                                <th>Soma Intervalos</th>
-
-                                <th>Maior Intervalo</th>
-
-                            </tr>
-
-                        """
-
-                        
+                        html_tabela = "<style>.tabela-jl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 18px; color: #ffffff; font-weight: bold; } .tabela-jl th { background-color: rgba(59, 130, 246, 0.2); padding: 14px 15px; text-align: left; border-bottom: 2px solid #3b82f6; color: #ffffff; font-size: 16px; font-weight: 800; white-space: nowrap; } .tabela-jl td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.08); white-space: nowrap; } .tabela-jl tr:hover { background-color: rgba(255,255,255,0.05); }</style>"
+                        html_tabela += "<table class='tabela-jl'><thead><tr><th>Nome</th><th>Jornada Líquida (%)</th><th>Horas Trabalhadas</th><th>Horas Separação</th><th>Qtd Itens</th><th>KG</th><th>Itens/Hora</th><th>1º Bipe</th><th>Último Bipe</th><th>Tempo Janta</th><th>Soma Intervalos</th><th>Maior Intervalo</th></tr></thead><tbody>"
 
                         for index, row_disp in df_display.iterrows():
-
                             jl_formatado = f"{row_disp['Jornada Líquida (%)']:.1f}%".replace('.', ',')
+                            qtd_formatado = f"{int(round(row_disp['Qtd Itens'])):,}".replace(',', '.')
+                            kg_formatado = f"{int(round(row_disp['KG'])):,}".replace(',', '.')
+                            ih_formatado = f"{int(round(row_disp['Itens/Hora'])):,}".replace(',', '.')
 
-                            qtd_formatado = f"{int(row_disp['Qtd Itens'])}"
+                            html_tabela += f"<tr><td>{row_disp['Nome']}</td><td><span style='color: #2ecc71; font-size: 20px; font-weight: 900;'>{jl_formatado}</span></td><td>{row_disp['Horas Trabalhadas']}</td><td>{row_disp['Horas Separação']}</td><td>{qtd_formatado}</td><td>{kg_formatado}</td><td>{ih_formatado}</td><td style='color: #ffca28;'>{row_disp['1º Bipe']}</td><td style='color: #ffca28;'>{row_disp['Último Bipe']}</td><td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td><td style='color: #ef4444;'>{row_disp['Soma Intervalos']}</td><td style='color: #ef4444;'>{row_disp['Maior Intervalo']}</td></tr>"
 
-                            kg_formatado = f"{row_disp['KG']:.2f}".replace('.', ',')
-
-                            ih_formatado = f"{row_disp['Itens/Hora']:.2f}".replace('.', ',')
-
-                            
-
-                            html_tabela += f"""<tr>
-
-                                <td>{row_disp['Nome']}</td>
-
-                                <td><span style='color: #2ecc71; font-size: 20px; font-weight: 900;'>{jl_formatado}</span></td>
-
-                                <td>{row_disp['Horas Trabalhadas']}</td>
-
-                                <td>{row_disp['Horas Separação']}</td>
-
-                                <td>{qtd_formatado}</td>
-
-                                <td>{kg_formatado}</td>
-
-                                <td>{ih_formatado}</td>
-
-                                <td style='color: #ffca28;'>{row_disp['1º Bipe']}</td>
-
-                                <td style='color: #ffca28;'>{row_disp['Último Bipe']}</td>
-
-                                <td style='color: #ef4444;'>{row_disp['Tempo Janta']}</td>
-
-                                <td style='color: #ef4444;'>{row_disp['Soma Intervalos']}</td>
-
-                                <td style='color: #ef4444;'>{row_disp['Maior Intervalo']}</td>
-
-                            </tr>"""
-
-                            
-
-                        html_tabela += "</table><br><br>"
-
+                        html_tabela += "</tbody></table><br><br>"
                         st.markdown(html_tabela, unsafe_allow_html=True)
 
                 else:
