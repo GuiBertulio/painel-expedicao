@@ -1360,7 +1360,7 @@ ver_jornada = st.sidebar.checkbox("⏱️ Acompanhamento Jornada Líquida (T3)",
 
 
 
-if st.session_state.get("usuario") in ["guilherme", "nilo"]:
+if st.session_state.get("usuario") in ["guilherme", "nilo", "diegoc"]:
 
 
 
