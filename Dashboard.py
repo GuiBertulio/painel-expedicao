@@ -1016,7 +1016,7 @@ df['Ranking_Categoria'] = ""
 
 
 
-for grupo_turno in [['T2'], ['T3', 'T4']]:
+for grupo_turno in [['T2'], ['T3']]:
 
     is_t3_t4 = ('T3' in grupo_turno)
 
