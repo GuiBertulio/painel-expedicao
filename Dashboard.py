@@ -2522,25 +2522,19 @@ else:
 
 
                     with st.container():
-
+                        linhas_gargalo = "<br>".join(detalhes_gargalo)
                         st.markdown(f"""
-
-
-
-
-
-⚠️ [{cod_c}] {nome_c}
-
-
-
-**Turno:** {turno_c} | **Função:** {cargo_c} | **Dias Lançados:** {d_trab} dias
-
-
-
-
-
-
-
+                        <div class='card-detrator'>
+                            <h4 style='color: #ef4444; margin-top: 0; margin-bottom: 5px;'>⚠️ [{cod_c}] {nome_c}</h4>
+                            <div style='color: #ccc; font-size: 15px; margin-bottom: 12px;'>
+                                <b>Turno:</b> {turno_c} &nbsp;|&nbsp; <b>Função:</b> {cargo_c} &nbsp;|&nbsp; <b>Dias Lançados:</b> {d_trab}
+                            </div>
+                            <div style='color: #ffffff; font-weight: bold; margin-bottom: 5px;'>Pontos de Desvio Identificados:</div>
+                            <div style='color: #ef4444; font-size: 15px; line-height: 1.6;'>
+                                {linhas_gargalo}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 Pontos de Desvio Identificados:
 
 
