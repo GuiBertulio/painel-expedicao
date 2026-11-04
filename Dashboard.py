@@ -3408,405 +3408,158 @@ Pontos de Desvio Identificados:
 
 
         # =============================================================================
-
         # 👥 VISÃO GERAL EQUIPE
-
         # =============================================================================
-
         else:
-
             filtros_ativos = (turno_selecionado not in ["Todos", "Todos Permitidos"]) or (cargo_selecionado != "Todos")
 
-
-
             if not filtros_ativos:
-
-                st.markdown(f"""
-
-
-
-
-
-""", unsafe_allow_html=True)
-
-
-
-                st.markdown("""
-
-
-
-## 👋 Bem-vindo ao Painel de Comando da Expedição
-
-
-
-""", unsafe_allow_html=True)
-
-
-
-                st.markdown("""
-
-
-
-O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.
-
-
-
-""", unsafe_allow_html=True)
-
-
-
-                st.markdown("""
-
-
-
-""", unsafe_allow_html=True)
-
-
+                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.markdown("<h2 style='text-align: center; color: lightgray;'>👋 Bem-vindo ao Painel de Comando da Expedição</h2>", unsafe_allow_html=True)
+                st.markdown("<p style='text-align: center; font-size: 18px; color: #888;'>O painel de produtividade está pronto. Utilize o menu lateral para direcionar sua análise.</p>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
 
                 c1, c2, c3 = st.columns(3)
-
                 with c1:
-
-                    st.markdown(f"""
-
-
-
-#### 👥 Visão de Equipe
-
-
-
-Filtre por **Turno** ou **Função** para carregar os indicadores coletivos.
-
-
-
-""", unsafe_allow_html=True)
-
+                    st.markdown(f"<div style='background-color: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_AZUL}; height: 100%;'><h4>👥 Visão de Equipe</h4><p style='color: #ccc; font-size: 15px;'>Filtre por <b>Turno</b> ou <b>Função</b> para carregar os indicadores coletivos.</p></div>", unsafe_allow_html=True)
                 with c2:
-
-                    st.markdown(f"""
-
-
-
-#### 🎯 Análise Individual
-
-
-
-Selecione um **Colaborador** para auditar seu desempenho real, prêmios e posição no Ranking.
-
-
-
-""", unsafe_allow_html=True)
-
+                    st.markdown(f"<div style='background-color: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERDE}; height: 100%;'><h4>🎯 Análise Individual</h4><p style='color: #ccc; font-size: 15px;'>Selecione um <b>Colaborador</b> para auditar seu desempenho real, prêmios e posição no Ranking.</p></div>", unsafe_allow_html=True)
                 with c3:
-
-                    st.markdown(f"""
-
-
-
-#### 🚨 Gestão de Detratores
-
-
-
-Ative o filtro de **Desempenho Abaixo da Meta** para identifificar gargalos.
-
-
-
-""", unsafe_allow_html=True)
-
+                    st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-top: 5px solid {C_VERMELHO}; height: 100%;'><h4>🚨 Gestão de Detratores</h4><p style='color: #ccc; font-size: 15px;'>Ative o filtro de <b>Desempenho Abaixo da Meta</b> para identificar gargalos.</p></div>", unsafe_allow_html=True)
             else:
-
                 cargos_render = [cargo_selecionado] if cargo_selecionado != "Todos" else sorted(df_filtrado['FUNÇÃO'].dropna().unique().tolist())
 
-
-
                 for cargo_atual in cargos_render:
-
                     df_cargo = df_filtrado[df_filtrado['FUNÇÃO'] == cargo_atual]
-
                     if df_cargo.empty:
-
                         continue
 
-
-
-                    st.markdown(f"""
-
-
-
-
-
-#### 🔹 Equipe: {cargo_atual}
-
-
-
-""", unsafe_allow_html=True)
-
-
+                    st.markdown(f"<h4 style='color: lightgray; margin-top: 15px;'>🔹 Equipe: {cargo_atual}</h4>", unsafe_allow_html=True)
 
                     cols_eq = st.columns(4)
-
                     col_idx = 0
 
-
-
                     for kpi in kpis_mapeados:
-
                         if f"{kpi}_Meta2" in df_cargo.columns:
-
                             col_rac = f"{kpi}_Racional"
-
                             modos = df_cargo[col_rac].dropna().mode() if col_rac in df_cargo.columns else pd.Series([])
-
                             racional_temp = modos.iloc[0] if not modos.empty else 1
-
                             df_kpi_valido = (df_cargo[df_cargo[kpi] > 0] if kpi in df_cargo.columns else df_cargo) if racional_temp == 1 else (df_cargo[df_cargo['Dias Trabalhados'] > 0] if 'Dias Trabalhados' in df_cargo.columns else df_cargo)
-
                             if df_kpi_valido.empty:
-
                                 continue
-
-
 
                             df_com_meta = df_kpi_valido[df_kpi_valido[f"{kpi}_Meta2"] > 0] if f"{kpi}_Meta2" in df_kpi_valido.columns else pd.DataFrame()
-
                             if df_com_meta.empty:
-
                                 continue
 
-
-
                             meta2_med = df_com_meta[f"{kpi}_Meta2"].mean()
-
                             meta1_med = df_com_meta[f"{kpi}_Meta1"].mean() if f"{kpi}_Meta1" in df_com_meta.columns else meta2_med
-
                             meta3_med = df_com_meta[f"{kpi}_Meta3"].mean() if f"{kpi}_Meta3" in df_com_meta.columns else meta2_med
-
                             real_med = df_kpi_valido[kpi].mean() if kpi in df_kpi_valido.columns else 0
-
                             soma_total = df_kpi_valido[kpi].sum() if kpi in df_kpi_valido.columns else 0
 
-
-
                             cargo_atual_upper = str(cargo_atual).strip().upper()
-
                             kpi_upper = str(kpi).strip().upper()
-
                             is_meta_unica_dev = ('DEVOLUÇÃO' in cargo_atual_upper and kpi_upper == 'DEV. %')
-
                             is_chk = (kpi_upper == 'CHECKLIST MANUTENÇÃO')
-
                             is_meta_unica = is_meta_unica_dev or (kpi_upper == 'AVARIA') or is_chk
 
-
-
                             if is_meta_unica:
-
                                 if is_meta_unica_dev:
-
                                     alvo_atual_med = 0.48
-
                                 elif is_chk:
-
                                     alvo_atual_med = 0.95
-
                                 else:
-
                                     alvo_atual_med = 0.07
-
-
 
                                 nome_alvo = "Meta Única"
 
-
-
                                 if is_chk:
-
-                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med >= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
-
-                                    real_perc = 100.0 if real_med >= alvo_atual_med else ((real_med / alvo_atual_med * 100) if alvo_atual_med > 0 else 0)
-
+                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if round(real_med, 4) >= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
                                 else:
-
-                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if real_med <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
-
-                                    real_perc = 100.0 if real_med <= alvo_atual_med else ((alvo_atual_med / real_med * 100) if real_med > 0 else 0)
-
+                                    cor, icone, status = (C_VERDE, "🟢", "Na Meta") if round(real_med, 4) <= alvo_atual_med else (C_VERMELHO, "🔴", "Abaixo")
                             else:
-
                                 if racional_temp == 1:
-
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med < meta1_med else ((meta2_med, "Meta 2") if real_med < meta2_med else ((meta3_med, "Meta 3") if real_med < meta3_med else (meta3_med, "Meta Máx")))
-
-                                    perc = (real_med / meta2_med) if meta2_med > 0 else 0
-
+                                    cor, icone, status = (C_AZUL, "🔵", "Superando") if real_med >= meta3_med else ((C_VERDE, "🟢", "Na Meta") if real_med >= meta2_med else ((C_AMARELO, "🟡", "Parcial") if real_med >= meta1_med else (C_VERMELHO, "🔴", "Abaixo")))
                                 else:
-
                                     alvo_atual_med, nome_alvo = (meta1_med, "Meta 1") if real_med > meta1_med else ((meta2_med, "Meta 2") if real_med > meta2_med else ((meta3_med, "Meta 3") if real_med > meta3_med else (meta3_med, "Meta Máx")))
-
-                                    perc = (meta2_med / real_med) if real_med > 0 else 1.2
-
-
-
-                                real_perc = perc * 100
-
-                                cor, icone, status = (C_AZUL, "🔵", "Superando") if real_perc >= 120 else ((C_VERDE, "🟢", "Na Meta") if real_perc >= 100 else ((C_AMARELO, "🟡", "Parcial") if real_perc >= 50 else (C_VERMELHO, "🔴", "Abaixo")))
-
-
+                                    cor, icone, status = (C_AZUL, "🔵", "Superando") if real_med <= meta3_med else ((C_VERDE, "🟢", "Na Meta") if real_med <= meta2_med else ((C_AMARELO, "🟡", "Parcial") if real_med <= meta1_med else (C_VERMELHO, "🔴", "Abaixo")))
 
                             is_percent_format = "%" in str(kpi) or "AVARIA" in str(kpi).upper() or "CORTE" in str(kpi).upper() or "DEV" in str(kpi).upper() or "CHECKLIST" in str(kpi).upper()
 
-
-
                             if "Tempo" in str(kpi):
-
                                 v_tela = f"{int(real_med)//3600:02d}:{(int(real_med)%3600)//60:02d}:{(int(real_med)%60):02d}"
-
                                 t_tela = f"{int(alvo_atual_med)//3600:02d}:{(int(alvo_atual_med)%3600)//60:02d}:{(int(alvo_atual_med)%60):02d}"
-
                             elif "LÍQ" in str(kpi).upper():
-
                                 v_tela = f"{real_med:.1f}%".replace('.', ',')
-
                                 t_tela = f"{alvo_atual_med:.1f}%".replace('.', ',')
-
                             elif is_percent_format:
-
                                 v_real_formated = real_med * 100 if ("CHECKLIST" in str(kpi).upper() and real_med < 2) else real_med
-
                                 v_alvo_formated = alvo_atual_med * 100 if ("CHECKLIST" in str(kpi).upper() and alvo_atual_med < 2) else alvo_atual_med
-
                                 v_tela = f"{v_real_formated:.2f}%".replace('.', ',')
-
                                 t_tela = f"{v_alvo_formated:.2f}%".replace('.', ',')
-
                             else:
-
                                 v_tela = f"{real_med:,.0f}".replace(',', '.')
-
                                 t_tela = f"{alvo_atual_med:,.0f}".replace(',', '.')
 
-
-
                             eh_global = any(g in str(kpi).upper() for g in ['DEV', 'CORTE', 'AVARIA', 'ITENS RAMPA', 'CARGA PALET', 'CARGA BAT', 'PALETS PX', 'TEMPO MÉDIO', 'MÉD. PALET'])
-
-                            titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} (Soma: {f'{soma_total:,.0f}'.replace(',', '.')})"
-
-                            alvo_formatado = f" | Alvo ({nome_alvo}): {t_tela}"
-
-                            val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
-
-                            html_dinheiro_med = ""
-
-
+                            titulo_card = f"{kpi}" if eh_global else f"Média: {kpi} <span style='color: #888; font-weight: normal; font-size: 16px;'>(Soma: {f'{soma_total:,.0f}'.replace(',', '.')})</span>"
+                            alvo_formatado = f"<span style='font-size: 20px; color: #888; font-weight: normal;'> | Alvo ({nome_alvo}): {t_tela}</span>"
 
                             turno_atual = str(df_cargo['TURNO'].iloc[0]).strip().upper()
+                            v_100_base_eq = obter_valor_100(turno_atual, cargo_atual_upper, kpi)
+                            html_tabela_premios_eq = ""
+                            if v_100_base_eq > 0:
+                                if is_meta_unica:
+                                    v_unica_str = f"{v_100_base_eq:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                    html_tabela_premios_eq = f"<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: center; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta Única<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_unica_str}</span></div></div></div>"
+                                else:
+                                    v_m1, v_m2, v_m3 = v_100_base_eq * 0.5, v_100_base_eq * 1.0, v_100_base_eq * 1.2
+                                    v_m1_str, v_m2_str, v_m3_str = f"{v_m1:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m2:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), f"{v_m3:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                    html_tabela_premios_eq = f"<div style='margin-top: 15px; padding: 12px; background-color: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);'><div style='margin-bottom: 8px; color: #ffffff; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;'>💰 Tabela da Métrica (Mês Integral)</div><div style='display: flex; justify-content: space-between; font-size: 15px; color: #e0e0e0; font-weight: bold;'><div style='text-align: center;'>Meta 1<br><span style='color: #ffca28; font-size: 17px;'>R$ {v_m1_str}</span></div><div style='text-align: center;'>Meta 2<br><span style='color: #2ecc71; font-size: 17px;'>R$ {v_m2_str}</span></div><div style='text-align: center;'>Meta Máx<br><span style='color: #3b82f6; font-size: 17px;'>R$ {v_m3_str}</span></div></div></div>"
 
-                            is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in str(cargo_atual).upper() and 'ITENS SEP' in str(kpi).upper())
-
-                            if not is_itens_t2_sepg and val_tot_equipe > 0:
-
-                                val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-                                html_dinheiro_med = f"""
-
-
-
-
-
-💰 Total Adquirido (Equipe): **R$ {val_tot_eq_str}**
-
-
-
-"""
-
-
+                            val_tot_equipe = df_kpi_valido[f"{kpi}_Valor"].sum() if f"{kpi}_Valor" in df_kpi_valido.columns else 0
+                            html_dinheiro_med = ""
+                            is_itens_t2_sepg = (turno_atual == 'T2' and 'SEPARADOR G' in cargo_atual_upper and 'ITENS SEP' in str(kpi).upper())
+                            if not is_itens_t2_sepg:
+                                if val_tot_equipe > 0:
+                                    val_tot_eq_str = f"{val_tot_equipe:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                    html_dinheiro_med = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #2ecc71; font-size: 15px;'>💰 Total Adquirido (Equipe): <b>R$ {val_tot_eq_str}</b></span></div>"
+                                elif v_100_base_eq > 0:
+                                    html_dinheiro_med = f"<div style='margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);'><span style='color: #ef4444; font-size: 15px;'>💰 Total Adquirido (Equipe): <b>R$ 0,00</b></span></div>"
 
                             with cols_eq[col_idx % 4]:
-
-                                st.markdown(f"""
-
-
-
-
-
-{titulo_card}
-
-
-
-{v_tela}{alvo_formatado}
-
-
-
-{icone} {status}
-
-
-
-{html_dinheiro_med}
-
-
-
-""", unsafe_allow_html=True)
-
-
+                                st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios_eq}{html_dinheiro_med}</div>", unsafe_allow_html=True)
 
                             col_idx += 1
 
-
-
             if filtros_ativos:
-
                 if 'cargos_render' in locals() and len(cargos_render) > 0:
-
                     st.divider()
-
                 st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
-
                 kpis_ativos_tabela = [kpi for kpi in kpis_mapeados if f"{kpi}_Meta2" in df_filtrado.columns and pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0).sum() > 0]
-
                 extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
-
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
-
                 colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
-
                 df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
 
-
-
                 if 'Tempo Médio' in df_tabela.columns:
-
                     df_tabela['Tempo Médio'] = pd.to_numeric(df_tabela['Tempo Médio'], errors='coerce').fillna(0)
-
                     df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if s > 0 else "00:00:00")
 
-
-
                 config = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
-
                 for col in df_tabela.columns:
-
                     if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']:
-
                         continue
-
                     elif "LÍQ" in col.upper():
-
                         config[col] = st.column_config.NumberColumn(col, format="%.1f%%")
-
                     elif "%" in col or "Avaria" in col or "Corte" in col or "Dev" in col:
-
                         config[col] = st.column_config.NumberColumn(col, format="%.2f%%")
-
                     else:
-
                         config[col] = st.column_config.NumberColumn(col, format="%d")
-
-
 
                 st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
-
-
     except Exception as e:
-
-        st.error(f"⚠️ Erro ao renderizar painel: {e}") 
+        st.error(f"⚠️ Erro ao renderizar painel: {e}")
