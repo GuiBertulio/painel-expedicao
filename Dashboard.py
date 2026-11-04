@@ -456,7 +456,7 @@ USUARIOS = {
 
     "nilo": {"senha": "esp#26", "perfil": "Gerente", "turno_acesso": "Todos"},
 
-    "andreus": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": "Todos"},
+    "mauricio": {"senha": "Mau@26TAF", "perfil": "Lider", "turno_acesso": "T3"},
 
     "gabriel": {"senha": "ana#26", "perfil": "Gerente", "turno_acesso": ["T1", "T2"]},
 
