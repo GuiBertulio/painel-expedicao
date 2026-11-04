@@ -2589,15 +2589,6 @@ else:
                                             st.error(f"Erro: {e}")
 
 
-
-                st.markdown("""
-
-
-
-""", unsafe_allow_html=True)
-
-
-
             if not houve_detrator:
 
                 st.success("🎉 Nenhum detrator encontrado! Operação saudável.")
