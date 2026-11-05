@@ -3469,10 +3469,11 @@ else:
                                 st.markdown(f"<div class='card-meta' style='border-left-color: {cor};'><div class='texto-card-titulo'>{titulo_card}</div><div class='texto-card-principal'>{v_tela}{alvo_formatado}</div><div style='font-size: 18px; color: {cor}; font-weight: bold; margin-top: 8px;'>{icone} {status}</div>{html_tabela_premios_eq}{html_dinheiro_med}</div>", unsafe_allow_html=True)
 
                             col_idx += 1
-if filtros_ativos:
-    if 'cargos_render' in locals() and len(cargos_render) > 0:
-        st.divider()
-    st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
+# =============================================================================
+            if filtros_ativos:
+                if 'cargos_render' in locals() and len(cargos_render) > 0:
+                    st.divider()
+                st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
                 kpis_ativos_tabela = [kpi for kpi in kpis_mapeados if f"{kpi}_Meta2" in df_filtrado.columns and pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0).sum() > 0]
                 extras_ind = [c for c in df_filtrado.columns if ('ITENS SEPARADOS' in str(c).upper() or 'ITENS SEP' in str(c).upper()) and 'HORA' not in str(c).upper() and 'RAMPA' not in str(c).upper() and '_' not in str(c) and c not in kpis_ativos_tabela]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
