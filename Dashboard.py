@@ -1060,7 +1060,7 @@ for grupo_turno in [['T2'], ['T3']]:
 
 
 
-                if is_t3:
+                if is_t3_t4:
 
                     val_base = 250.0 if pos == 1 else (200.0 if pos == 2 else (100.0 if pos == 3 else 0.0))
 
