@@ -1017,34 +1017,20 @@ df['Ranking_Categoria'] = ""
 
 
 for grupo_turno in [['T2'], ['T3']]:
-
     is_t3_t4 = ('T3' in grupo_turno)
-
     for cargo in df['FUNÇÃO'].unique():
-
         cargo_str = str(cargo).upper()
-
         df_eq = df[(df['TURNO'].isin(grupo_turno)) & (df['FUNÇÃO'] == cargo)].copy()
-
         if df_eq.empty:
-
             continue
-
-
 
         kpis = [c.replace('_Racional', '') for c in df_eq.columns if '_Racional' in c]
-
         if not kpis:
-
             continue
 
-
-
         if 'SEPARADOR' in cargo_str:
-
             metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()),
-
-                                next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper()), None))
+                                next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper() and 'HORA' not in str(c).upper()), None))
 
             if not metrica_rank:
 
@@ -1074,7 +1060,7 @@ for grupo_turno in [['T2'], ['T3']]:
 
 
 
-                if is_t3_t4:
+                if is_t3:
 
                     val_base = 250.0 if pos == 1 else (200.0 if pos == 2 else (100.0 if pos == 3 else 0.0))
 
@@ -1279,18 +1265,6 @@ if not df_aux_jl.empty and 'NOME' in df_aux_jl.columns:
                 df.at[idx, 'Valor Final'] = 0.0
 
                 df.at[idx, 'Valor Ranking'] = 0.0
-
-
-
-# =============================================================================
-
-# 📅 3. LÓGICA DE DATAS E BARRA LATERAL
-
-# =============================================================================
-
-
-
-
 
 # =============================================================================
 
@@ -3496,23 +3470,51 @@ else:
 
                             col_idx += 1
 
-            if filtros_ativos:
+           if filtros_ativos:
                 if 'cargos_render' in locals() and len(cargos_render) > 0:
                     st.divider()
                 st.markdown("### 📋 Tabela de Produtividade Consolidada (Relatório Gerencial)")
                 kpis_ativos_tabela = [kpi for kpi in kpis_mapeados if f"{kpi}_Meta2" in df_filtrado.columns and pd.to_numeric(df_filtrado[f"{kpi}_Meta2"], errors='coerce').fillna(0).sum() > 0]
-                extras_ind = [c for c in df_filtrado.columns if 'ITENS SEPARADOS' in str(c).upper() and c not in kpis_ativos_tabela]
+                extras_ind = [c for c in df_filtrado.columns if ('ITENS SEPARADOS' in str(c).upper() or 'ITENS SEP' in str(c).upper()) and 'HORA' not in str(c).upper() and 'RAMPA' not in str(c).upper() and '_' not in str(c) and c not in kpis_ativos_tabela]
                 extras_erros = [c for c in df_filtrado.columns if 'ERROS' in str(c).upper() and c not in kpis_ativos_tabela and c not in extras_ind]
-                colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
-                df_tabela = df_filtrado[[c for c in colunas_exibicao if c in df_filtrado.columns]].copy()
+
+                df_temp_tab = df_filtrado.copy()
+                tem_separador = df_temp_tab['FUNÇÃO'].astype(str).str.upper().str.contains('SEPARADOR').any()
+
+                if tem_separador:
+                    col_itens_rank = next((c for c in df_temp_tab.columns if 'ITENS SEPARADOS' in str(c).upper()),
+                                          next((c for c in df_temp_tab.columns if 'ITENS SEP' in str(c).upper() and '_' not in str(c)), None))
+                    if col_itens_rank:
+                        df_temp_tab['_ordem_rank'] = df_temp_tab['Posicao Ranking'].apply(lambda x: int(x) if pd.notna(x) and int(x) > 0 else 9999)
+                        df_temp_tab = df_temp_tab.sort_values(by=['FUNÇÃO', '_ordem_rank', col_itens_rank], ascending=[True, True, False])
+
+                    def formatar_posicao_podio(row_t):
+                        func_t = str(row_t.get('FUNÇÃO', '')).upper()
+                        pos_t = int(row_t.get('Posicao Ranking', 0)) if pd.notna(row_t.get('Posicao Ranking', 0)) else 0
+                        if 'SEPARADOR' in func_t and pos_t > 0:
+                            if pos_t == 1: return "🥇 1º Lugar"
+                            elif pos_t == 2: return "🥈 2º Lugar"
+                            elif pos_t == 3: return "🥉 3º Lugar"
+                            else: return f"{pos_t}º Lugar"
+                        return "-"
+
+                    df_temp_tab['Ranking'] = df_temp_tab.apply(formatar_posicao_podio, axis=1)
+                    colunas_exibicao = ['Ranking', 'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
+                else:
+                    colunas_exibicao = ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Dias Corridos', 'Dias Trabalhados', 'Dias Meta', 'Valor Final'] + extras_ind + extras_erros + kpis_ativos_tabela
+
+                df_tabela = df_temp_tab[[c for c in colunas_exibicao if c in df_temp_tab.columns]].copy()
 
                 if 'Tempo Médio' in df_tabela.columns:
                     df_tabela['Tempo Médio'] = pd.to_numeric(df_tabela['Tempo Médio'], errors='coerce').fillna(0)
                     df_tabela['Tempo Médio'] = df_tabela['Tempo Médio'].apply(lambda s: f"{int(s) // 3600:02d}:{(int(s) % 3600) // 60:02d}:{int(s) % 60:02d}" if s > 0 else "00:00:00")
 
                 config = {'Valor Final': st.column_config.NumberColumn("Total R$", format="R$ %.2f")}
+                if 'Ranking' in df_tabela.columns:
+                    config['Ranking'] = st.column_config.TextColumn("🏆 Ranking")
+
                 for col in df_tabela.columns:
-                    if col in ['CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']:
+                    if col in ['Ranking', 'CÓD.', 'NOME', 'TURNO', 'FUNÇÃO', 'Tempo Médio', 'Data Inicio', 'Data Fim', 'Valor Final']:
                         continue
                     elif "LÍQ" in col.upper():
                         config[col] = st.column_config.NumberColumn(col, format="%.1f%%")
@@ -3521,7 +3523,20 @@ else:
                     else:
                         config[col] = st.column_config.NumberColumn(col, format="%d")
 
-                st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
+                if 'Ranking' in df_tabela.columns:
+                    def destacar_podio(row_s):
+                        r_val = str(row_s.get('Ranking', ''))
+                        if r_val == "🥇 1º Lugar":
+                            return ['color: #ffd700; font-weight: bold;' for _ in row_s]
+                        elif r_val == "🥈 2º Lugar":
+                            return ['color: #c0c0c0; font-weight: bold;' for _ in row_s]
+                        elif r_val == "🥉 3º Lugar":
+                            return ['color: #cd7f32; font-weight: bold;' for _ in row_s]
+                        return ['' for _ in row_s]
+
+                    st.dataframe(df_tabela.style.apply(destacar_podio, axis=1), hide_index=True, use_container_width=True, height=600, column_config=config)
+                else:
+                    st.dataframe(df_tabela, hide_index=True, use_container_width=True, height=600, column_config=config)
 
     except Exception as e:
         st.error(f"⚠️ Erro ao renderizar painel: {e}")
