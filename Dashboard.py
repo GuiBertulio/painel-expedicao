@@ -2707,7 +2707,7 @@ else:
 
                 is_ranking_cargo = (('SEPARADOR' in cargo_p and '6H' not in cargo_p and '6 HORAS' not in cargo_p and turno_p in ['T2', 'T3']) or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
 
-             if is_ranking_cargo:
+                 if is_ranking_cargo:
                  funcao_original = row.get('FUNÇÃO', '')
                  cat_rank = str(row.get('Ranking_Categoria', '')).strip()
                  texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
