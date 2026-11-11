@@ -2710,7 +2710,7 @@ else:
 
                 
 
-                is_ranking_cargo = (('SEPARADOR' in cargo_p and '6H' not in cargo_p and '6 HORAS' not in cargo_p and turno_p != 'T4') or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
+                is_ranking_cargo = (('SEPARADOR' in cargo_p and '6H' not in cargo_p and '6 HORAS' not in cargo_p) or ('CONFERENTE' in cargo_p and turno_p in ['T3', 'T4']) or ('OPERADOR' in cargo_p and turno_p in ['T3', 'T4']))
 
                 if is_ranking_cargo:
 
