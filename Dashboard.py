@@ -324,6 +324,12 @@ def obter_valor_100(turno, funcao, kpi):
 
         ("T3", "SEPARADOR G", "ITENS/HORA"): 150,
 
+        ("T3", "SEPARADOR G 6 horas", "JORNADA LÍQ."): 100,
+
+        ("T3", "SEPARADOR G 6 horas", "ITENS SEP"): 100,
+
+        ("T3", "SEPARADOR G 6 horas", "ITENS/HORA"): 100,
+
 
 
         ("T3", "CONFERENTE", "ITENS CONF."): 350,
