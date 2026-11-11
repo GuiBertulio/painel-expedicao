@@ -324,11 +324,12 @@ def obter_valor_100(turno, funcao, kpi):
 
         ("T3", "SEPARADOR G", "ITENS/HORA"): 150,
 
-        ("T3", "SEPARADOR G 6 horas", "JORNADA LÍQ."): 100,
-
-        ("T3", "SEPARADOR G 6 horas", "ITENS SEP"): 100,
-
-        ("T3", "SEPARADOR G 6 horas", "ITENS/HORA"): 100,
+        ("T3", "SEPARADOR G 6 HORAS", "JORNADA LÍQ."): 100,
+        ("T3", "SEPARADOR G 6 HORAS", "ITENS SEP"): 100,
+        ("T3", "SEPARADOR G 6 HORAS", "ITENS/HORA"): 100,
+        ("T3", "SEPARADOR G 6H", "JORNADA LÍQ."): 100,
+        ("T3", "SEPARADOR G 6H", "ITENS SEP"): 100,
+        ("T3", "SEPARADOR G 6H", "ITENS/HORA"): 100,
 
 
 
@@ -1035,8 +1036,7 @@ for grupo_turno in [['T2'], ['T3']]:
             continue
 
         if 'SEPARADOR' in cargo_str and '6H' not in cargo_str and '6 HORAS' not in cargo_str:
-            metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()),
-
+            metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()), next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper() and 'HORA' not in str(c).upper()), None))
             if not metrica_rank:
 
                 continue
@@ -1691,17 +1691,12 @@ if st.session_state["perfil"] == "Gerente":
 
 
 
-            if 'SEPARADOR' in cargo_str:
-
-                potencial += 250 if turno_str in ['T3', 'T4'] else (150 if turno_str == 'T2' else 0)
-
-            elif 'CONFERENTE' in cargo_str and turno_str in ['T3', 'T4']:
-
-                potencial += 200
-
-            elif 'OPERADOR' in cargo_str and turno_str in ['T3', 'T4']:
-
-                potencial += 200
+            if 'SEPARADOR' in cargo_str and '6H' not in cargo_str and '6 HORAS' not in cargo_str:
+             potencial += 250 if turno_str == 'T3' else (150 if turno_str == 'T2' else 0)
+         elif 'CONFERENTE' in cargo_str and turno_str == 'T3':
+             potencial += 200
+         elif 'OPERADOR' in cargo_str and turno_str == 'T3':
+             potencial += 200
 
             potencial_max_list.append(potencial)
 
@@ -2710,19 +2705,13 @@ else:
 
                 
 
-                is_ranking_cargo = (('SEPARADOR' in cargo_p and '6H' not in cargo_p and '6 HORAS' not in cargo_p) or ('CONFERENTE' in cargo_p and turno_p in ['T3', 'T4']) or ('OPERADOR' in cargo_p and turno_p in ['T3', 'T4']))
+                is_ranking_cargo = (('SEPARADOR' in cargo_p and '6H' not in cargo_p and '6 HORAS' not in cargo_p and turno_p in ['T2', 'T3']) or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
 
-                if is_ranking_cargo:
-
-                    funcao_original = row.get('FUNÇÃO', '')
-
-                    cat_rank = str(row.get('Ranking_Categoria', '')).strip()
-
-                    texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
-
-                    if turno_p in ['T3', 'T4']:
-
-                        total_eq = len(df[(df['TURNO'].isin(['T3', 'T4'])) & (df['FUNÇÃO'] == funcao_original)])
+             if is_ranking_cargo:
+                 funcao_original = row.get('FUNÇÃO', '')
+                 cat_rank = str(row.get('Ranking_Categoria', '')).strip()
+                 texto_funcao_rank = f"{funcao_original} <br><span style='font-size: 15px; color: #ffca28; font-weight: normal;'>📊 {cat_rank}</span>" if (cat_rank and 'CONFERENTE' in cargo_p) else funcao_original
+                 total_eq = len(df[(df['TURNO'] == row.get('TURNO')) & (df['FUNÇÃO'] == funcao_original)])
 
                     else:
 
