@@ -1034,9 +1034,8 @@ for grupo_turno in [['T2'], ['T3']]:
         if not kpis:
             continue
 
-        if 'SEPARADOR' in cargo_str:
+        if 'SEPARADOR' in cargo_str and '6H' not in cargo_str and '6 HORAS' not in cargo_str:
             metrica_rank = next((c for c in df_eq.columns if 'ITENS SEPARADOS' in str(c).upper()),
-                                next((c for c in kpis if 'ITENS' in str(c).upper() and 'RAMPA' not in str(c).upper() and 'HORA' not in str(c).upper()), None))
 
             if not metrica_rank:
 
@@ -2711,7 +2710,7 @@ else:
 
                 
 
-                is_ranking_cargo = ('SEPARADOR' in cargo_p or ('CONFERENTE' in cargo_p and turno_p in ['T3', 'T4']) or ('OPERADOR' in cargo_p and turno_p in ['T3', 'T4']))
+                is_ranking_cargo = (('SEPARADOR' in cargo_p and '6H' not in cargo_p and '6 HORAS' not in cargo_p and turno_p != 'T4') or ('CONFERENTE' in cargo_p and turno_p == 'T3') or ('OPERADOR' in cargo_p and turno_p == 'T3'))
 
                 if is_ranking_cargo:
 
