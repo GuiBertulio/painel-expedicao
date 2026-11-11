@@ -1691,13 +1691,13 @@ if st.session_state["perfil"] == "Gerente":
 
 
 
+     # -----------------------------------------------------------------------------
             if 'SEPARADOR' in cargo_str and '6H' not in cargo_str and '6 HORAS' not in cargo_str:
-             potencial += 250 if turno_str == 'T3' else (150 if turno_str == 'T2' else 0)
-         elif 'CONFERENTE' in cargo_str and turno_str == 'T3':
-             potencial += 200
-         elif 'OPERADOR' in cargo_str and turno_str == 'T3':
-             potencial += 200
-
+                potencial += 250 if turno_str == 'T3' else (150 if turno_str == 'T2' else 0)
+            elif 'CONFERENTE' in cargo_str and turno_str == 'T3':
+                potencial += 200
+            elif 'OPERADOR' in cargo_str and turno_str == 'T3':
+                potencial += 200
             potencial_max_list.append(potencial)
 
 
